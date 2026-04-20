@@ -13,6 +13,9 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
+import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
+import { Route as DesignIdBookRouteImport } from './routes/design.$id.book'
+import { Route as DesignIdViewIdxRouteImport } from './routes/design.$id.view.$idx'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -34,39 +37,88 @@ const DesignIdRefineRoute = DesignIdRefineRouteImport.update({
   path: '/design/$id/refine',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignIdGalleryRoute = DesignIdGalleryRouteImport.update({
+  id: '/design/$id/gallery',
+  path: '/design/$id/gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdBookRoute = DesignIdBookRouteImport.update({
+  id: '/design/$id/book',
+  path: '/design/$id/book',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
+  id: '/design/$id/view/$idx',
+  path: '/design/$id/view/$idx',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/design/new' | '/design/$id/refine'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/design/new' | '/design/$id/refine'
-  id: '__root__' | '/' | '/auth' | '/design/new' | '/design/$id/refine'
+  to:
+    | '/'
+    | '/auth'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DesignNewRoute: typeof DesignNewRoute
+  DesignIdBookRoute: typeof DesignIdBookRoute
+  DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
+  DesignIdViewIdxRoute: typeof DesignIdViewIdxRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +151,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignIdRefineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/$id/gallery': {
+      id: '/design/$id/gallery'
+      path: '/design/$id/gallery'
+      fullPath: '/design/$id/gallery'
+      preLoaderRoute: typeof DesignIdGalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/book': {
+      id: '/design/$id/book'
+      path: '/design/$id/book'
+      fullPath: '/design/$id/book'
+      preLoaderRoute: typeof DesignIdBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/view/$idx': {
+      id: '/design/$id/view/$idx'
+      path: '/design/$id/view/$idx'
+      fullPath: '/design/$id/view/$idx'
+      preLoaderRoute: typeof DesignIdViewIdxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,8 +179,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DesignNewRoute: DesignNewRoute,
+  DesignIdBookRoute: DesignIdBookRoute,
+  DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
+  DesignIdViewIdxRoute: DesignIdViewIdxRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
