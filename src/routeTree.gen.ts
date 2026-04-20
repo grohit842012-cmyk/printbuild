@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
+import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -28,35 +29,44 @@ const DesignNewRoute = DesignNewRouteImport.update({
   path: '/design/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignIdRefineRoute = DesignIdRefineRouteImport.update({
+  id: '/design/$id/refine',
+  path: '/design/$id/refine',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/design/new': typeof DesignNewRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/design/new'
+  fullPaths: '/' | '/auth' | '/design/new' | '/design/$id/refine'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/design/new'
-  id: '__root__' | '/' | '/auth' | '/design/new'
+  to: '/' | '/auth' | '/design/new' | '/design/$id/refine'
+  id: '__root__' | '/' | '/auth' | '/design/new' | '/design/$id/refine'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DesignNewRoute: typeof DesignNewRoute
+  DesignIdRefineRoute: typeof DesignIdRefineRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/$id/refine': {
+      id: '/design/$id/refine'
+      path: '/design/$id/refine'
+      fullPath: '/design/$id/refine'
+      preLoaderRoute: typeof DesignIdRefineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,7 +106,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DesignNewRoute: DesignNewRoute,
+  DesignIdRefineRoute: DesignIdRefineRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

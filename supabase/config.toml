@@ -1,1 +1,4 @@
 project_id = "zyzkuielgpvkvhrdyemu"
+
+[functions.refine-design]
+verify_jwt = true
