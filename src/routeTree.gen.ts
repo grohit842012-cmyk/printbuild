@@ -9,38 +9,167 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DesignsRouteImport } from './routes/designs'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DesignNewRouteImport } from './routes/design.new'
+import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
+import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
+import { Route as DesignIdBookRouteImport } from './routes/design.$id.book'
+import { Route as DesignIdViewIdxRouteImport } from './routes/design.$id.view.$idx'
 
+const DesignsRoute = DesignsRouteImport.update({
+  id: '/designs',
+  path: '/designs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesignNewRoute = DesignNewRouteImport.update({
+  id: '/design/new',
+  path: '/design/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdRefineRoute = DesignIdRefineRouteImport.update({
+  id: '/design/$id/refine',
+  path: '/design/$id/refine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdGalleryRoute = DesignIdGalleryRouteImport.update({
+  id: '/design/$id/gallery',
+  path: '/design/$id/gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdBookRoute = DesignIdBookRouteImport.update({
+  id: '/design/$id/book',
+  path: '/design/$id/book',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
+  id: '/design/$id/view/$idx',
+  path: '/design/$id/view/$idx',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
+  '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
+  '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
+  '/design/new': typeof DesignNewRoute
+  '/design/$id/book': typeof DesignIdBookRoute
+  '/design/$id/gallery': typeof DesignIdGalleryRoute
+  '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/designs'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/designs'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/designs'
+    | '/design/new'
+    | '/design/$id/book'
+    | '/design/$id/gallery'
+    | '/design/$id/refine'
+    | '/design/$id/view/$idx'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  AuthRoute: typeof AuthRoute
+  DesignsRoute: typeof DesignsRoute
+  DesignNewRoute: typeof DesignNewRoute
+  DesignIdBookRoute: typeof DesignIdBookRoute
+  DesignIdGalleryRoute: typeof DesignIdGalleryRoute
+  DesignIdRefineRoute: typeof DesignIdRefineRoute
+  DesignIdViewIdxRoute: typeof DesignIdViewIdxRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/designs': {
+      id: '/designs'
+      path: '/designs'
+      fullPath: '/designs'
+      preLoaderRoute: typeof DesignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +177,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/design/new': {
+      id: '/design/new'
+      path: '/design/new'
+      fullPath: '/design/new'
+      preLoaderRoute: typeof DesignNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/refine': {
+      id: '/design/$id/refine'
+      path: '/design/$id/refine'
+      fullPath: '/design/$id/refine'
+      preLoaderRoute: typeof DesignIdRefineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/gallery': {
+      id: '/design/$id/gallery'
+      path: '/design/$id/gallery'
+      fullPath: '/design/$id/gallery'
+      preLoaderRoute: typeof DesignIdGalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/book': {
+      id: '/design/$id/book'
+      path: '/design/$id/book'
+      fullPath: '/design/$id/book'
+      preLoaderRoute: typeof DesignIdBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design/$id/view/$idx': {
+      id: '/design/$id/view/$idx'
+      path: '/design/$id/view/$idx'
+      fullPath: '/design/$id/view/$idx'
+      preLoaderRoute: typeof DesignIdViewIdxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  AuthRoute: AuthRoute,
+  DesignsRoute: DesignsRoute,
+  DesignNewRoute: DesignNewRoute,
+  DesignIdBookRoute: DesignIdBookRoute,
+  DesignIdGalleryRoute: DesignIdGalleryRoute,
+  DesignIdRefineRoute: DesignIdRefineRoute,
+  DesignIdViewIdxRoute: DesignIdViewIdxRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
