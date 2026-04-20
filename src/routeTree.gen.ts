@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DesignsRouteImport } from './routes/designs'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
@@ -17,9 +19,19 @@ import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery
 import { Route as DesignIdBookRouteImport } from './routes/design.$id.book'
 import { Route as DesignIdViewIdxRouteImport } from './routes/design.$id.view.$idx'
 
+const DesignsRoute = DesignsRouteImport.update({
+  id: '/designs',
+  path: '/designs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -55,7 +67,9 @@ const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
@@ -64,7 +78,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
@@ -74,7 +90,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/designs': typeof DesignsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
@@ -85,7 +103,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
+    | '/designs'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
@@ -94,7 +114,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
+    | '/designs'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
@@ -103,7 +125,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
+    | '/designs'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
@@ -113,7 +137,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
+  DesignsRoute: typeof DesignsRoute
   DesignNewRoute: typeof DesignNewRoute
   DesignIdBookRoute: typeof DesignIdBookRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
@@ -123,11 +149,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/designs': {
+      id: '/designs'
+      path: '/designs'
+      fullPath: '/designs'
+      preLoaderRoute: typeof DesignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -177,7 +217,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
+  DesignsRoute: DesignsRoute,
   DesignNewRoute: DesignNewRoute,
   DesignIdBookRoute: DesignIdBookRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
