@@ -82,8 +82,7 @@ function DesignsPage() {
                 <Link
                   key={d.id}
                   to={route.to}
-                  // @ts-expect-error dynamic params
-                  params={route.params}
+                  params={route.params as never}
                   className="block bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-center justify-between gap-3">
