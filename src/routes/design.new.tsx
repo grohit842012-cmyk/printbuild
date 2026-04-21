@@ -256,40 +256,58 @@ function NewDesignWizard() {
 
           {step === 2 && (
             <>
-              <h2 className="text-xl font-display">Rooms</h2>
+              <h2 className="text-xl font-display">Rooms by floor</h2>
               <p className="text-sm text-muted-foreground">
-                How many of each room do you need? We&apos;ll arrange them across {spec.floors}{" "}
-                floor(s).
+                Set the rooms for each floor. Floor 1 is the ground floor.
               </p>
-              <div className="space-y-3">
-                {DEFAULT_ROOMS.map((r) => {
-                  const cur = spec.rooms.find((x) => x.type === r.type);
+              <div className="space-y-8">
+                {Array.from({ length: spec.floors }, (_, f) => {
+                  const floorRooms = spec.roomsPerFloor?.[f] ?? [];
                   return (
-                    <div key={r.type} className="grid grid-cols-12 items-center gap-3 py-2 border-b border-border last:border-0">
-                      <div className="col-span-5 text-sm">{r.label}</div>
-                      <div className="col-span-3">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={cur?.count ?? 0}
-                          onChange={(e) => setRoom(r.type, { count: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="col-span-4">
-                        <Select
-                          value={cur?.sizePref ?? "medium"}
-                          onValueChange={(v) =>
-                            setRoom(r.type, { sizePref: v as "small" | "medium" | "large" })
-                          }
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="small">Small</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="large">Large</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div key={f} className="border border-border rounded-xl p-4">
+                      <h3 className="text-base font-display mb-3">
+                        {f === 0 ? "Ground floor" : `Floor ${f + 1}`}
+                      </h3>
+                      <div className="space-y-2">
+                        {DEFAULT_ROOMS.map((r) => {
+                          const cur = floorRooms.find((x) => x.type === r.type);
+                          return (
+                            <div
+                              key={r.type}
+                              className="grid grid-cols-12 items-center gap-3 py-1.5 border-b border-border/60 last:border-0"
+                            >
+                              <div className="col-span-5 text-sm">{r.label}</div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={10}
+                                  value={cur?.count ?? 0}
+                                  onChange={(e) =>
+                                    setFloorRoom(f, r.type, { count: Number(e.target.value) })
+                                  }
+                                />
+                              </div>
+                              <div className="col-span-4">
+                                <Select
+                                  value={cur?.sizePref ?? "medium"}
+                                  onValueChange={(v) =>
+                                    setFloorRoom(f, r.type, {
+                                      sizePref: v as "small" | "medium" | "large",
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="small">Small</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="large">Large</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -297,6 +315,7 @@ function NewDesignWizard() {
               </div>
             </>
           )}
+
 
           {step === 3 && (
             <>
