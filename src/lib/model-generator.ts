@@ -286,26 +286,37 @@ export function generateVariations(
   const variations: Variation[] = [];
   const baseSeed = Math.floor(Math.random() * 1_000_000);
 
-  // Distribute rooms across floors: essentials on floor 1
-  const flat: FlatRoom[] = [];
-  for (const r of spec.rooms) {
-    for (let k = 0; k < r.count; k++) flat.push({ type: r.type, sizePref: r.sizePref });
-  }
-  const groundFirst: RoomType[] = ["living", "kitchen", "dining", "pooja", "courtyard"];
-  flat.sort((a, b) => {
-    const ai = groundFirst.indexOf(a.type);
-    const bi = groundFirst.indexOf(b.type);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
-
+  // Per-floor room distribution.
+  // - If spec.roomsPerFloor is provided, use it directly (customer-driven).
+  // - Otherwise, fall back to auto-distribution from spec.rooms.
   const perFloor: FlatRoom[][] = [];
-  for (let f = 0; f < spec.floors; f++) perFloor.push([]);
-  let cursor = 0;
-  for (const r of flat) {
-    const floor = groundFirst.includes(r.type) ? 0 : cursor++ % spec.floors;
-    perFloor[floor].push(r);
+  if (spec.roomsPerFloor && spec.roomsPerFloor.length > 0) {
+    for (let f = 0; f < spec.floors; f++) {
+      const list: FlatRoom[] = [];
+      const src = spec.roomsPerFloor[f] ?? [];
+      for (const r of src) {
+        for (let k = 0; k < r.count; k++) list.push({ type: r.type, sizePref: r.sizePref });
+      }
+      perFloor.push(list);
+    }
+  } else {
+    const flat: FlatRoom[] = [];
+    for (const r of spec.rooms) {
+      for (let k = 0; k < r.count; k++) flat.push({ type: r.type, sizePref: r.sizePref });
+    }
+    const groundFirst: RoomType[] = ["living", "kitchen", "dining", "pooja", "courtyard"];
+    flat.sort((a, b) => {
+      const ai = groundFirst.indexOf(a.type);
+      const bi = groundFirst.indexOf(b.type);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    for (let f = 0; f < spec.floors; f++) perFloor.push([]);
+    let cursor = 0;
+    for (const r of flat) {
+      const floor = groundFirst.includes(r.type) ? 0 : cursor++ % spec.floors;
+      perFloor[floor].push(r);
+    }
   }
-  // Floor 1 should always have the kitchen, living, etc — already guaranteed.
 
   for (let i = 0; i < count; i++) {
     const seed = baseSeed + i * 1009;
