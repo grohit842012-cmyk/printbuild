@@ -349,15 +349,37 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       }
     }
 
-    // Entrance arch on the perimeter
+    // Entrance porch + columns + arch
     const a = (variation.entranceAngleDeg * Math.PI) / 180;
     const reach = Math.min(variation.plotWidthFt, variation.plotDepthFt) * 0.45;
-    const ent = new THREE.Mesh(
-      new THREE.TorusGeometry(3, 0.5, 10, 24, Math.PI),
-      new THREE.MeshStandardMaterial({ color: accent }),
-    );
     const px = variation.plotWidthFt / 2 + Math.sin(a) * reach;
     const pz = variation.plotDepthFt / 2 - Math.cos(a) * reach;
+
+    const porch = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 0.5, 6),
+      new THREE.MeshStandardMaterial({ color: "#b8a78a", roughness: 0.85 }),
+    );
+    porch.position.set(px, 0.25, pz);
+    porch.rotation.y = -a;
+    porch.receiveShadow = true;
+    porch.castShadow = true;
+    group.add(porch);
+
+    const colMat = new THREE.MeshStandardMaterial({ color: "#f1ede4", roughness: 0.8 });
+    for (const off of [-3, 3]) {
+      const col = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.4, DOOR_HEIGHT + 1, 16),
+        colMat,
+      );
+      col.position.set(px + Math.cos(a) * off, (DOOR_HEIGHT + 1) / 2, pz + Math.sin(a) * off);
+      col.castShadow = true;
+      group.add(col);
+    }
+
+    const ent = new THREE.Mesh(
+      new THREE.TorusGeometry(3, 0.5, 10, 24, Math.PI),
+      new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }),
+    );
     ent.position.set(px, 3, pz);
     ent.rotation.y = -a;
     group.add(ent);
