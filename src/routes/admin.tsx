@@ -85,27 +85,41 @@ function AdminDashboard() {
     const v = variations[idx];
     if (!v) { toast.error("No variation selected"); return; }
     // Generate per-floor wall STL data on client (ASCII STL placeholder for v1).
-    // Each floor outline becomes a closed wall as triangulated strip.
+    // Walls are extruded from the rounded-rect floor plate perimeter, sampled.
     const files: { name: string; content: string }[] = [];
-    for (const outline of v.floorOutlines) {
-      const pts = outline.points;
-      const wallH = 1.6;
-      let stl = `solid floor_${outline.floor}_wall\n`;
+    const wallH = 10; // ft
+    function sampleRoundedRect(p: { x: number; y: number; w: number; h: number; cornerRadius: number }, segs = 32) {
+      const r = Math.min(p.cornerRadius, p.w / 2, p.h / 2);
+      const pts: { x: number; z: number }[] = [];
+      const arc = (cx: number, cz: number, a0: number, a1: number) => {
+        for (let i = 0; i <= segs / 4; i++) {
+          const t = i / (segs / 4);
+          const a = a0 + (a1 - a0) * t;
+          pts.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r });
+        }
+      };
+      // Counter-clockwise around the rect
+      arc(p.x + p.w - r, p.y + r, -Math.PI / 2, 0);
+      arc(p.x + p.w - r, p.y + p.h - r, 0, Math.PI / 2);
+      arc(p.x + r, p.y + p.h - r, Math.PI / 2, Math.PI);
+      arc(p.x + r, p.y + r, Math.PI, (Math.PI * 3) / 2);
+      return pts;
+    }
+    for (const plate of v.plates) {
+      const pts = sampleRoundedRect(plate);
+      let stl = `solid floor_${plate.floor}_wall\n`;
+      const yBase = (plate.floor - 1) * wallH;
+      const yTop = yBase + wallH;
       for (let i = 0; i < pts.length; i++) {
         const a = pts[i];
         const b = pts[(i + 1) % pts.length];
-        const ax = (a.x - 0.5) * 9, az = (a.y - 0.5) * 9;
-        const bx = (b.x - 0.5) * 9, bz = (b.y - 0.5) * 9;
-        const yBase = (outline.floor - 1) * wallH;
-        const yTop = yBase + wallH;
-        // Two triangles per segment
         const tri = (p1: number[], p2: number[], p3: number[]) =>
           `facet normal 0 0 0\n  outer loop\n    vertex ${p1.join(" ")}\n    vertex ${p2.join(" ")}\n    vertex ${p3.join(" ")}\n  endloop\nendfacet\n`;
-        stl += tri([ax, yBase, az], [bx, yBase, bz], [bx, yTop, bz]);
-        stl += tri([ax, yBase, az], [bx, yTop, bz], [ax, yTop, az]);
+        stl += tri([a.x, yBase, a.z], [b.x, yBase, b.z], [b.x, yTop, b.z]);
+        stl += tri([a.x, yBase, a.z], [b.x, yTop, b.z], [a.x, yTop, a.z]);
       }
-      stl += `endsolid floor_${outline.floor}_wall\n`;
-      files.push({ name: `floor-${outline.floor}/wall-perimeter.stl`, content: stl });
+      stl += `endsolid floor_${plate.floor}_wall\n`;
+      files.push({ name: `floor-${plate.floor}/wall-perimeter.stl`, content: stl });
     }
     // Bundle as single text manifest + concatenated STL files (simple zip alternative for v1)
     const manifest = files.map((f) => `=== ${f.name} ===\n${f.content}`).join("\n\n");

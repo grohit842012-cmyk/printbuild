@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { Variation } from "@/lib/design-types";
+import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
   variation: Variation;
@@ -8,7 +8,32 @@ interface Props {
   className?: string;
 }
 
-/** Three.js viewer that builds curved-wall lofted geometry from a variation. */
+const FLOOR_HEIGHT = 10; // ft
+const WALL_THICK = 0.6; // ft
+const WINDOW_SILL = 3; // ft
+const WINDOW_HEAD = 7; // ft
+const DOOR_HEIGHT = 7; // ft
+
+/** Build a rounded-rectangle Shape (in world units = feet, then we scale) */
+function plateShape(p: FloorPlate): THREE.Shape {
+  const shape = new THREE.Shape();
+  const r = Math.min(p.cornerRadius, p.w / 2, p.h / 2);
+  const x = p.x;
+  const y = p.y;
+  const w = p.w;
+  const h = p.h;
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r);
+  shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h);
+  shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+  return shape;
+}
+
 export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -23,12 +48,13 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     const height = mount.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#f5efe2");
+    scene.background = new THREE.Color("#f3f6fb");
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-    camera.position.set(8, 7, 10);
-    camera.lookAt(0, 1.5, 0);
+    // Center scene around plot mid using big units (feet)
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.5, 2000);
+    camera.position.set(80, 70, 100);
+    camera.lookAt(0, 8, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -38,67 +64,51 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-    scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-    dir.position.set(8, 14, 6);
-    dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
-    dir.shadow.camera.left = -10;
-    dir.shadow.camera.right = 10;
-    dir.shadow.camera.top = 10;
-    dir.shadow.camera.bottom = -10;
-    scene.add(dir);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(60, 120, 40);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -80;
+    sun.shadow.camera.right = 80;
+    sun.shadow.camera.top = 80;
+    sun.shadow.camera.bottom = -80;
+    scene.add(sun);
 
-    // Ground plate
+    // Ground
     const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(7, 64),
-      new THREE.MeshStandardMaterial({ color: "#e6dcc6", roughness: 0.95 }),
+      new THREE.CircleGeometry(120, 64),
+      new THREE.MeshStandardMaterial({ color: "#e2e8ee", roughness: 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Compass marker
-    const compass = new THREE.Mesh(
-      new THREE.RingGeometry(6.2, 6.5, 64),
-      new THREE.MeshBasicMaterial({ color: "#b8693a" }),
-    );
-    compass.rotation.x = -Math.PI / 2;
-    compass.position.y = 0.01;
-    scene.add(compass);
-
-    // North marker (small cone)
+    // North marker
     const north = new THREE.Mesh(
-      new THREE.ConeGeometry(0.18, 0.5, 6),
-      new THREE.MeshStandardMaterial({ color: "#b8693a" }),
+      new THREE.ConeGeometry(2, 5, 6),
+      new THREE.MeshStandardMaterial({ color: "#3b6db8" }),
     );
-    north.position.set(0, 0.25, -6.5);
-    north.rotation.x = Math.PI;
+    north.position.set(0, 2.5, -90);
     scene.add(north);
 
-    // Building group
     const buildingGroup = new THREE.Group();
     scene.add(buildingGroup);
     buildingGroupRef.current = buildingGroup;
 
-    // Animation loop with simple orbit
     let raf = 0;
-    let theta = 0;
+    let theta = Math.PI * 0.25;
     let userInteracting = false;
     let pointerDownX = 0;
     let pointerDownY = 0;
-    let angle = Math.atan2(camera.position.x, camera.position.z);
-    let elev = Math.asin(camera.position.y / camera.position.length());
-    let dist = camera.position.length();
+    let elev = 0.55;
+    let dist = 145;
 
     function animate() {
-      if (!userInteracting) theta += 0.0015;
-      else theta = angle;
+      if (!userInteracting) theta += 0.0012;
       const r = dist * Math.cos(elev);
       camera.position.set(Math.sin(theta) * r, dist * Math.sin(elev), Math.cos(theta) * r);
-      camera.lookAt(0, 1.2, 0);
+      camera.lookAt(0, 8, 0);
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
     }
@@ -114,26 +124,24 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     }
     window.addEventListener("resize", onResize);
 
-    // Pointer drag to rotate
     function onDown(e: PointerEvent) {
       userInteracting = true;
       pointerDownX = e.clientX;
       pointerDownY = e.clientY;
-      angle = theta;
     }
     function onMove(e: PointerEvent) {
       if (!userInteracting) return;
       const dx = e.clientX - pointerDownX;
       const dy = e.clientY - pointerDownY;
-      angle = theta - dx * 0.005;
-      elev = Math.max(0.1, Math.min(1.3, elev + dy * 0.003));
+      theta -= dx * 0.005;
+      elev = Math.max(0.15, Math.min(1.35, elev + dy * 0.003));
       pointerDownX = e.clientX;
       pointerDownY = e.clientY;
     }
     function onUp() { userInteracting = false; }
     function onWheel(e: WheelEvent) {
       e.preventDefault();
-      dist = Math.max(5, Math.min(25, dist + e.deltaY * 0.01));
+      dist = Math.max(60, Math.min(280, dist + e.deltaY * 0.12));
     }
     const dom = renderer.domElement;
     dom.addEventListener("pointerdown", onDown);
@@ -153,7 +161,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     };
   }, []);
 
-  // Rebuild building geometry when variation or visible floors change
+  // Rebuild geometry from architectural plates
   useEffect(() => {
     const group = buildingGroupRef.current;
     if (!group) return;
@@ -165,137 +173,179 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     }
 
     const accent = variation.paletteAccent;
-    const wallMaterial = new THREE.MeshStandardMaterial({
-      color: "#efe4cc",
-      roughness: 0.85,
-      metalness: 0.05,
+    const wallMat = new THREE.MeshStandardMaterial({ color: "#f1ede4", roughness: 0.85 });
+    const slabMat = new THREE.MeshStandardMaterial({ color: "#cbd5e1", roughness: 0.9 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.7 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: "#9ec5e8", roughness: 0.15, metalness: 0.1,
+      transparent: true, opacity: 0.55,
     });
-    const slabMaterial = new THREE.MeshStandardMaterial({
-      color: "#d9cdb3",
-      roughness: 0.9,
-    });
-    const roofMaterial = new THREE.MeshStandardMaterial({
-      color: accent,
-      roughness: 0.7,
-    });
+    const interiorMat = new THREE.MeshStandardMaterial({ color: "#e7ddc8", roughness: 0.9 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
 
-    const PLOT_SIZE = 9; // world units
-    const FLOOR_HEIGHT = 1.6;
+    // Center the building
+    const cx = -variation.plotWidthFt / 2;
+    const cy = -variation.plotDepthFt / 2;
+    group.position.set(cx, 0, cy);
 
-    for (const outline of variation.floorOutlines) {
-      if (!visibleFloors.has(outline.floor)) continue;
-      const yBase = (outline.floor - 1) * FLOOR_HEIGHT;
+    const sortedPlates = [...variation.plates].sort((a, b) => a.floor - b.floor);
+    const topFloor = sortedPlates[sortedPlates.length - 1].floor;
 
-      // Build wall as ExtrudeGeometry from closed shape (with curved bezier-smoothed points)
-      const shape = new THREE.Shape();
-      const pts = outline.points.map((p) => ({
-        x: (p.x - 0.5) * PLOT_SIZE,
-        y: (p.y - 0.5) * PLOT_SIZE,
-      }));
-      shape.moveTo(pts[0].x, pts[0].y);
-      // Smooth via Catmull-Rom-like approximation
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        const b = pts[(i + 1) % pts.length];
-        const c = pts[(i + 2) % pts.length];
-        const cp1x = (a.x + b.x) / 2;
-        const cp1y = (a.y + b.y) / 2;
-        const cp2x = b.x;
-        const cp2y = b.y;
-        const endx = (b.x + c.x) / 2;
-        const endy = (b.y + c.y) / 2;
-        shape.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endx, endy);
-      }
-      shape.closePath();
+    for (const plate of sortedPlates) {
+      if (!visibleFloors.has(plate.floor)) continue;
+      const yBase = (plate.floor - 1) * FLOOR_HEIGHT;
 
-      // Inner hole for hollow walls
-      const innerScale = 0.92;
-      const hole = new THREE.Path();
-      hole.moveTo(pts[0].x * innerScale, pts[0].y * innerScale);
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        const b = pts[(i + 1) % pts.length];
-        const c = pts[(i + 2) % pts.length];
-        const cp1x = ((a.x + b.x) / 2) * innerScale;
-        const cp1y = ((a.y + b.y) / 2) * innerScale;
-        const cp2x = b.x * innerScale;
-        const cp2y = b.y * innerScale;
-        const endx = ((b.x + c.x) / 2) * innerScale;
-        const endy = ((b.y + c.y) / 2) * innerScale;
-        hole.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endx, endy);
-      }
-      hole.closePath();
-      shape.holes.push(hole);
+      // Outer shell (hollow rounded rect) — extruded from outline minus inset
+      const outer = plateShape(plate);
+      const innerInset = WALL_THICK;
+      const inner = plateShape({
+        ...plate,
+        x: plate.x + innerInset,
+        y: plate.y + innerInset,
+        w: plate.w - innerInset * 2,
+        h: plate.h - innerInset * 2,
+        cornerRadius: Math.max(0, plate.cornerRadius - innerInset),
+      });
+      const innerPath = new THREE.Path(inner.getPoints(48));
+      outer.holes = [innerPath];
 
-      const wallGeom = new THREE.ExtrudeGeometry(shape, {
+      const wallGeom = new THREE.ExtrudeGeometry(outer, {
         depth: FLOOR_HEIGHT * 0.92,
         bevelEnabled: false,
         steps: 1,
+        curveSegments: 16,
       });
       wallGeom.rotateX(-Math.PI / 2);
-      const walls = new THREE.Mesh(wallGeom, wallMaterial);
-      walls.position.y = yBase;
+      wallGeom.translate(0, yBase, 0);
+      const walls = new THREE.Mesh(wallGeom, wallMat);
       walls.castShadow = true;
       walls.receiveShadow = true;
       group.add(walls);
 
       // Floor slab
-      const slabShape = new THREE.Shape();
-      slabShape.moveTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        const b = pts[(i + 1) % pts.length];
-        const c = pts[(i + 2) % pts.length];
-        slabShape.bezierCurveTo(
-          (a.x + b.x) / 2, (a.y + b.y) / 2,
-          b.x, b.y,
-          (b.x + c.x) / 2, (b.y + c.y) / 2,
-        );
-      }
-      slabShape.closePath();
-      const slabGeom = new THREE.ExtrudeGeometry(slabShape, { depth: 0.08, bevelEnabled: false });
+      const slabGeom = new THREE.ExtrudeGeometry(plateShape(plate), {
+        depth: 0.5, bevelEnabled: false, curveSegments: 16,
+      });
       slabGeom.rotateX(-Math.PI / 2);
-      const slab = new THREE.Mesh(slabGeom, slabMaterial);
-      slab.position.y = yBase;
+      slabGeom.translate(0, yBase, 0);
+      const slab = new THREE.Mesh(slabGeom, slabMat);
       slab.receiveShadow = true;
       group.add(slab);
 
+      // Interior partition walls between rooms (simple thin boxes on shared edges)
+      const tol = 0.6;
+      const drawn = new Set<string>();
+      for (let i = 0; i < plate.rooms.length; i++) {
+        const a = plate.rooms[i];
+        for (let j = i + 1; j < plate.rooms.length; j++) {
+          const b = plate.rooms[j];
+          // Vertical shared wall
+          if (Math.abs(a.x + a.w - b.x) < tol || Math.abs(b.x + b.w - a.x) < tol) {
+            const x = Math.abs(a.x + a.w - b.x) < tol ? a.x + a.w : a.x;
+            const y0 = Math.max(a.y, b.y);
+            const y1 = Math.min(a.y + a.h, b.y + b.h);
+            if (y1 - y0 > 1) {
+              const key = `v-${x.toFixed(1)}-${y0.toFixed(1)}-${y1.toFixed(1)}`;
+              if (drawn.has(key)) continue;
+              drawn.add(key);
+              const len = y1 - y0;
+              const geom = new THREE.BoxGeometry(WALL_THICK * 0.6, FLOOR_HEIGHT * 0.92, len);
+              const m = new THREE.Mesh(geom, interiorMat);
+              m.position.set(x, yBase + (FLOOR_HEIGHT * 0.92) / 2, (y0 + y1) / 2);
+              m.castShadow = true;
+              group.add(m);
+            }
+          }
+          // Horizontal shared wall
+          if (Math.abs(a.y + a.h - b.y) < tol || Math.abs(b.y + b.h - a.y) < tol) {
+            const y = Math.abs(a.y + a.h - b.y) < tol ? a.y + a.h : a.y;
+            const x0 = Math.max(a.x, b.x);
+            const x1 = Math.min(a.x + a.w, b.x + b.w);
+            if (x1 - x0 > 1) {
+              const key = `h-${y.toFixed(1)}-${x0.toFixed(1)}-${x1.toFixed(1)}`;
+              if (drawn.has(key)) continue;
+              drawn.add(key);
+              const len = x1 - x0;
+              const geom = new THREE.BoxGeometry(len, FLOOR_HEIGHT * 0.92, WALL_THICK * 0.6);
+              const m = new THREE.Mesh(geom, interiorMat);
+              m.position.set((x0 + x1) / 2, yBase + (FLOOR_HEIGHT * 0.92) / 2, y);
+              m.castShadow = true;
+              group.add(m);
+            }
+          }
+        }
+      }
+
+      // Windows + doors as thin glass / accent boxes on the wall
+      for (const o of plate.openings) {
+        const dx = o.x2 - o.x1;
+        const dz = o.y2 - o.y1;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.5) continue;
+        const cxO = (o.x1 + o.x2) / 2;
+        const cyO = (o.y1 + o.y2) / 2;
+        const angle = Math.atan2(dz, dx);
+        if (o.kind === "window") {
+          const h = WINDOW_HEAD - WINDOW_SILL;
+          const geom = new THREE.BoxGeometry(len, h, 0.3);
+          const m = new THREE.Mesh(geom, glassMat);
+          m.position.set(cxO, yBase + WINDOW_SILL + h / 2, cyO);
+          m.rotation.y = -angle;
+          group.add(m);
+        } else {
+          const geom = new THREE.BoxGeometry(len, DOOR_HEIGHT, 0.3);
+          const m = new THREE.Mesh(geom, doorMat);
+          m.position.set(cxO, yBase + DOOR_HEIGHT / 2, cyO);
+          m.rotation.y = -angle;
+          group.add(m);
+        }
+      }
+
       // Roof on top floor
-      if (outline.floor === Math.max(...variation.floorOutlines.map((o) => o.floor))) {
+      if (plate.floor === topFloor) {
         const roofY = yBase + FLOOR_HEIGHT;
         if (variation.roofType === "domed") {
-          const roof = new THREE.Mesh(
-            new THREE.SphereGeometry(PLOT_SIZE * 0.42, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-            roofMaterial,
+          const r = Math.min(plate.w, plate.h) * 0.45;
+          const dome = new THREE.Mesh(
+            new THREE.SphereGeometry(r, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+            roofMat,
           );
-          roof.position.y = roofY;
-          roof.castShadow = true;
-          group.add(roof);
+          dome.position.set(plate.x + plate.w / 2, roofY, plate.y + plate.h / 2);
+          dome.castShadow = true;
+          group.add(dome);
         } else if (variation.roofType === "sloped") {
-          const roof = new THREE.Mesh(
-            new THREE.ConeGeometry(PLOT_SIZE * 0.5, PLOT_SIZE * 0.25, 32),
-            roofMaterial,
+          const slope = new THREE.Mesh(
+            new THREE.ConeGeometry(Math.min(plate.w, plate.h) * 0.62, FLOOR_HEIGHT * 0.6, 4),
+            roofMat,
           );
-          roof.position.y = roofY + PLOT_SIZE * 0.125;
-          roof.castShadow = true;
-          group.add(roof);
+          slope.position.set(plate.x + plate.w / 2, roofY + FLOOR_HEIGHT * 0.3, plate.y + plate.h / 2);
+          slope.rotation.y = Math.PI / 4;
+          slope.castShadow = true;
+          group.add(slope);
         } else {
-          const roof = new THREE.Mesh(slabGeom.clone(), roofMaterial);
-          roof.position.y = roofY;
-          roof.castShadow = true;
-          group.add(roof);
+          const roofGeom = new THREE.ExtrudeGeometry(plateShape(plate), {
+            depth: 0.6, bevelEnabled: false, curveSegments: 16,
+          });
+          roofGeom.rotateX(-Math.PI / 2);
+          roofGeom.translate(0, roofY, 0);
+          const flat = new THREE.Mesh(roofGeom, roofMat);
+          flat.castShadow = true;
+          group.add(flat);
         }
       }
     }
 
-    // Entrance marker (small arch)
-    const angle = (variation.entranceAngleDeg * Math.PI) / 180;
+    // Entrance arch on the perimeter
+    const a = (variation.entranceAngleDeg * Math.PI) / 180;
+    const reach = Math.min(variation.plotWidthFt, variation.plotDepthFt) * 0.45;
     const ent = new THREE.Mesh(
-      new THREE.TorusGeometry(0.45, 0.08, 8, 24, Math.PI),
+      new THREE.TorusGeometry(3, 0.5, 10, 24, Math.PI),
       new THREE.MeshStandardMaterial({ color: accent }),
     );
-    ent.position.set(Math.sin(angle) * (PLOT_SIZE * 0.42), 0.45, Math.cos(angle) * (PLOT_SIZE * 0.42));
-    ent.rotation.y = -angle;
+    const px = variation.plotWidthFt / 2 + Math.sin(a) * reach;
+    const pz = variation.plotDepthFt / 2 - Math.cos(a) * reach;
+    ent.position.set(px, 3, pz);
+    ent.rotation.y = -a;
     group.add(ent);
   }, [variation, visibleFloors]);
 
