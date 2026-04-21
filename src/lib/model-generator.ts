@@ -263,9 +263,10 @@ function buildPlate(
     }
   }
 
-  // Corner radius: gentle = small radius, bold = larger. Up to ~15% of shorter side.
+  // Curvature is now ALWAYS at maximum for every variation — corners are
+  // strongly rounded so corner rooms read as curved.
   const minSide = Math.min(fw, fh);
-  const cornerRadius = Math.min(minSide * 0.18, 2 + curvatureLevel * (minSide * 0.16));
+  const cornerRadius = minSide * (0.20 + 0.04 * curvatureLevel);
 
   return {
     floor: floorIndex,
