@@ -1,18 +1,10 @@
-import type { Direction, RoomType, VastuPreferences, RoomLayout } from "./design-types";
+import type { Direction, RoomType, VastuPreferences, RoomRect } from "./design-types";
 
-// Compass angle in degrees: 0 = N, increasing clockwise.
+// Compass: 0 = N, increases clockwise.
 export const DIRECTION_ANGLES: Record<Direction, number> = {
-  N: 0,
-  NE: 45,
-  E: 90,
-  SE: 135,
-  S: 180,
-  SW: 225,
-  W: 270,
-  NW: 315,
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
 };
 
-// Ideal Vastu directions per room type.
 export const VASTU_IDEAL: Partial<Record<RoomType, Direction[]>> = {
   pooja: ["NE"],
   kitchen: ["SE", "NW"],
@@ -25,31 +17,28 @@ export const VASTU_IDEAL: Partial<Record<RoomType, Direction[]>> = {
   courtyard: ["NE", "E", "N"],
 };
 
-/** Convert a (cx, cy) in 0..1 plot coords to a compass direction relative to center. */
-export function pointToDirection(cx: number, cy: number): Direction {
-  const dx = cx - 0.5;
-  // y in image: 0=top=North. Convert: northVec = (0,-1)
-  const dy = cy - 0.5;
-  // angle from north, clockwise
+/** Direction of a point relative to plate center. y increases downward (south). */
+export function pointToDirection(cx: number, cy: number, centerX: number, centerY: number): Direction {
+  const dx = cx - centerX;
+  const dy = cy - centerY;
+  // North = -dy. Angle clockwise from north.
   const angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
   const normalized = (angle + 360) % 360;
-  // Snap to nearest 45°
   const dirs: Direction[] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-  const idx = Math.round(normalized / 45) % 8;
-  return dirs[idx];
+  return dirs[Math.round(normalized / 45) % 8];
 }
 
 export interface VastuScoreResult {
-  score: number; // 0..100
+  score: number;
   tier: "strict" | "mostly" | "partial";
   conflicts: string[];
 }
 
-/** Score a layout against Vastu rules + user preferences. */
 export function scoreVastu(
-  rooms: RoomLayout[],
+  rooms: RoomRect[],
   prefs: VastuPreferences,
   entranceDirection: Direction,
+  plateCenter: { x: number; y: number },
 ): VastuScoreResult {
   if (prefs.follow === "none") {
     return { score: 100, tier: "strict", conflicts: [] };
@@ -59,23 +48,21 @@ export function scoreVastu(
   let earned = 0;
   const conflicts: string[] = [];
 
-  // Entrance check
   if (prefs.entranceDirection) {
     total += 20;
     if (prefs.entranceDirection === entranceDirection) earned += 20;
-    else conflicts.push(`Entrance is ${entranceDirection}, prefers ${prefs.entranceDirection}`);
+    else conflicts.push(`Entrance ${entranceDirection}, prefers ${prefs.entranceDirection}`);
   }
 
-  // Per-room ideal direction
   for (const room of rooms.filter((r) => r.floor === 1)) {
     const ideal = VASTU_IDEAL[room.type];
     if (!ideal || ideal.length === 0) continue;
-    const actual = pointToDirection(room.cx, room.cy);
+    const cx = room.x + room.w / 2;
+    const cy = room.y + room.h / 2;
+    const actual = pointToDirection(cx, cy, plateCenter.x, plateCenter.y);
     total += 10;
     if (ideal.includes(actual)) earned += 10;
-    else if (
-      ideal.some((d) => Math.abs(DIRECTION_ANGLES[d] - DIRECTION_ANGLES[actual]) <= 45)
-    ) {
+    else if (ideal.some((d) => Math.abs(DIRECTION_ANGLES[d] - DIRECTION_ANGLES[actual]) <= 45)) {
       earned += 5;
       conflicts.push(`${room.type} in ${actual} (prefers ${ideal.join("/")})`);
     } else {
