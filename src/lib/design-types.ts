@@ -22,6 +22,9 @@ export interface DesignSpec {
   };
   floors: number;
   rooms: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[];
+  // Optional per-floor breakdown (floor 1 = ground floor). When present, this
+  // overrides `rooms` for layout generation. Length should match `floors`.
+  roomsPerFloor?: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[][];
   curvature: "gentle" | "bold" | "mixed";
   roofStyle: "flat" | "domed" | "sloped";
   windowDensity: "low" | "medium" | "high";
