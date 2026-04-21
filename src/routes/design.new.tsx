@@ -213,7 +213,7 @@ function NewDesignWizard() {
                     min={1}
                     max={5}
                     value={spec.floors}
-                    onChange={(e) => setSpec({ ...spec, floors: Number(e.target.value) })}
+                    onChange={(e) => ensureFloors(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
                   />
                 </div>
               </div>
