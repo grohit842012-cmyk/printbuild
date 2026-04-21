@@ -31,13 +31,13 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Vaastu Studio — Design & 3D-print your dream home" },
+      { title: "PrintBuild — Design & 3D-print your dream home" },
       {
         name: "description",
         content:
           "Customize a curved-wall home with Vastu guidance. See 10 AI-generated 3D models, pick your favorite, and order printable STL files.",
       },
-      { property: "og:title", content: "Vaastu Studio — Design your dream home" },
+      { property: "og:title", content: "PrintBuild — Design your dream home" },
       {
         property: "og:description",
         content: "Generate Vastu-aligned 3D home designs with curved walls, ready to print.",

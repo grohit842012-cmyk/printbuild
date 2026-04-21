@@ -12,7 +12,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import type { DesignSpec, VastuPreferences, Variation } from "@/lib/design-types";
 
 export const Route = createFileRoute("/design/$id/gallery")({
-  head: () => ({ meta: [{ title: "Your designs — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "Your designs — PrintBuild" }] }),
   component: () => (
     <RequireAuth>
       <GalleryPage />

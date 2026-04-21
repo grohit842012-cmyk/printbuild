@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 export const Route = createFileRoute("/design/$id/book")({
-  head: () => ({ meta: [{ title: "Book your design — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "Book your design — PrintBuild" }] }),
   component: () => (
     <RequireAuth>
       <BookPage />

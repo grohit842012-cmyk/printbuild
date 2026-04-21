@@ -12,7 +12,7 @@ export function SiteHeader() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <Compass className="h-5 w-5 text-accent group-hover:rotate-45 transition-transform" />
-          <span className="font-display text-xl tracking-tight">Vaastu Studio</span>
+          <span className="font-display text-xl tracking-tight">PrintBuild</span>
         </Link>
         <nav className="flex items-center gap-2 sm:gap-4 text-sm">
           {user ? (

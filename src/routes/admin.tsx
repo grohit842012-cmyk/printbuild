@@ -15,7 +15,7 @@ import { FloorPlan2D } from "@/components/floor-plan-2d";
 import type { Variation } from "@/lib/design-types";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "Admin — PrintBuild" }] }),
   component: () => (
     <RequireAuth requireAdmin>
       <AdminDashboard />
