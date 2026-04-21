@@ -40,7 +40,7 @@ function InspectorPage() {
       const v = variations[Number(idx)];
       if (!v) { toast.error("Variation not found"); return; }
       setVariation(v);
-      const floors = v.floorOutlines.map((o) => o.floor);
+      const floors = v.plates.map((p) => p.floor);
       setAllFloors(floors);
       setVisibleFloors(new Set(floors));
       setActiveFloor(floors[0]);
