@@ -48,11 +48,11 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     const height = mount.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#f3f6fb");
+    scene.background = new THREE.Color("#dde8f4");
+    scene.fog = new THREE.Fog("#dde8f4", 200, 380);
     sceneRef.current = scene;
 
-    // Center scene around plot mid using big units (feet)
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.5, 2000);
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.5, 2000);
     camera.position.set(80, 70, 100);
     camera.lookAt(0, 8, 0);
 
@@ -61,35 +61,49 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     renderer.setSize(width, height);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-    sun.position.set(60, 120, 40);
+    scene.add(new THREE.HemisphereLight(0xeaf2ff, 0xb8a890, 0.65));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+    const sun = new THREE.DirectionalLight(0xfff4d6, 1.25);
+    sun.position.set(60, 130, 50);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -80;
-    sun.shadow.camera.right = 80;
-    sun.shadow.camera.top = 80;
-    sun.shadow.camera.bottom = -80;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -100;
+    sun.shadow.camera.right = 100;
+    sun.shadow.camera.top = 100;
+    sun.shadow.camera.bottom = -100;
+    sun.shadow.bias = -0.0005;
     scene.add(sun);
 
-    // Ground
+    // Grass ground
     const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(120, 64),
-      new THREE.MeshStandardMaterial({ color: "#e2e8ee", roughness: 0.95 }),
+      new THREE.CircleGeometry(160, 64),
+      new THREE.MeshStandardMaterial({ color: "#9bb592", roughness: 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
+
+    // Stone plinth under building
+    const plinth = new THREE.Mesh(
+      new THREE.CircleGeometry(60, 64),
+      new THREE.MeshStandardMaterial({ color: "#c8b89a", roughness: 0.85 }),
+    );
+    plinth.rotation.x = -Math.PI / 2;
+    plinth.position.y = 0.05;
+    plinth.receiveShadow = true;
+    scene.add(plinth);
 
     // North marker
     const north = new THREE.Mesh(
       new THREE.ConeGeometry(2, 5, 6),
       new THREE.MeshStandardMaterial({ color: "#3b6db8" }),
     );
-    north.position.set(0, 2.5, -90);
+    north.position.set(0, 2.5, -110);
     scene.add(north);
 
     const buildingGroup = new THREE.Group();
