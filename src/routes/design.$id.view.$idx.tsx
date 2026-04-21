@@ -11,7 +11,7 @@ import { FloorPlan2D } from "@/components/floor-plan-2d";
 import type { Variation } from "@/lib/design-types";
 
 export const Route = createFileRoute("/design/$id/view/$idx")({
-  head: () => ({ meta: [{ title: "Inspect design — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "Inspect design — PrintBuild" }] }),
   component: () => (
     <RequireAuth>
       <InspectorPage />

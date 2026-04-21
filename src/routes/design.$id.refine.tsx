@@ -12,7 +12,7 @@ import type { DesignSpec, VastuPreferences } from "@/lib/design-types";
 import { generateVariations } from "@/lib/model-generator";
 
 export const Route = createFileRoute("/design/$id/refine")({
-  head: () => ({ meta: [{ title: "Refine your design — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "Refine your design — PrintBuild" }] }),
   component: () => (
     <RequireAuth>
       <RefinePage />

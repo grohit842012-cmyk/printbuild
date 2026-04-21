@@ -28,7 +28,7 @@ import type {
 export const Route = createFileRoute("/design/new")({
   head: () => ({
     meta: [
-      { title: "New design — Vaastu Studio" },
+      { title: "New design — PrintBuild" },
       { name: "description", content: "Describe your dream home through a guided wizard." },
     ],
   }),

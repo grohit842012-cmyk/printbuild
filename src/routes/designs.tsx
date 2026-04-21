@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/designs")({
-  head: () => ({ meta: [{ title: "My designs — Vaastu Studio" }] }),
+  head: () => ({ meta: [{ title: "My designs — PrintBuild" }] }),
   component: () => (
     <RequireAuth>
       <DesignsPage />

@@ -12,7 +12,7 @@ import { Compass } from "lucide-react";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Vaastu Studio" },
+      { title: "Sign in — PrintBuild" },
       { name: "description", content: "Create an account to design and save your custom home." },
     ],
   }),
@@ -76,7 +76,7 @@ function AuthPage() {
       <header className="px-4 sm:px-6 h-16 flex items-center">
         <Link to="/" className="flex items-center gap-2">
           <Compass className="h-5 w-5 text-accent" />
-          <span className="font-display text-xl">Vaastu Studio</span>
+          <span className="font-display text-xl">PrintBuild</span>
         </Link>
       </header>
       <div className="flex-1 flex items-center justify-center p-4">

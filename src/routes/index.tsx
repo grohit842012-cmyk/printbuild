@@ -7,13 +7,13 @@ import { Compass, Home, Sparkles, Box } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Vaastu Studio — Design & 3D-print your dream home" },
+      { title: "PrintBuild — Design & 3D-print your dream home" },
       {
         name: "description",
         content:
           "Customize a curved-wall home with Vastu guidance. See 10 AI-generated 3D models, pick your favorite, and order printable STL files.",
       },
-      { property: "og:title", content: "Vaastu Studio — Design your dream home" },
+      { property: "og:title", content: "PrintBuild — Design your dream home" },
       {
         property: "og:description",
         content: "Generate Vastu-aligned 3D home designs with curved walls.",
@@ -111,7 +111,7 @@ function Index() {
 
       <footer className="border-t border-border py-8">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 text-sm text-muted-foreground flex flex-col sm:flex-row gap-2 justify-between">
-          <span>© Vaastu Studio</span>
+          <span>© PrintBuild</span>
           <span>Curved walls. Considered design. Printable homes.</span>
         </div>
       </footer>
