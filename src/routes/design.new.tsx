@@ -65,9 +65,23 @@ function NewDesignWizard() {
     rooms: [
       { type: "living", count: 1, sizePref: "large" },
       { type: "kitchen", count: 1, sizePref: "medium" },
+      { type: "dining", count: 1, sizePref: "medium" },
       { type: "master_bedroom", count: 1, sizePref: "large" },
       { type: "bedroom", count: 2, sizePref: "medium" },
       { type: "bath", count: 2, sizePref: "small" },
+    ],
+    roomsPerFloor: [
+      [
+        { type: "living", count: 1, sizePref: "large" },
+        { type: "kitchen", count: 1, sizePref: "medium" },
+        { type: "dining", count: 1, sizePref: "medium" },
+        { type: "bath", count: 1, sizePref: "small" },
+      ],
+      [
+        { type: "master_bedroom", count: 1, sizePref: "large" },
+        { type: "bedroom", count: 2, sizePref: "medium" },
+        { type: "bath", count: 1, sizePref: "small" },
+      ],
     ],
     curvature: "mixed",
     roofStyle: "domed",
@@ -90,15 +104,40 @@ function NewDesignWizard() {
 
   const [name, setName] = useState("My dream home");
 
-  function setRoom(type: RoomType, patch: Partial<{ count: number; sizePref: "small" | "medium" | "large" }>) {
+  function ensureFloors(n: number) {
     setSpec((s) => {
-      const existing = s.rooms.find((r) => r.type === type);
-      const others = s.rooms.filter((r) => r.type !== type);
-      const next = existing
-        ? { ...existing, ...patch }
-        : { type, count: 1, sizePref: "medium" as const, ...patch };
-      const cleaned = next.count > 0 ? [...others, next] : others;
-      return { ...s, rooms: cleaned };
+      const cur = s.roomsPerFloor ?? [];
+      const next = Array.from({ length: n }, (_, i) => cur[i] ?? []);
+      return { ...s, floors: n, roomsPerFloor: next };
+    });
+  }
+
+  function setFloorRoom(
+    floor: number,
+    type: RoomType,
+    patch: Partial<{ count: number; sizePref: "small" | "medium" | "large" }>,
+  ) {
+    setSpec((s) => {
+      const list = s.roomsPerFloor ?? Array.from({ length: s.floors }, () => []);
+      const floorRooms = [...(list[floor] ?? [])];
+      const idx = floorRooms.findIndex((r) => r.type === type);
+      const existing = idx >= 0
+        ? floorRooms[idx]
+        : { type, count: 0, sizePref: "medium" as const };
+      const next = { ...existing, ...patch };
+      if (idx >= 0) floorRooms[idx] = next;
+      else floorRooms.push(next);
+      const cleaned = floorRooms.filter((r) => r.count > 0);
+      const updated = list.map((f, i) => (i === floor ? cleaned : f));
+      const agg: typeof s.rooms = [];
+      for (const f of updated) {
+        for (const r of f) {
+          const ex = agg.find((x) => x.type === r.type);
+          if (ex) ex.count += r.count;
+          else agg.push({ ...r });
+        }
+      }
+      return { ...s, roomsPerFloor: updated, rooms: agg };
     });
   }
 
@@ -174,7 +213,7 @@ function NewDesignWizard() {
                     min={1}
                     max={5}
                     value={spec.floors}
-                    onChange={(e) => setSpec({ ...spec, floors: Number(e.target.value) })}
+                    onChange={(e) => ensureFloors(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
                   />
                 </div>
               </div>
@@ -217,40 +256,58 @@ function NewDesignWizard() {
 
           {step === 2 && (
             <>
-              <h2 className="text-xl font-display">Rooms</h2>
+              <h2 className="text-xl font-display">Rooms by floor</h2>
               <p className="text-sm text-muted-foreground">
-                How many of each room do you need? We&apos;ll arrange them across {spec.floors}{" "}
-                floor(s).
+                Set the rooms for each floor. Floor 1 is the ground floor.
               </p>
-              <div className="space-y-3">
-                {DEFAULT_ROOMS.map((r) => {
-                  const cur = spec.rooms.find((x) => x.type === r.type);
+              <div className="space-y-8">
+                {Array.from({ length: spec.floors }, (_, f) => {
+                  const floorRooms = spec.roomsPerFloor?.[f] ?? [];
                   return (
-                    <div key={r.type} className="grid grid-cols-12 items-center gap-3 py-2 border-b border-border last:border-0">
-                      <div className="col-span-5 text-sm">{r.label}</div>
-                      <div className="col-span-3">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={cur?.count ?? 0}
-                          onChange={(e) => setRoom(r.type, { count: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="col-span-4">
-                        <Select
-                          value={cur?.sizePref ?? "medium"}
-                          onValueChange={(v) =>
-                            setRoom(r.type, { sizePref: v as "small" | "medium" | "large" })
-                          }
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="small">Small</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="large">Large</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div key={f} className="border border-border rounded-xl p-4">
+                      <h3 className="text-base font-display mb-3">
+                        {f === 0 ? "Ground floor" : `Floor ${f + 1}`}
+                      </h3>
+                      <div className="space-y-2">
+                        {DEFAULT_ROOMS.map((r) => {
+                          const cur = floorRooms.find((x) => x.type === r.type);
+                          return (
+                            <div
+                              key={r.type}
+                              className="grid grid-cols-12 items-center gap-3 py-1.5 border-b border-border/60 last:border-0"
+                            >
+                              <div className="col-span-5 text-sm">{r.label}</div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={10}
+                                  value={cur?.count ?? 0}
+                                  onChange={(e) =>
+                                    setFloorRoom(f, r.type, { count: Number(e.target.value) })
+                                  }
+                                />
+                              </div>
+                              <div className="col-span-4">
+                                <Select
+                                  value={cur?.sizePref ?? "medium"}
+                                  onValueChange={(v) =>
+                                    setFloorRoom(f, r.type, {
+                                      sizePref: v as "small" | "medium" | "large",
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="small">Small</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="large">Large</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -258,6 +315,7 @@ function NewDesignWizard() {
               </div>
             </>
           )}
+
 
           {step === 3 && (
             <>

@@ -59,12 +59,17 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
   const entX = cx + Math.sin(a) * reach;
   const entY = cy - Math.cos(a) * reach;
 
+  const plateD = platePath(plate, scale, ox, oy);
+
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
       <defs>
         <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
           <path d="M 16 0 L 0 0 0 16" fill="none" stroke="hsl(var(--border) / 0.5)" strokeWidth="0.5" />
         </pattern>
+        <clipPath id={`plate-clip-${floor}`}>
+          <path d={plateD} />
+        </clipPath>
       </defs>
       <rect width={size} height={size} fill="url(#grid)" />
 
@@ -77,35 +82,46 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
 
       {/* Floor plate footprint with rounded corners */}
       <path
-        d={platePath(plate, scale, ox, oy)}
+        d={plateD}
         fill="hsl(var(--card))"
         stroke="hsl(var(--foreground))"
         strokeWidth="2.5"
       />
 
-      {/* Rooms */}
-      {plate.rooms.map((r, i) => {
-        const rx = ox + r.x * scale;
-        const ry = oy + r.y * scale;
-        const rw = r.w * scale;
-        const rh = r.h * scale;
-        const cxR = rx + rw / 2;
-        const cyR = ry + rh / 2;
-        return (
-          <g key={i}>
-            <rect
-              x={rx} y={ry} width={rw} height={rh}
-              fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
-              stroke="#1e293b" strokeWidth="0.8"
-            />
-            <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
-              fill="#1e293b" fontWeight="600">{r.label}</text>
-            <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">
-              {Math.round(r.w)}′ × {Math.round(r.h)}′
-            </text>
-          </g>
-        );
-      })}
+      {/* Rooms — clipped to the rounded plate so corner rooms follow the curve */}
+      <g clipPath={`url(#plate-clip-${floor})`}>
+        {plate.rooms.map((r, i) => {
+          const rx = ox + r.x * scale;
+          const ry = oy + r.y * scale;
+          const rw = r.w * scale;
+          const rh = r.h * scale;
+          const cxR = rx + rw / 2;
+          const cyR = ry + rh / 2;
+          return (
+            <g key={i}>
+              <rect
+                x={rx} y={ry} width={rw} height={rh}
+                fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
+                stroke="#1e293b" strokeWidth="0.8"
+              />
+              <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
+                fill="#1e293b" fontWeight="600">{r.label}</text>
+              <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">
+                {Math.round(r.w)}′ × {Math.round(r.h)}′
+              </text>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Re-stroke the plate outline above the clipped rooms for a clean curve */}
+      <path
+        d={plateD}
+        fill="none"
+        stroke="hsl(var(--foreground))"
+        strokeWidth="2.5"
+      />
+
 
       {/* Doors and windows */}
       {plate.openings.map((o, i) => (
