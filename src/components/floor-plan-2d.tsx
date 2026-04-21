@@ -1,4 +1,4 @@
-import type { Variation } from "@/lib/design-types";
+import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
   variation: Variation;
@@ -7,84 +7,130 @@ interface Props {
 }
 
 const ROOM_COLOR: Record<string, string> = {
-  living: "#d4a373",
-  kitchen: "#e0a96d",
-  bedroom: "#c2c5aa",
-  master_bedroom: "#a4ac86",
-  bath: "#9eb7c8",
-  pooja: "#dab785",
-  study: "#bcb38d",
-  dining: "#d8b4a0",
-  courtyard: "#b8d8b6",
+  living: "#cfe0f5",
+  kitchen: "#f4d9b4",
+  bedroom: "#dfe5d3",
+  master_bedroom: "#cdd9bd",
+  bath: "#bcd5e8",
+  pooja: "#f0e2c2",
+  study: "#e1dfd0",
+  dining: "#ecd6c8",
+  courtyard: "#c8e3c5",
 };
 
+/** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
+function platePath(p: FloorPlate, scale: number, ox: number, oy: number): string {
+  const x = ox + p.x * scale;
+  const y = oy + p.y * scale;
+  const w = p.w * scale;
+  const h = p.h * scale;
+  const r = Math.min(p.cornerRadius * scale, w / 2, h / 2);
+  // Standard rounded-rect path
+  return [
+    `M ${x + r} ${y}`,
+    `L ${x + w - r} ${y}`,
+    `Q ${x + w} ${y} ${x + w} ${y + r}`,
+    `L ${x + w} ${y + h - r}`,
+    `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
+    `L ${x + r} ${y + h}`,
+    `Q ${x} ${y + h} ${x} ${y + h - r}`,
+    `L ${x} ${y + r}`,
+    `Q ${x} ${y} ${x + r} ${y}`,
+    "Z",
+  ].join(" ");
+}
+
 export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
-  const outline = variation.floorOutlines.find((o) => o.floor === floor);
-  if (!outline) return null;
-  const rooms = variation.rooms.filter((r) => r.floor === floor);
-  const w = size;
+  const plate = variation.plates.find((p) => p.floor === floor);
+  if (!plate) return null;
 
-  // Build smooth path
-  const pts = outline.points;
-  let d = `M ${pts[0].x * w},${pts[0].y * w}`;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i];
-    const b = pts[(i + 1) % pts.length];
-    const c = pts[(i + 2) % pts.length];
-    const cp1x = ((a.x + b.x) / 2) * w;
-    const cp1y = ((a.y + b.y) / 2) * w;
-    const cp2x = b.x * w;
-    const cp2y = b.y * w;
-    const endx = ((b.x + c.x) / 2) * w;
-    const endy = ((b.y + c.y) / 2) * w;
-    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${endx},${endy}`;
-  }
-  d += " Z";
+  const plotW = variation.plotWidthFt;
+  const plotD = variation.plotDepthFt;
+  const padding = 16;
+  const scale = (size - padding * 2) / Math.max(plotW, plotD);
+  const ox = padding;
+  const oy = padding;
 
-  const entAngle = (variation.entranceAngleDeg * Math.PI) / 180;
-  const entX = w / 2 + Math.sin(entAngle) * w * 0.42;
-  const entY = w / 2 - Math.cos(entAngle) * w * 0.42;
+  // Entrance position on the plate perimeter
+  const a = (variation.entranceAngleDeg * Math.PI) / 180;
+  const cx = ox + (plate.x + plate.w / 2) * scale;
+  const cy = oy + (plate.y + plate.h / 2) * scale;
+  const reach = Math.min(plate.w, plate.h) * scale * 0.55;
+  const entX = cx + Math.sin(a) * reach;
+  const entY = cy - Math.cos(a) * reach;
 
   return (
-    <svg viewBox={`0 0 ${w} ${w}`} className="w-full h-auto">
+    <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
       <defs>
-        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e8dcc4" strokeWidth="0.5" />
+        <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
+          <path d="M 16 0 L 0 0 0 16" fill="none" stroke="hsl(var(--border) / 0.5)" strokeWidth="0.5" />
         </pattern>
       </defs>
-      <rect width={w} height={w} fill="url(#grid)" />
-      {/* Wall outline */}
-      <path d={d} fill="#f5efe2" stroke="#3a2e22" strokeWidth="3" strokeLinejoin="round" />
+      <rect width={size} height={size} fill="url(#grid)" />
+
+      {/* Plot boundary (dashed) */}
+      <rect
+        x={ox} y={oy}
+        width={plotW * scale} height={plotD * scale}
+        fill="none" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1"
+      />
+
+      {/* Floor plate footprint with rounded corners */}
+      <path
+        d={platePath(plate, scale, ox, oy)}
+        fill="hsl(var(--card))"
+        stroke="hsl(var(--foreground))"
+        strokeWidth="2.5"
+      />
+
       {/* Rooms */}
-      {rooms.map((r, i) => (
-        <g key={i} transform={`translate(${r.cx * w},${r.cy * w}) rotate(${r.rotationDeg})`}>
-          <ellipse
-            rx={r.rx * w}
-            ry={r.ry * w}
-            fill={ROOM_COLOR[r.type] ?? "#cccccc"}
-            opacity="0.65"
-            stroke="#3a2e22"
-            strokeWidth="0.8"
-          />
-          <text textAnchor="middle" fontSize="9" fill="#3a2e22" dominantBaseline="middle">
-            {r.type.replace("_", " ")}
-          </text>
-        </g>
+      {plate.rooms.map((r, i) => {
+        const rx = ox + r.x * scale;
+        const ry = oy + r.y * scale;
+        const rw = r.w * scale;
+        const rh = r.h * scale;
+        const cxR = rx + rw / 2;
+        const cyR = ry + rh / 2;
+        return (
+          <g key={i}>
+            <rect
+              x={rx} y={ry} width={rw} height={rh}
+              fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
+              stroke="#1e293b" strokeWidth="0.8"
+            />
+            <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
+              fill="#1e293b" fontWeight="600">{r.label}</text>
+            <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">
+              {Math.round(r.w)}′ × {Math.round(r.h)}′
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Doors and windows */}
+      {plate.openings.map((o, i) => (
+        <line key={i}
+          x1={ox + o.x1 * scale} y1={oy + o.y1 * scale}
+          x2={ox + o.x2 * scale} y2={oy + o.y2 * scale}
+          stroke={o.kind === "door" ? "hsl(var(--primary))" : "#60a5fa"}
+          strokeWidth={o.kind === "door" ? 2.5 : 2}
+          strokeLinecap="round"
+        />
       ))}
-      {/* Entrance */}
-      <circle cx={entX} cy={entY} r="6" fill="#b8693a" />
-      <text x={entX} y={entY - 10} textAnchor="middle" fontSize="9" fill="#b8693a" fontWeight="600">
-        Entry
-      </text>
+
+      {/* Entrance marker */}
+      <circle cx={entX} cy={entY} r="6" fill="hsl(var(--primary))" />
+      <text x={entX} y={entY - 9} textAnchor="middle" fontSize="9"
+        fill="hsl(var(--primary))" fontWeight="700">Entry</text>
+
       {/* Compass */}
-      <g transform={`translate(${w - 38}, 38)`}>
-        <circle r="22" fill="white" stroke="#3a2e22" strokeWidth="1" />
-        <text textAnchor="middle" y="-12" fontSize="10" fill="#3a2e22" fontWeight="700">N</text>
-        <text textAnchor="middle" y="18" fontSize="9" fill="#3a2e22">S</text>
-        <text textAnchor="middle" x="14" y="3" fontSize="9" fill="#3a2e22">E</text>
-        <text textAnchor="middle" x="-14" y="3" fontSize="9" fill="#3a2e22">W</text>
-        <line x1="0" y1="-8" x2="0" y2="8" stroke="#b8693a" strokeWidth="1" />
-        <polygon points="0,-9 -3,-3 3,-3" fill="#b8693a" />
+      <g transform={`translate(${size - 36}, 36)`}>
+        <circle r="20" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="1" />
+        <text textAnchor="middle" y="-10" fontSize="9" fontWeight="700" fill="hsl(var(--foreground))">N</text>
+        <text textAnchor="middle" y="15" fontSize="8" fill="hsl(var(--foreground))">S</text>
+        <text textAnchor="middle" x="12" y="3" fontSize="8" fill="hsl(var(--foreground))">E</text>
+        <text textAnchor="middle" x="-12" y="3" fontSize="8" fill="hsl(var(--foreground))">W</text>
+        <polygon points="0,-7 -2,-2 2,-2" fill="hsl(var(--primary))" />
       </g>
     </svg>
   );
