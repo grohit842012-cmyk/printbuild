@@ -1,68 +1,70 @@
 
 
-# Custom Home Designer & 3D Booking Platform
+## Fix all critical liveability issues
 
-A web app where customers describe their dream home through a guided form + AI chat (now including Vastu preferences), see 10 generated 3D models with curved walls, view 2D floor plans, and book — triggering per-floor, per-wall STL exports for you to fabricate.
+Rebuild the layout engine to produce real, liveable homes with hallways, proper doors, realistic room sizes, and add architectural detail to the 3D view plus a liveability check on the inspector.
 
-## Customer journey
+### 1. `src/lib/design-types.ts`
+- Add `entranceDoor: Opening` to `FloorPlate`.
+- Add `hallway?: { x: number; y: number; w: number; h: number }` to `FloorPlate` so the 2D and liveability check can render/verify it.
+- Add to `Variation`:
+  ```ts
+  liveability: {
+    hallway: boolean;
+    bedroomsHaveWindows: boolean;
+    bathroomsPrivate: boolean;
+    entranceCorrect: boolean;
+    stairsAligned: boolean;
+    issues: string[];
+  }
+  ```
 
-1. **Landing page** — explains the concept, showcases sample homes, CTA to start designing.
-2. **Sign up / log in** — email + password, customers can save designs and revisit.
-3. **Design wizard (form)** — step-by-step:
-   - Plot dimensions, shape, and **plot orientation (which direction the plot faces — N/S/E/W/NE/etc.)**
-   - Number of floors
-   - Rooms per floor (bedrooms, kitchen, living, bath, pooja room, etc.) with size preferences
-   - Curvature style (gentle, bold organic, mixed straight + curved)
-   - Roof style, window density, exterior feel
-   - Budget feel & lifestyle (family size, work-from-home, entertaining, etc.)
-   - **Vastu preferences**:
-     - Follow Vastu? (Strict / Flexible / Not important)
-     - Main entrance direction preference
-     - Pooja / prayer room (yes/no + preferred direction, e.g. NE)
-     - Kitchen direction (e.g. SE)
-     - Master bedroom direction (e.g. SW)
-     - Water element / borewell placement (e.g. NE)
-     - Open space / courtyard preferences
-     - Any custom Vastu notes
-4. **AI chat refinement** — conversational AI asks follow-ups based on form answers, including Vastu clarifications ("you chose strict Vastu but want a south-facing entrance — should I prioritize Vastu rules or your direction preference?").
-5. **10 model generation** — system generates 10 parametric variations honoring the spec **and Vastu constraints** (room placement by direction, entrance orientation, pooja room in NE, etc.).
-6. **Gallery view** — thumbnails of all 10 models with a small **Vastu compliance badge** (e.g. "Strict Vastu", "Mostly compliant") on each.
-7. **Model inspector** — interactive 3D viewer (rotate, zoom, pan), toggle floor visibility, 2D top-down floor plan per floor with **compass/direction indicator overlay** so customers can verify Vastu alignment.
-8. **Like / dislike / regenerate** — keep favorites, dismiss others, request another batch with adjusted parameters.
-9. **Book this design** — confirms order, captures shipping/contact details.
-10. **My designs** — saved designs and booking history.
+### 2. `src/lib/model-generator.ts` — full layout rewrite
+Replace the quadrant BSP inside `buildPlate` with a residential pipeline:
 
-## Admin dashboard (you)
+- **Entrance**: cut a 3.5 ft front door on the facade matching the requested Vastu direction (fallback: longest street-facing wall).
+- **Hallway spine**: 3.5 ft wide corridor running from the front door to the back of the plate; perpendicular branch added when bedroom count ≥ 3.
+- **Stair shaft**: placed flush against the hallway (not floating), vertically aligned across all floors (keep existing alignment pass).
+- **Zoning**:
+  - Public zone (front, near entrance): living, dining, kitchen — sharing walls.
+  - Private zone (rear): bedrooms grouped together, each touching one exterior wall.
+  - Master bedroom: largest exterior corner + ensuite bath.
+  - Pooja: NE if Vastu enabled, accessed from hallway.
+  - Bathrooms: clustered on a single plumbing wall, back-to-back with kitchen where possible.
+- **Fixed minimum room sizes** (reject + surface error if plot too small):
+  bedroom ≥ 10×10, master ≥ 12×14, bath ≥ 5×7, kitchen ≥ 8×10, living ≥ 14×16, dining ≥ 8×10, pooja ≥ 5×5.
+- **Doors**: each room gets exactly one door onto the hallway (ensuite exception). Bathroom doors never face kitchen or pooja (validate + rotate door wall if conflict).
+- **Windows**: at least one per habitable room, on the longest exterior wall.
+- **Liveability scoring**: after placing rooms, evaluate the 5 checks and store on `Variation.liveability`.
 
-- Login-protected admin area.
-- Bookings list with customer info, date, status, model thumbnail, **Vastu compliance level**.
-- Order detail view: full spec (incl. Vastu choices), 3D preview, customer notes.
-- **Download STL bundle**: ZIP file with one STL per wall organized by floor (`floor-1/wall-north.stl`, etc.) plus floor slabs and roof.
-- Order status workflow: New → In Production → Shipped → Delivered.
-- Internal notes & customer messaging thread.
+### 3. `src/components/floor-plan-2d.tsx`
+- Render the hallway as a distinct light-gray corridor below room fills.
+- Render the front door as a clearly marked opening with a swing arc and "Entry" label.
+- Render per-room door swing arcs (quarter-circle).
+- Keep existing rounded-corner clip path.
 
-## How the 3D + STL works
+### 4. `src/components/model-viewer-3d.tsx`
+- **Plinth**: 1.5 ft stone base extruded under the building footprint.
+- **Per-floor heights**: ground 11 ft, upper floors 10 ft (currently uniform).
+- **Roof overhang**: extrude roof slab 1.5 ft beyond wall plate on all sides.
+- **Front porch**: small slab + 2 columns + visible door cutout at the entrance wall.
+- **Window frames**: add sill + lintel band geometry around each window opening (not just glass plane).
+- Keep wall corner curvature; do NOT curve the roof.
 
-- **Three.js** in the browser renders interactive previews and the 2D plan projection with a compass overlay.
-- **Curved walls** built as lofted geometry along bezier curves with configurable thickness and height.
-- **Parametric generator** takes the spec + Vastu rules and produces 10 variations by perturbing curvature, room arrangement (within Vastu constraints), and openings.
-- **Vastu rule engine** maps room types to preferred directions and validates each generated layout, scoring compliance.
-- **STL export** runs server-side when a booking is placed: rebuilds the chosen model, splits per-wall and per-floor, zips it, stores in cloud storage, downloadable from the admin panel.
-- **AI** powers the chat refinement step (asks smart follow-up questions, resolves Vastu vs preference conflicts, translates intent into parameters).
+### 5. `src/routes/design.$id.view.$idx.tsx`
+Add a "Liveability check" panel above the "Book it" button showing the 5 checks from `variation.liveability` with green check / red cross icons and the `issues[]` list. Booking button stays enabled — warnings are advisory.
 
-## Backend & data
+### 6. `src/routes/design.new.tsx`
+On submit, if any floor's room set violates minimum dimensions for the plot, show a toast explaining which room won't fit and block submission.
 
-- Authentication for customers and admin (separate role).
-- Tables: `profiles`, `user_roles`, `designs` (spec incl. `vastu_preferences` JSON + chosen variation), `bookings` (status, contact, shipping), `stl_bundles` (storage path).
-- Cloud storage bucket for generated STL ZIP files.
-- Row-level security so customers see only their own designs/bookings; admin sees all.
+### Out of scope this round
+Furniture icons, drag-to-edit, terraces/setbacks, walkthrough camera, payments, structural validation.
 
-## Visual direction
-
-Clean, architectural, premium feel — large 3D viewer, soft shadows, generous whitespace, neutral palette with a single accent color. Compass/Vastu overlay uses subtle, non-intrusive iconography. Mobile-friendly browsing; the 3D designer optimized for tablet/desktop.
-
-## Out of scope (v1)
-
-- Online payment (booking only — you contact customer for payment offline).
-- Real-time print job tracking, structural engineering validation, material cost estimates, certified Vastu consultant review.
+### Files changed
+- `src/lib/design-types.ts`
+- `src/lib/model-generator.ts`
+- `src/components/floor-plan-2d.tsx`
+- `src/components/model-viewer-3d.tsx`
+- `src/routes/design.$id.view.$idx.tsx`
+- `src/routes/design.new.tsx`
 
