@@ -51,6 +51,7 @@ const DEFAULT_ROOMS: { type: RoomType; label: string }[] = [
   { type: "pooja", label: "Pooja / prayer room" },
   { type: "study", label: "Study" },
   { type: "courtyard", label: "Courtyard" },
+  { type: "stairs", label: "Stairs (auto-added for multi-floor)" },
 ];
 
 function NewDesignWizard() {
