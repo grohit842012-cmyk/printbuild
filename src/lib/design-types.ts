@@ -11,7 +11,8 @@ export type RoomType =
   | "pooja"
   | "study"
   | "dining"
-  | "courtyard";
+  | "courtyard"
+  | "stairs";
 
 export interface DesignSpec {
   plot: {
