@@ -35,6 +35,7 @@ const ROOM_AREA: Record<RoomType, { small: number; medium: number; large: number
   study: { small: 80, medium: 110, large: 150 },
   dining: { small: 100, medium: 140, large: 180 },
   courtyard: { small: 80, medium: 120, large: 180 },
+  stairs: { small: 40, medium: 50, large: 60 },
 };
 
 const LABEL: Record<RoomType, string> = {
@@ -47,6 +48,7 @@ const LABEL: Record<RoomType, string> = {
   study: "Study",
   dining: "Dining",
   courtyard: "Courtyard",
+  stairs: "Stairs",
 };
 
 interface FlatRoom { type: RoomType; sizePref: "small" | "medium" | "large" }
