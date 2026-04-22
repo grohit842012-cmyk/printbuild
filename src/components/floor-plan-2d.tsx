@@ -16,6 +16,7 @@ const ROOM_COLOR: Record<string, string> = {
   study: "#e1dfd0",
   dining: "#ecd6c8",
   courtyard: "#c8e3c5",
+  stairs: "#b8c5d6",
 };
 
 /** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
@@ -104,6 +105,18 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                 fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
                 stroke="#1e293b" strokeWidth="0.8"
               />
+              {/* Stair tread lines */}
+              {r.type === "stairs" && Array.from({ length: 8 }).map((_, k) => (
+                <line
+                  key={k}
+                  x1={rx + 2}
+                  x2={rx + rw - 2}
+                  y1={ry + ((k + 1) * rh) / 9}
+                  y2={ry + ((k + 1) * rh) / 9}
+                  stroke="#475569"
+                  strokeWidth="0.6"
+                />
+              ))}
               <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
                 fill="#1e293b" fontWeight="600">{r.label}</text>
               <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">
