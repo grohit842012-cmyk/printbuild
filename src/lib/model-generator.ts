@@ -289,8 +289,6 @@ export function generateVariations(
   const baseSeed = Math.floor(Math.random() * 1_000_000);
 
   // Per-floor room distribution.
-  // - If spec.roomsPerFloor is provided, use it directly (customer-driven).
-  // - Otherwise, fall back to auto-distribution from spec.rooms.
   const perFloor: FlatRoom[][] = [];
   if (spec.roomsPerFloor && spec.roomsPerFloor.length > 0) {
     for (let f = 0; f < spec.floors; f++) {
@@ -320,6 +318,14 @@ export function generateVariations(
     }
   }
 
+  // For multi-floor homes inject a stair shaft on every floor (if missing).
+  if (spec.floors > 1) {
+    for (let f = 0; f < spec.floors; f++) {
+      const has = perFloor[f].some((r) => r.type === "stairs");
+      if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
+    }
+  }
+
   for (let i = 0; i < count; i++) {
     const seed = baseSeed + i * 1009;
     const rng = mulberry32(seed);
@@ -338,10 +344,29 @@ export function generateVariations(
       );
     }
 
+    // Align stair shafts vertically across floors so stairs actually connect.
+    if (plates.length > 1) {
+      const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
+      if (groundStairs) {
+        for (let f = 1; f < plates.length; f++) {
+          const idx = plates[f].rooms.findIndex((r) => r.type === "stairs");
+          if (idx >= 0) {
+            // Snap upper stair footprint to match the ground stair location/size
+            plates[f].rooms[idx] = {
+              ...plates[f].rooms[idx],
+              x: groundStairs.x,
+              y: groundStairs.y,
+              w: groundStairs.w,
+              h: groundStairs.h,
+            };
+          }
+        }
+      }
+    }
+
     const entranceDir: Direction = vastu.entranceDirection ?? spec.plot.facing;
     const entranceAngleDeg = DIRECTION_ANGLES[entranceDir];
 
-    // Score on floor 1 rooms
     const allRooms = plates.flatMap((p) => p.rooms);
     const center = {
       x: plates[0].x + plates[0].w / 2,
