@@ -26,7 +26,6 @@ function platePath(p: FloorPlate, scale: number, ox: number, oy: number): string
   const w = p.w * scale;
   const h = p.h * scale;
   const r = Math.min(p.cornerRadius * scale, w / 2, h / 2);
-  // Standard rounded-rect path
   return [
     `M ${x + r} ${y}`,
     `L ${x + w - r} ${y}`,
@@ -41,6 +40,20 @@ function platePath(p: FloorPlate, scale: number, ox: number, oy: number): string
   ].join(" ");
 }
 
+/** Door swing arc (quarter circle) anchored at the hinge. */
+function swingArcPath(
+  hingeX: number,
+  hingeY: number,
+  radius: number,
+  startAngle: number, // degrees
+): string {
+  const sx = hingeX + Math.cos((startAngle * Math.PI) / 180) * radius;
+  const sy = hingeY + Math.sin((startAngle * Math.PI) / 180) * radius;
+  const ex = hingeX + Math.cos(((startAngle + 90) * Math.PI) / 180) * radius;
+  const ey = hingeY + Math.sin(((startAngle + 90) * Math.PI) / 180) * radius;
+  return `M ${hingeX} ${hingeY} L ${sx} ${sy} A ${radius} ${radius} 0 0 1 ${ex} ${ey} Z`;
+}
+
 export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
   const plate = variation.plates.find((p) => p.floor === floor);
   if (!plate) return null;
@@ -52,15 +65,26 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
   const ox = padding;
   const oy = padding;
 
-  // Entrance position on the plate perimeter
-  const a = (variation.entranceAngleDeg * Math.PI) / 180;
-  const cx = ox + (plate.x + plate.w / 2) * scale;
-  const cy = oy + (plate.y + plate.h / 2) * scale;
-  const reach = Math.min(plate.w, plate.h) * scale * 0.55;
-  const entX = cx + Math.sin(a) * reach;
-  const entY = cy - Math.cos(a) * reach;
-
   const plateD = platePath(plate, scale, ox, oy);
+
+  // Entrance position from entranceDoor if present, else fall back to compass.
+  let entX: number;
+  let entY: number;
+  let entLabelDx = 0;
+  let entLabelDy = -9;
+  if (plate.entranceDoor) {
+    entX = ox + ((plate.entranceDoor.x1 + plate.entranceDoor.x2) / 2) * scale;
+    entY = oy + ((plate.entranceDoor.y1 + plate.entranceDoor.y2) / 2) * scale;
+  } else {
+    const a = (variation.entranceAngleDeg * Math.PI) / 180;
+    const cx = ox + (plate.x + plate.w / 2) * scale;
+    const cy = oy + (plate.y + plate.h / 2) * scale;
+    const reach = Math.min(plate.w, plate.h) * scale * 0.55;
+    entX = cx + Math.sin(a) * reach;
+    entY = cy - Math.cos(a) * reach;
+  }
+  void entLabelDx;
+  void entLabelDy;
 
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
@@ -81,7 +105,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         fill="none" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1"
       />
 
-      {/* Floor plate footprint with rounded corners */}
+      {/* Floor plate footprint */}
       <path
         d={plateD}
         fill="hsl(var(--card))"
@@ -89,8 +113,22 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         strokeWidth="2.5"
       />
 
-      {/* Rooms — clipped to the rounded plate so corner rooms follow the curve */}
+      {/* Hallway corridor — drawn before rooms so room walls overlay */}
       <g clipPath={`url(#plate-clip-${floor})`}>
+        {plate.hallway && (
+          <rect
+            x={ox + plate.hallway.x * scale}
+            y={oy + plate.hallway.y * scale}
+            width={plate.hallway.w * scale}
+            height={plate.hallway.h * scale}
+            fill="#eef2f7"
+            stroke="#cbd5e1"
+            strokeWidth="0.8"
+            strokeDasharray="2 2"
+          />
+        )}
+
+        {/* Rooms */}
         {plate.rooms.map((r, i) => {
           const rx = ox + r.x * scale;
           const ry = oy + r.y * scale;
@@ -105,7 +143,6 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                 fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
                 stroke="#1e293b" strokeWidth="0.8"
               />
-              {/* Stair tread lines */}
               {r.type === "stairs" && Array.from({ length: 8 }).map((_, k) => (
                 <line
                   key={k}
@@ -125,9 +162,45 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
             </g>
           );
         })}
+
+        {/* Per-room door swing arcs (skip stair openings) */}
+        {plate.rooms.map((r, i) => {
+          if (!r.doorWall || r.doorMid == null) return null;
+          const arcR = Math.min(r.w, r.h) * 0.18 * scale;
+          let hx = 0;
+          let hy = 0;
+          let start = 0;
+          if (r.doorWall === "E") {
+            hx = ox + (r.x + r.w) * scale;
+            hy = oy + (r.y + r.doorMid - 1.5) * scale;
+            start = 90; // sweeps from south wall into room (toward west)
+          } else if (r.doorWall === "W") {
+            hx = ox + r.x * scale;
+            hy = oy + (r.y + r.doorMid - 1.5) * scale;
+            start = -90; // toward east
+          } else if (r.doorWall === "N") {
+            hx = ox + (r.x + r.doorMid - 1.5) * scale;
+            hy = oy + r.y * scale;
+            start = 0; // toward south
+          } else if (r.doorWall === "S") {
+            hx = ox + (r.x + r.doorMid - 1.5) * scale;
+            hy = oy + (r.y + r.h) * scale;
+            start = 180; // toward north
+          }
+          return (
+            <path
+              key={`arc-${i}`}
+              d={swingArcPath(hx, hy, arcR, start)}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="0.8"
+              opacity="0.55"
+            />
+          );
+        })}
       </g>
 
-      {/* Re-stroke the plate outline above the clipped rooms for a clean curve */}
+      {/* Re-stroke the plate outline above */}
       <path
         d={plateD}
         fill="none"
@@ -135,8 +208,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         strokeWidth="2.5"
       />
 
-
-      {/* Doors and windows */}
+      {/* Doors and windows (lines on walls) */}
       {plate.openings.map((o, i) => (
         <line key={i}
           x1={ox + o.x1 * scale} y1={oy + o.y1 * scale}
@@ -146,6 +218,31 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
           strokeLinecap="round"
         />
       ))}
+
+      {/* Front door swing arc */}
+      {plate.entranceDoor && (() => {
+        const o = plate.entranceDoor;
+        const midX = ox + ((o.x1 + o.x2) / 2) * scale;
+        const midY = ox + ((o.y1 + o.y2) / 2) * scale;
+        const arcR = 14;
+        // Determine inward direction (into hallway / into building)
+        let start = 0;
+        if (Math.abs(o.y1 - o.y2) < 0.1) {
+          // Horizontal door (N or S wall)
+          start = o.y1 < plate.y + plate.h / 2 ? 0 : 180;
+        } else {
+          // Vertical door (E or W wall)
+          start = o.x1 < plate.x + plate.w / 2 ? -90 : 90;
+        }
+        return (
+          <path
+            d={swingArcPath(midX, midY, arcR, start)}
+            fill="hsl(var(--primary) / 0.12)"
+            stroke="hsl(var(--primary))"
+            strokeWidth="1.2"
+          />
+        );
+      })()}
 
       {/* Entrance marker */}
       <circle cx={entX} cy={entY} r="6" fill="hsl(var(--primary))" />

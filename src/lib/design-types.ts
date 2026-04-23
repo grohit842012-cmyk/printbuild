@@ -60,6 +60,10 @@ export interface RoomRect {
   h: number;
   floor: number;
   label: string;
+  // Optional: where the door from this room enters the hallway / parent room.
+  // Stored as midpoint of door + which wall side it sits on.
+  doorWall?: "N" | "E" | "S" | "W";
+  doorMid?: number; // along the wall in feet, from the room's origin
 }
 
 // A door or window on one of the room's walls
@@ -90,6 +94,19 @@ export interface FloorPlate {
   chamfer: number;
   rooms: RoomRect[];
   openings: Opening[];
+  // The hallway corridor for this floor (light-gray spine in 2D).
+  hallway?: { x: number; y: number; w: number; h: number };
+  // The front door for this floor (only floor 1 typically).
+  entranceDoor?: Opening;
+}
+
+export interface Liveability {
+  hallway: boolean;
+  bedroomsHaveWindows: boolean;
+  bathroomsPrivate: boolean;
+  entranceCorrect: boolean;
+  stairsAligned: boolean;
+  issues: string[];
 }
 
 export interface Variation {
@@ -107,4 +124,5 @@ export interface Variation {
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "domed" | "sloped";
   paletteAccent: string;
+  liveability: Liveability;
 }

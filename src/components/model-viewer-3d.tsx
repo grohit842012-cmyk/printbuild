@@ -8,14 +8,30 @@ interface Props {
   className?: string;
 }
 
-const FLOOR_HEIGHT = 10; // ft
+const GROUND_FLOOR_HEIGHT = 11; // ft
+const UPPER_FLOOR_HEIGHT = 10; // ft
+const PLINTH_HEIGHT = 1.5; // ft
+const ROOF_OVERHANG = 1.5; // ft
 const WALL_THICK = 0.6; // ft
 const WINDOW_SILL = 3; // ft
 const WINDOW_HEAD = 7; // ft
 const DOOR_HEIGHT = 7; // ft
 
-/** Build a rounded-rectangle Shape (in world units = feet, then we scale) */
-function plateShape(p: FloorPlate): THREE.Shape {
+function floorBaseY(floorNum: number): number {
+  // floor 1 base = plinth top
+  let y = PLINTH_HEIGHT;
+  for (let f = 1; f < floorNum; f++) {
+    y += f === 1 ? GROUND_FLOOR_HEIGHT : UPPER_FLOOR_HEIGHT;
+  }
+  return y;
+}
+
+function floorHeight(floorNum: number): number {
+  return floorNum === 1 ? GROUND_FLOOR_HEIGHT : UPPER_FLOOR_HEIGHT;
+}
+
+/** Rounded-rect Shape (in feet) */
+function plateShape(p: { x: number; y: number; w: number; h: number; cornerRadius: number }): THREE.Shape {
   const shape = new THREE.Shape();
   const r = Math.min(p.cornerRadius, p.w / 2, p.h / 2);
   const x = p.x;
@@ -43,7 +59,6 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
-
     const width = mount.clientWidth;
     const height = mount.clientHeight;
 
@@ -79,7 +94,6 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     sun.shadow.bias = -0.0005;
     scene.add(sun);
 
-    // Grass ground
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(160, 64),
       new THREE.MeshStandardMaterial({ color: "#9bb592", roughness: 0.95 }),
@@ -88,17 +102,6 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Stone plinth under building
-    const plinth = new THREE.Mesh(
-      new THREE.CircleGeometry(60, 64),
-      new THREE.MeshStandardMaterial({ color: "#c8b89a", roughness: 0.85 }),
-    );
-    plinth.rotation.x = -Math.PI / 2;
-    plinth.position.y = 0.05;
-    plinth.receiveShadow = true;
-    scene.add(plinth);
-
-    // North marker
     const north = new THREE.Mesh(
       new THREE.ConeGeometry(2, 5, 6),
       new THREE.MeshStandardMaterial({ color: "#3b6db8" }),
@@ -187,37 +190,61 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     }
 
     const accent = variation.paletteAccent;
-    // Exterior wall colour leans warm cream so the blue accent reads as trim.
     const wallMat = new THREE.MeshStandardMaterial({ color: "#f5efe2", roughness: 0.85 });
     const trimMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.55 });
     const slabMat = new THREE.MeshStandardMaterial({ color: "#cbd5e1", roughness: 0.9 });
     const roofMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: "#a89b86", roughness: 0.95 });
     const glassMat = new THREE.MeshStandardMaterial({
       color: "#9ec5e8", roughness: 0.15, metalness: 0.1,
       transparent: true, opacity: 0.55,
     });
+    const frameMat = new THREE.MeshStandardMaterial({ color: "#3a3024", roughness: 0.7 });
     const interiorMat = new THREE.MeshStandardMaterial({ color: "#e7ddc8", roughness: 0.9 });
     const stairMat = new THREE.MeshStandardMaterial({ color: "#9ca3af", roughness: 0.75 });
     const doorMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
+    const hallwayMat = new THREE.MeshStandardMaterial({ color: "#d6cbb1", roughness: 0.9 });
 
-    // Center the building
+    // Center building
     const cx = -variation.plotWidthFt / 2;
     const cy = -variation.plotDepthFt / 2;
     group.position.set(cx, 0, cy);
 
     const sortedPlates = [...variation.plates].sort((a, b) => a.floor - b.floor);
+    const groundPlate = sortedPlates[0];
     const topFloor = sortedPlates[sortedPlates.length - 1].floor;
-    const wallH = FLOOR_HEIGHT * 0.92;
+
+    // ------- Plinth (stone base under entire building footprint) -------
+    if (groundPlate) {
+      const plinthShape = plateShape({
+        x: groundPlate.x - 0.8,
+        y: groundPlate.y - 0.8,
+        w: groundPlate.w + 1.6,
+        h: groundPlate.h + 1.6,
+        cornerRadius: groundPlate.cornerRadius + 0.8,
+      });
+      const plinthGeom = new THREE.ExtrudeGeometry(plinthShape, {
+        depth: PLINTH_HEIGHT,
+        bevelEnabled: false,
+        curveSegments: 28,
+      });
+      plinthGeom.rotateX(-Math.PI / 2);
+      const plinth = new THREE.Mesh(plinthGeom, stoneMat);
+      plinth.castShadow = true;
+      plinth.receiveShadow = true;
+      group.add(plinth);
+    }
 
     for (const plate of sortedPlates) {
       if (!visibleFloors.has(plate.floor)) continue;
-      const yBase = (plate.floor - 1) * FLOOR_HEIGHT;
+      const yBase = floorBaseY(plate.floor);
+      const fH = floorHeight(plate.floor);
+      const wallH = fH * 0.92;
 
-      // Outer shell (hollow rounded rect) — extruded from outline minus inset
+      // ------- Outer shell wall (hollow rounded rect) -------
       const outer = plateShape(plate);
       const innerInset = WALL_THICK;
       const inner = plateShape({
-        ...plate,
         x: plate.x + innerInset,
         y: plate.y + innerInset,
         w: plate.w - innerInset * 2,
@@ -226,12 +253,11 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       });
       const innerPath = new THREE.Path(inner.getPoints(48));
       outer.holes = [innerPath];
-
       const wallGeom = new THREE.ExtrudeGeometry(outer, {
         depth: wallH,
         bevelEnabled: false,
         steps: 1,
-        curveSegments: 24,
+        curveSegments: 28,
       });
       wallGeom.rotateX(-Math.PI / 2);
       wallGeom.translate(0, yBase, 0);
@@ -240,9 +266,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       walls.receiveShadow = true;
       group.add(walls);
 
-      // Floor slab
+      // ------- Floor slab -------
       const slabGeom = new THREE.ExtrudeGeometry(plateShape(plate), {
-        depth: 0.5, bevelEnabled: false, curveSegments: 24,
+        depth: 0.5, bevelEnabled: false, curveSegments: 28,
       });
       slabGeom.rotateX(-Math.PI / 2);
       slabGeom.translate(0, yBase, 0);
@@ -250,9 +276,21 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       slab.receiveShadow = true;
       group.add(slab);
 
-      // Decorative trim band at top of each floor (gives the "story line")
+      // ------- Hallway floor (warm tile) -------
+      if (plate.hallway) {
+        const hwGeom = new THREE.BoxGeometry(plate.hallway.w, 0.15, plate.hallway.h);
+        const hw = new THREE.Mesh(hwGeom, hallwayMat);
+        hw.position.set(
+          plate.hallway.x + plate.hallway.w / 2,
+          yBase + 0.55,
+          plate.hallway.y + plate.hallway.h / 2,
+        );
+        hw.receiveShadow = true;
+        group.add(hw);
+      }
+
+      // ------- Story trim band -------
       const trimShape = plateShape({
-        ...plate,
         x: plate.x - 0.4,
         y: plate.y - 0.4,
         w: plate.w + 0.8,
@@ -260,7 +298,6 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         cornerRadius: plate.cornerRadius + 0.4,
       });
       const trimHole = plateShape({
-        ...plate,
         x: plate.x - 0.1,
         y: plate.y - 0.1,
         w: plate.w + 0.2,
@@ -269,7 +306,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       });
       trimShape.holes = [new THREE.Path(trimHole.getPoints(48))];
       const trimGeom = new THREE.ExtrudeGeometry(trimShape, {
-        depth: 0.8, bevelEnabled: false, curveSegments: 24,
+        depth: 0.8, bevelEnabled: false, curveSegments: 28,
       });
       trimGeom.rotateX(-Math.PI / 2);
       trimGeom.translate(0, yBase + wallH - 0.8, 0);
@@ -277,7 +314,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       trim.castShadow = true;
       group.add(trim);
 
-      // Interior partition walls between rooms
+      // ------- Interior partition walls -------
       const tol = 0.6;
       const drawn = new Set<string>();
       for (let i = 0; i < plate.rooms.length; i++) {
@@ -319,16 +356,15 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // Staircase: for every floor below the top, render a real flight of steps
-      // in the stair room going up to the next floor.
+      // ------- Staircase steps -------
       if (plate.floor < topFloor) {
         const stair = plate.rooms.find((r) => r.type === "stairs");
         if (stair) {
           const STEPS = 14;
-          const runLen = stair.h - 1; // along +y
+          const runLen = stair.h - 1;
           const treadDepth = runLen / STEPS;
           const treadWidth = stair.w - 1;
-          const riser = FLOOR_HEIGHT / STEPS;
+          const riser = fH / STEPS;
           for (let s = 0; s < STEPS; s++) {
             const tread = new THREE.Mesh(
               new THREE.BoxGeometry(treadWidth, riser, treadDepth),
@@ -346,7 +382,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // Windows + doors
+      // ------- Windows + doors with frames + sills -------
       for (const o of plate.openings) {
         const dx = o.x2 - o.x1;
         const dz = o.y2 - o.y1;
@@ -357,11 +393,45 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         const angle = Math.atan2(dz, dx);
         if (o.kind === "window") {
           const h = WINDOW_HEAD - WINDOW_SILL;
-          const geom = new THREE.BoxGeometry(len, h, 0.3);
-          const m = new THREE.Mesh(geom, glassMat);
-          m.position.set(cxO, yBase + WINDOW_SILL + h / 2, cyO);
-          m.rotation.y = -angle;
-          group.add(m);
+          // Glass
+          const glass = new THREE.Mesh(
+            new THREE.BoxGeometry(len, h, 0.18),
+            glassMat,
+          );
+          glass.position.set(cxO, yBase + WINDOW_SILL + h / 2, cyO);
+          glass.rotation.y = -angle;
+          group.add(glass);
+          // Frame (slightly larger box) — sill below + lintel above
+          const sill = new THREE.Mesh(
+            new THREE.BoxGeometry(len + 0.6, 0.4, 0.5),
+            frameMat,
+          );
+          sill.position.set(cxO, yBase + WINDOW_SILL - 0.2, cyO);
+          sill.rotation.y = -angle;
+          sill.castShadow = true;
+          group.add(sill);
+          const lintel = new THREE.Mesh(
+            new THREE.BoxGeometry(len + 0.6, 0.45, 0.5),
+            frameMat,
+          );
+          lintel.position.set(cxO, yBase + WINDOW_HEAD + 0.2, cyO);
+          lintel.rotation.y = -angle;
+          lintel.castShadow = true;
+          group.add(lintel);
+          // Side jambs
+          for (const off of [-len / 2 - 0.15, len / 2 + 0.15]) {
+            const jamb = new THREE.Mesh(
+              new THREE.BoxGeometry(0.3, h + 0.5, 0.5),
+              frameMat,
+            );
+            jamb.position.set(
+              cxO + Math.cos(angle) * off,
+              yBase + WINDOW_SILL + h / 2,
+              cyO + Math.sin(angle) * off,
+            );
+            jamb.rotation.y = -angle;
+            group.add(jamb);
+          }
         } else {
           const geom = new THREE.BoxGeometry(len, DOOR_HEIGHT, 0.3);
           const m = new THREE.Mesh(geom, doorMat);
@@ -371,28 +441,43 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // Roof on top floor — sized to the plate, not to a global radius
+      // ------- Roof on top floor with overhang -------
       if (plate.floor === topFloor) {
-        const roofY = yBase + FLOOR_HEIGHT;
+        const roofY = yBase + fH;
+        const overhang = ROOF_OVERHANG;
+        const overShape = plateShape({
+          x: plate.x - overhang,
+          y: plate.y - overhang,
+          w: plate.w + overhang * 2,
+          h: plate.h + overhang * 2,
+          cornerRadius: plate.cornerRadius + overhang,
+        });
         if (variation.roofType === "domed") {
+          // Flat overhang slab + dome above
+          const slabG = new THREE.ExtrudeGeometry(overShape, {
+            depth: 0.6, bevelEnabled: false, curveSegments: 28,
+          });
+          slabG.rotateX(-Math.PI / 2);
+          slabG.translate(0, roofY, 0);
+          const overSlab = new THREE.Mesh(slabG, roofMat);
+          overSlab.castShadow = true;
+          group.add(overSlab);
           const r = Math.min(plate.w, plate.h) * 0.5;
           const dome = new THREE.Mesh(
             new THREE.SphereGeometry(r, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
             roofMat,
           );
-          // Stretch dome to cover the plate (oval if non-square)
           dome.scale.set(plate.w / (2 * r), 0.55, plate.h / (2 * r));
-          dome.position.set(plate.x + plate.w / 2, roofY, plate.y + plate.h / 2);
+          dome.position.set(plate.x + plate.w / 2, roofY + 0.5, plate.y + plate.h / 2);
           dome.castShadow = true;
           group.add(dome);
         } else if (variation.roofType === "sloped") {
-          // Hip-style roof using extruded plate scaled to a peak
-          const roofGeom = new THREE.ExtrudeGeometry(plateShape(plate), {
-            depth: 0.4, bevelEnabled: false, curveSegments: 24,
+          const slabG = new THREE.ExtrudeGeometry(overShape, {
+            depth: 0.5, bevelEnabled: false, curveSegments: 28,
           });
-          roofGeom.rotateX(-Math.PI / 2);
-          roofGeom.translate(0, roofY, 0);
-          const base = new THREE.Mesh(roofGeom, roofMat);
+          slabG.rotateX(-Math.PI / 2);
+          slabG.translate(0, roofY, 0);
+          const base = new THREE.Mesh(slabG, roofMat);
           base.castShadow = true;
           group.add(base);
           const peakH = Math.min(plate.w, plate.h) * 0.25;
@@ -400,59 +485,91 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
             new THREE.ConeGeometry(Math.min(plate.w, plate.h) * 0.55, peakH, 4),
             roofMat,
           );
-          cone.position.set(plate.x + plate.w / 2, roofY + peakH / 2, plate.y + plate.h / 2);
+          cone.position.set(plate.x + plate.w / 2, roofY + peakH / 2 + 0.5, plate.y + plate.h / 2);
           cone.rotation.y = Math.PI / 4;
           cone.scale.set(plate.w / Math.min(plate.w, plate.h), 1, plate.h / Math.min(plate.w, plate.h));
           cone.castShadow = true;
           group.add(cone);
         } else {
-          // Flat roof with a parapet trim
-          const roofGeom = new THREE.ExtrudeGeometry(plateShape(plate), {
-            depth: 0.6, bevelEnabled: false, curveSegments: 24,
+          // Flat roof slab with overhang
+          const flatG = new THREE.ExtrudeGeometry(overShape, {
+            depth: 0.7, bevelEnabled: false, curveSegments: 28,
           });
-          roofGeom.rotateX(-Math.PI / 2);
-          roofGeom.translate(0, roofY, 0);
-          const flat = new THREE.Mesh(roofGeom, roofMat);
+          flatG.rotateX(-Math.PI / 2);
+          flatG.translate(0, roofY, 0);
+          const flat = new THREE.Mesh(flatG, roofMat);
           flat.castShadow = true;
           group.add(flat);
         }
       }
     }
 
-    // Entrance porch + columns + arch
-    const a = (variation.entranceAngleDeg * Math.PI) / 180;
-    const reach = Math.min(variation.plotWidthFt, variation.plotDepthFt) * 0.45;
-    const px = variation.plotWidthFt / 2 + Math.sin(a) * reach;
-    const pz = variation.plotDepthFt / 2 - Math.cos(a) * reach;
+    // ------- Front porch + columns at the actual entrance door -------
+    const entDoor = groundPlate?.entranceDoor;
+    if (entDoor) {
+      const exMid = (entDoor.x1 + entDoor.x2) / 2;
+      const ezMid = (entDoor.y1 + entDoor.y2) / 2;
+      // Outward direction (away from plate center)
+      const outX = exMid - (groundPlate.x + groundPlate.w / 2);
+      const outZ = ezMid - (groundPlate.y + groundPlate.h / 2);
+      const isHorizontalWall = Math.abs(entDoor.y1 - entDoor.y2) < 0.1;
+      const angle = isHorizontalWall ? 0 : Math.PI / 2;
+      const outNorm = isHorizontalWall ? Math.sign(outZ) : Math.sign(outX);
 
-    const porch = new THREE.Mesh(
-      new THREE.BoxGeometry(8, 0.5, 6),
-      new THREE.MeshStandardMaterial({ color: "#b8a78a", roughness: 0.85 }),
-    );
-    porch.position.set(px, 0.25, pz);
-    porch.rotation.y = -a;
-    porch.receiveShadow = true;
-    porch.castShadow = true;
-    group.add(porch);
+      const porchDepth = 5;
+      const porchWidth = 9;
+      const px = exMid + (isHorizontalWall ? 0 : outNorm * porchDepth / 2);
+      const pz = ezMid + (isHorizontalWall ? outNorm * porchDepth / 2 : 0);
 
-    const colMat = new THREE.MeshStandardMaterial({ color: "#f1ede4", roughness: 0.8 });
-    for (const off of [-3, 3]) {
-      const col = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.4, 0.4, DOOR_HEIGHT + 1, 16),
-        colMat,
+      const porch = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          isHorizontalWall ? porchWidth : porchDepth,
+          0.4,
+          isHorizontalWall ? porchDepth : porchWidth,
+        ),
+        new THREE.MeshStandardMaterial({ color: "#b8a78a", roughness: 0.85 }),
       );
-      col.position.set(px + Math.cos(a) * off, (DOOR_HEIGHT + 1) / 2, pz + Math.sin(a) * off);
-      col.castShadow = true;
-      group.add(col);
-    }
+      porch.position.set(px, PLINTH_HEIGHT + 0.2, pz);
+      porch.receiveShadow = true;
+      porch.castShadow = true;
+      group.add(porch);
 
-    const ent = new THREE.Mesh(
-      new THREE.TorusGeometry(3, 0.5, 10, 24, Math.PI),
-      new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5 }),
-    );
-    ent.position.set(px, 3, pz);
-    ent.rotation.y = -a;
-    group.add(ent);
+      // Two columns flanking entrance
+      const colMat = new THREE.MeshStandardMaterial({ color: "#f1ede4", roughness: 0.8 });
+      const colH = DOOR_HEIGHT + 1.5;
+      for (const off of [-3.5, 3.5]) {
+        const col = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.4, 0.4, colH, 16),
+          colMat,
+        );
+        const cxC = isHorizontalWall ? exMid + off : px;
+        const czC = isHorizontalWall ? pz + outNorm * (porchDepth / 2 - 0.4) : ezMid + off;
+        const cxF = isHorizontalWall ? cxC : px + outNorm * (porchDepth / 2 - 0.4);
+        col.position.set(cxF, PLINTH_HEIGHT + 0.4 + colH / 2, czC);
+        col.castShadow = true;
+        group.add(col);
+      }
+
+      // Visible front door panel
+      const dw = Math.hypot(entDoor.x2 - entDoor.x1, entDoor.y2 - entDoor.y1);
+      const door = new THREE.Mesh(
+        new THREE.BoxGeometry(dw, DOOR_HEIGHT, 0.25),
+        new THREE.MeshStandardMaterial({ color: "#5a3d28", roughness: 0.6 }),
+      );
+      door.position.set(exMid, PLINTH_HEIGHT + DOOR_HEIGHT / 2, ezMid);
+      door.rotation.y = angle;
+      door.castShadow = true;
+      group.add(door);
+
+      // Decorative arch above door
+      const arch = new THREE.Mesh(
+        new THREE.TorusGeometry(2.5, 0.4, 10, 24, Math.PI),
+        new THREE.MeshStandardMaterial({ color: variation.paletteAccent, roughness: 0.5 }),
+      );
+      arch.position.set(exMid, PLINTH_HEIGHT + DOOR_HEIGHT + 0.4, ezMid);
+      arch.rotation.y = angle;
+      group.add(arch);
+    }
   }, [variation, visibleFloors]);
 
   return <div ref={mountRef} className={className ?? "w-full h-full"} />;

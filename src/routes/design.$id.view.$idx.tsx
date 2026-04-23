@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ModelViewer3D } from "@/components/model-viewer-3d";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import type { Variation } from "@/lib/design-types";
+import { Check, X, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/design/$id/view/$idx")({
   head: () => ({ meta: [{ title: "Inspect design — PrintBuild" }] }),
@@ -133,6 +134,29 @@ function InspectorPage() {
                 <p className="font-display text-2xl">{Math.round(variation.curvatureLevel * 100)}%</p>
               </div>
             </div>
+
+            {/* Liveability check */}
+            <div className="mt-4 border border-border rounded-xl p-4">
+              <h3 className="font-display text-sm mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-accent" />
+                Liveability check
+              </h3>
+              <ul className="space-y-1.5 text-xs">
+                <CheckRow ok={variation.liveability.hallway} label="Hallway / corridor" />
+                <CheckRow ok={variation.liveability.bedroomsHaveWindows} label="Every habitable room has a window" />
+                <CheckRow ok={variation.liveability.bathroomsPrivate} label="Bathrooms not adjacent to kitchen / pooja" />
+                <CheckRow ok={variation.liveability.entranceCorrect} label="Front door on requested direction" />
+                <CheckRow ok={variation.liveability.stairsAligned} label="Stairs aligned across floors" />
+              </ul>
+              {variation.liveability.issues.length > 0 && (
+                <ul className="mt-2 pt-2 border-t border-border space-y-0.5 text-[11px] text-muted-foreground">
+                  {variation.liveability.issues.slice(0, 4).map((issue, i) => (
+                    <li key={i}>• {issue}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <Button className="w-full mt-5" size="lg" onClick={selectAndBook} disabled={booking}>
               {booking ? "Saving…" : "I want this — book it"}
             </Button>
@@ -140,5 +164,18 @@ function InspectorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CheckRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className="flex items-center gap-2">
+      {ok ? (
+        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+      ) : (
+        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+      )}
+      <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </li>
   );
 }
