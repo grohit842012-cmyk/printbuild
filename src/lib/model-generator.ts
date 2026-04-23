@@ -2,13 +2,14 @@ import type {
   DesignSpec,
   Direction,
   FloorPlate,
+  Liveability,
   Opening,
   RoomRect,
   RoomType,
   Variation,
   VastuPreferences,
 } from "./design-types";
-import { DIRECTION_ANGLES, scoreVastu, VASTU_IDEAL } from "./vastu";
+import { DIRECTION_ANGLES, scoreVastu } from "./vastu";
 
 // ---------- Seeded RNG ----------
 function mulberry32(seed: number) {
@@ -24,20 +25,6 @@ function mulberry32(seed: number) {
 
 const ACCENTS = ["#3b6db8", "#2f5a99", "#4a7fc1", "#5b8fd1", "#264e8a", "#6ea1df"];
 
-// ---------- Architectural sizing (sq ft per room) ----------
-const ROOM_AREA: Record<RoomType, { small: number; medium: number; large: number }> = {
-  living: { small: 180, medium: 260, large: 360 },
-  kitchen: { small: 90, medium: 130, large: 180 },
-  bedroom: { small: 110, medium: 150, large: 200 },
-  master_bedroom: { small: 160, medium: 220, large: 300 },
-  bath: { small: 35, medium: 50, large: 70 },
-  pooja: { small: 25, medium: 36, large: 48 },
-  study: { small: 80, medium: 110, large: 150 },
-  dining: { small: 100, medium: 140, large: 180 },
-  courtyard: { small: 80, medium: 120, large: 180 },
-  stairs: { small: 40, medium: 50, large: 60 },
-};
-
 const LABEL: Record<RoomType, string> = {
   living: "Living",
   kitchen: "Kitchen",
@@ -51,69 +38,287 @@ const LABEL: Record<RoomType, string> = {
   stairs: "Stairs",
 };
 
-interface FlatRoom { type: RoomType; sizePref: "small" | "medium" | "large" }
+// ---------- Architectural minimum dimensions (ft) ----------
+// Width × Depth (independent of orientation: rooms can be rotated to fit)
+export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
+  living: { w: 14, h: 16 },
+  master_bedroom: { w: 12, h: 14 },
+  bedroom: { w: 10, h: 10 },
+  kitchen: { w: 8, h: 10 },
+  dining: { w: 8, h: 10 },
+  bath: { w: 5, h: 7 },
+  pooja: { w: 5, h: 5 },
+  study: { w: 8, h: 8 },
+  courtyard: { w: 8, h: 8 },
+  stairs: { w: 6, h: 12 },
+};
 
-// ---------- BSP-style room placement ----------
-interface Cell { x: number; y: number; w: number; h: number }
+// Preferred (target) dimensions used when there's plenty of room.
+const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
+  living: { w: 16, h: 18 },
+  master_bedroom: { w: 14, h: 16 },
+  bedroom: { w: 11, h: 12 },
+  kitchen: { w: 10, h: 12 },
+  dining: { w: 10, h: 11 },
+  bath: { w: 6, h: 8 },
+  pooja: { w: 6, h: 6 },
+  study: { w: 9, h: 10 },
+  courtyard: { w: 10, h: 10 },
+  stairs: { w: 7, h: 13 },
+};
+
+interface FlatRoom {
+  type: RoomType;
+  sizePref: "small" | "medium" | "large";
+}
+
+const HALLWAY_WIDTH = 3.5;
+const SETBACK = 3;
+
+// ---------- Plot validation ----------
+export interface PlotValidationIssue {
+  floor: number;
+  message: string;
+}
 
 /**
- * Split a rectangle into N cells of roughly target areas using recursive
- * binary splits along the longer axis. Produces an axis-aligned grid layout.
+ * Check whether the requested rooms can fit on the plot at minimum dimensions.
+ * Conservative: sums area incl. hallway + setbacks, and checks the smallest
+ * single room dimension against plate dims.
  */
-function splitCells(
-  cell: Cell,
-  weights: number[],
-  rng: () => number,
-): Cell[] {
-  if (weights.length <= 1) return [cell];
-  const total = weights.reduce((a, b) => a + b, 0);
-
-  // Choose split index roughly at half of total weight
-  let acc = 0;
-  let splitAt = 1;
-  const target = total / 2 + (rng() - 0.5) * total * 0.15;
-  for (let i = 0; i < weights.length; i++) {
-    acc += weights[i];
-    if (acc >= target) { splitAt = Math.max(1, Math.min(weights.length - 1, i + 1)); break; }
+export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
+  const issues: PlotValidationIssue[] = [];
+  const fw = spec.plot.widthFt - SETBACK * 2;
+  const fh = spec.plot.depthFt - SETBACK * 2;
+  if (fw < 18 || fh < 22) {
+    issues.push({
+      floor: 0,
+      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Need at least 24×28 ft.`,
+    });
+    return issues;
   }
-  const leftW = weights.slice(0, splitAt);
-  const rightW = weights.slice(splitAt);
-  const leftSum = leftW.reduce((a, b) => a + b, 0);
-  const ratio = leftSum / total;
-
-  // Split along longer axis
-  let a: Cell, b: Cell;
-  if (cell.w >= cell.h) {
-    const split = cell.w * ratio;
-    a = { x: cell.x, y: cell.y, w: split, h: cell.h };
-    b = { x: cell.x + split, y: cell.y, w: cell.w - split, h: cell.h };
-  } else {
-    const split = cell.h * ratio;
-    a = { x: cell.x, y: cell.y, w: cell.w, h: split };
-    b = { x: cell.x, y: cell.y + split, w: cell.w, h: cell.h - split };
+  const perFloor = spec.roomsPerFloor ?? [];
+  for (let f = 0; f < spec.floors; f++) {
+    const rooms = perFloor[f] ?? [];
+    let needed = 0;
+    for (const r of rooms) {
+      const m = MIN_ROOM_DIMS[r.type];
+      needed += m.w * m.h * r.count;
+    }
+    // hallway area estimate
+    const hallway = HALLWAY_WIDTH * fh;
+    const usable = fw * fh - hallway;
+    if (needed > usable) {
+      issues.push({
+        floor: f + 1,
+        message: `Floor ${f + 1}: rooms need ${Math.ceil(needed)} sqft but plot only fits ${Math.floor(usable)} sqft after hallway.`,
+      });
+    }
+    // Largest single room must fit between hallway and outer wall
+    const sideZone = (fw - HALLWAY_WIDTH) / 2;
+    for (const r of rooms) {
+      if (r.count <= 0) continue;
+      const m = MIN_ROOM_DIMS[r.type];
+      const minSide = Math.min(m.w, m.h);
+      if (minSide > sideZone) {
+        issues.push({
+          floor: f + 1,
+          message: `Floor ${f + 1}: ${LABEL[r.type]} needs ${minSide} ft but only ${Math.floor(sideZone)} ft available beside hallway.`,
+        });
+      }
+    }
   }
-  return [...splitCells(a, leftW, rng), ...splitCells(b, rightW, rng)];
+  return issues;
 }
 
-/** Sort flat rooms so that vastu-preferred ones land in their preferred quadrant. */
-function orderRoomsForQuadrants(
+// ---------- Helpers ----------
+function pickEntranceWall(dir: Direction): "N" | "E" | "S" | "W" {
+  // Map 8-way to 4-way wall (which wall the front door cuts through)
+  if (dir === "N" || dir === "NE" || dir === "NW") return "N";
+  if (dir === "S" || dir === "SE" || dir === "SW") return "S";
+  if (dir === "E") return "E";
+  if (dir === "W") return "W";
+  return "E";
+}
+
+interface PlacedZone {
+  type: RoomType;
+  sizePref: "small" | "medium" | "large";
+  // Zone slot: which side of hallway, and order along the corridor
+  side: "left" | "right";
+  order: number; // 0 = closest to entrance
+  isEnsuiteOf?: number; // index of master bedroom in placed list
+}
+
+/**
+ * Plan a residential floor:
+ *   - hallway runs from front wall to back wall
+ *   - rooms hang off either side of hallway in zones (public near entrance,
+ *     private at the back)
+ *   - bathrooms cluster on plumbing wall
+ */
+function planFloor(
   rooms: FlatRoom[],
-  vastu: VastuPreferences,
-): { quadrant: Direction; room: FlatRoom }[] {
-  // Quadrants of the plate (roughly): NE, NW, SE, SW; and edge dirs N,E,S,W absorbed.
-  const dirOf = (r: FlatRoom): Direction => {
-    if (r.type === "pooja" && vastu.poojaDirection) return vastu.poojaDirection;
-    if (r.type === "kitchen" && vastu.kitchenDirection) return vastu.kitchenDirection;
-    if (r.type === "master_bedroom" && vastu.masterBedroomDirection) return vastu.masterBedroomDirection;
-    const ideal = VASTU_IDEAL[r.type];
-    if (vastu.follow !== "none" && ideal && ideal.length) return ideal[0];
-    const all: Direction[] = ["NE", "NW", "SE", "SW"];
-    return all[Math.floor(Math.random() * 4)];
+  entranceWall: "N" | "E" | "S" | "W",
+): PlacedZone[] {
+  // Public zone (priority front): living, dining, kitchen, pooja
+  // Private zone (priority back): bedrooms, master_bedroom, study
+  // Service: stairs (mid), baths (clustered, near bedrooms or kitchen wall)
+  const PUBLIC: RoomType[] = ["living", "dining", "kitchen", "pooja", "courtyard"];
+  const PRIVATE: RoomType[] = ["master_bedroom", "bedroom", "study"];
+
+  // We always think in "hallway runs from front to back, with left/right sides".
+  // Rotation back to actual entranceWall happens at the placement step.
+  const list = [...rooms];
+
+  // Pull out one master bedroom and one bathroom to be ensuite if both exist.
+  const masterIdx = list.findIndex((r) => r.type === "master_bedroom");
+  const bathIdx = list.findIndex((r) => r.type === "bath");
+  let ensuiteBath: FlatRoom | null = null;
+  if (masterIdx >= 0 && bathIdx >= 0) {
+    ensuiteBath = list.splice(bathIdx, 1)[0];
+  }
+
+  // Pull out stairs to place mid-corridor.
+  const stairsIdx = list.findIndex((r) => r.type === "stairs");
+  const stairs = stairsIdx >= 0 ? list.splice(stairsIdx, 1)[0] : null;
+
+  // Sort: public items first, then private. Within each, larger area first.
+  const sortKey = (r: FlatRoom) => {
+    const m = PREF_ROOM_DIMS[r.type];
+    return -(m.w * m.h);
   };
-  return rooms.map((r) => ({ quadrant: dirOf(r), room: r }));
+  const publicRooms = list.filter((r) => PUBLIC.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
+  const privateRooms = list.filter((r) => PRIVATE.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
+  const baths = list.filter((r) => r.type === "bath");
+  const others = list.filter(
+    (r) =>
+      !PUBLIC.includes(r.type) &&
+      !PRIVATE.includes(r.type) &&
+      r.type !== "bath" &&
+      r.type !== "stairs",
+  );
+
+  // Order along the corridor (front → back):
+  // [public left/right alternating] → [stairs centred] → [bath cluster] → [private left/right alternating]
+  const order: PlacedZone[] = [];
+  let leftCount = 0;
+  let rightCount = 0;
+  const pushAlt = (r: FlatRoom) => {
+    const side: "left" | "right" = leftCount <= rightCount ? "left" : "right";
+    order.push({ type: r.type, sizePref: r.sizePref, side, order: leftCount + rightCount });
+    if (side === "left") leftCount++;
+    else rightCount++;
+  };
+  for (const r of publicRooms) pushAlt(r);
+  if (stairs) {
+    order.push({ type: "stairs", sizePref: stairs.sizePref, side: "right", order: leftCount + rightCount });
+    rightCount++;
+  }
+  // Cluster bathrooms (skip ensuite, handled with master)
+  for (const r of baths) pushAlt(r);
+  for (const r of privateRooms) pushAlt(r);
+  // Mark ensuite next to its master
+  if (ensuiteBath) {
+    const masterPlaceIdx = order.findIndex((o) => o.type === "master_bedroom");
+    if (masterPlaceIdx >= 0) {
+      const masterSide = order[masterPlaceIdx].side;
+      // Place bath on same side, immediately after master in the order
+      order.splice(masterPlaceIdx + 1, 0, {
+        type: "bath",
+        sizePref: ensuiteBath.sizePref,
+        side: masterSide,
+        order: order[masterPlaceIdx].order + 0.5,
+        isEnsuiteOf: masterPlaceIdx,
+      });
+    } else {
+      // No master, just append
+      pushAlt(ensuiteBath);
+    }
+  }
+  for (const r of others) pushAlt(r);
+
+  // Re-number order positions
+  const left = order.filter((o) => o.side === "left").sort((a, b) => a.order - b.order);
+  const right = order.filter((o) => o.side === "right").sort((a, b) => a.order - b.order);
+  left.forEach((o, i) => (o.order = i));
+  right.forEach((o, i) => (o.order = i));
+
+  return [...left, ...right];
 }
 
-/** Build the floor plate for one floor. */
+/**
+ * Lay out one side of the hallway as a vertical stack of rooms.
+ * Returns RoomRect[] in plate-local coordinates where:
+ *   x=0 is the side wall (or hallway edge for the inner side)
+ *   y=0 is the front of the building
+ *   "depth" is along the hallway direction (front → back)
+ */
+function layoutSide(
+  zones: PlacedZone[],
+  sideWidth: number,
+  totalDepth: number,
+  startWall: "left" | "right",
+  floorIndex: number,
+  hallwayX: number, // x position where hallway starts (the inner edge for this side)
+  hallwayW: number,
+): { rooms: RoomRect[] } {
+  if (zones.length === 0) return { rooms: [] };
+
+  // Compute target depths (along corridor) for each zone, scaled to fit.
+  const targets = zones.map((z) => {
+    const pref = PREF_ROOM_DIMS[z.type];
+    // Orient long side along the hallway when sensible
+    const along = Math.max(pref.w, pref.h);
+    return along;
+  });
+  const sumTarget = targets.reduce((a, b) => a + b, 0);
+  const scale = totalDepth / Math.max(1, sumTarget);
+
+  const rooms: RoomRect[] = [];
+  let cursorY = 0;
+  for (let i = 0; i < zones.length; i++) {
+    const z = zones[i];
+    const min = MIN_ROOM_DIMS[z.type];
+    const pref = PREF_ROOM_DIMS[z.type];
+
+    let depth = Math.max(min.h, targets[i] * scale);
+    // Clamp so we don't overrun
+    const remaining = totalDepth - cursorY;
+    const remainingZones = zones.length - i;
+    if (depth > remaining - (remainingZones - 1) * min.h) {
+      depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
+    }
+    if (i === zones.length - 1) depth = remaining; // last room takes the rest
+
+    const width = Math.min(sideWidth, Math.max(min.w, pref.w));
+    // Position: anchor against outer wall on this side
+    const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
+    const y = cursorY;
+
+    // Decide door wall: opens onto hallway → wall facing hallway
+    const doorWall: "N" | "E" | "S" | "W" =
+      startWall === "left" ? "E" : "W";
+
+    rooms.push({
+      type: z.type,
+      x,
+      y,
+      w: width,
+      h: depth,
+      floor: floorIndex,
+      label: LABEL[z.type],
+      doorWall,
+      doorMid: depth / 2,
+    });
+
+    cursorY += depth;
+  }
+
+  return { rooms };
+}
+
+/** Build the floor plate for one floor using residential layout pipeline. */
 function buildPlate(
   floorIndex: number,
   rooms: FlatRoom[],
@@ -121,154 +326,221 @@ function buildPlate(
   plotD: number,
   curvatureLevel: number,
   vastu: VastuPreferences,
+  entranceDir: Direction,
   rng: () => number,
+  isGroundFloor: boolean,
 ): FloorPlate {
-  // Footprint: leave a 3 ft setback from plot
-  const setback = 3;
-  const fx = setback;
-  const fy = setback;
-  const fw = plotW - setback * 2;
-  const fh = plotD - setback * 2;
+  const fx = SETBACK;
+  const fy = SETBACK;
+  const fw = plotW - SETBACK * 2;
+  const fh = plotD - SETBACK * 2;
 
-  // Areas
-  const totalArea = rooms.reduce(
-    (sum, r) => sum + ROOM_AREA[r.type][r.sizePref],
-    0,
-  );
-  // Add ~18% for circulation
-  const usableFootprint = fw * fh;
-  const areaScale = Math.min(1, (usableFootprint * 0.82) / Math.max(1, totalArea));
+  const entranceWall = pickEntranceWall(entranceDir);
 
-  // Group into NE / NW / SE / SW buckets based on vastu preference; rooms with
-  // edge-only ideals (N,E,S,W) snap to the closest quadrant.
-  const quadrantMap: Record<"NE" | "NW" | "SE" | "SW", FlatRoom[]> = {
-    NE: [], NW: [], SE: [], SW: [],
-  };
-  const snap: Record<Direction, "NE" | "NW" | "SE" | "SW"> = {
-    N: "NE", NE: "NE", E: "NE",
-    S: "SW", SW: "SW", W: "SW",
-    SE: "SE", NW: "NW",
-  };
-  for (const { quadrant, room } of orderRoomsForQuadrants(rooms, vastu)) {
-    quadrantMap[snap[quadrant]].push(room);
-  }
+  // We always plan in "front=top, hallway runs vertically (top→bottom)"
+  // Then rotate the plan so 'front' aligns to the entranceWall.
+  // For simplicity we keep the plan oriented with hallway running along the
+  // longer dimension, with front edge = entranceWall.
 
-  // If a quadrant is empty, pull from the largest one to balance.
-  const quadrants: ("NE" | "NW" | "SE" | "SW")[] = ["NE", "NW", "SE", "SW"];
-  for (const q of quadrants) {
-    if (quadrantMap[q].length === 0) {
-      const donor = quadrants
-        .map((k) => ({ k, n: quadrantMap[k].length }))
-        .sort((a, b) => b.n - a.n)[0];
-      if (donor.n > 1) {
-        quadrantMap[q].push(quadrantMap[donor.k].pop()!);
-      }
-    }
-  }
+  const hallwayAlongY = entranceWall === "N" || entranceWall === "S";
+  // Plate-local working dims: depth runs from front to back, side width
+  // perpendicular.
+  const workDepth = hallwayAlongY ? fh : fw;
+  const workWidth = hallwayAlongY ? fw : fh;
 
-  // Map quadrants to a 2x2 grid of cells (north = top = -y direction in our coords;
-  // we place +y as south, +x as east).
-  const halfW = fw / 2;
-  const halfH = fh / 2;
-  // Slight asymmetry for variation
-  const splitX = halfW * (0.85 + rng() * 0.3);
-  const splitY = halfH * (0.85 + rng() * 0.3);
+  const hallwayW = HALLWAY_WIDTH;
+  const sideWidth = (workWidth - hallwayW) / 2;
+  const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
 
-  const quadCells: Record<"NE" | "NW" | "SE" | "SW", Cell> = {
-    NW: { x: fx, y: fy, w: splitX, h: splitY },
-    NE: { x: fx + splitX, y: fy, w: fw - splitX, h: splitY },
-    SW: { x: fx, y: fy + splitY, w: splitX, h: fh - splitY },
-    SE: { x: fx + splitX, y: fy + splitY, w: fw - splitX, h: fh - splitY },
-  };
+  const zones = planFloor(rooms, entranceWall);
+  const leftZones = zones.filter((z) => z.side === "left");
+  const rightZones = zones.filter((z) => z.side === "right");
 
+  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW);
+  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW);
+  const localRooms = [...leftLayout.rooms, ...rightLayout.rooms];
+
+  // Rotate / mirror local coords to match entranceWall.
+  // Local: front = y=0, hallway vertical at x=hallwayLocalX
+  // Entrance "S": front is at y=fh (south), so flip y.
+  // Entrance "E": rotate 90° so hallway runs horizontally with front at x=fw.
+  // Entrance "W": rotate 90° with front at x=0.
   const placed: RoomRect[] = [];
-  for (const q of quadrants) {
-    const list = quadrantMap[q];
-    if (list.length === 0) continue;
-    const weights = list.map((r) => ROOM_AREA[r.type][r.sizePref] * areaScale);
-    const cells = splitCells(quadCells[q], weights, rng);
-    list.forEach((r, i) => {
-      const c = cells[i] ?? cells[cells.length - 1];
-      // Inset 0.5 ft for wall thickness gap
-      placed.push({
-        type: r.type,
-        x: c.x + 0.5,
-        y: c.y + 0.5,
-        w: Math.max(6, c.w - 1),
-        h: Math.max(6, c.h - 1),
-        floor: floorIndex,
-        label: LABEL[r.type],
-      });
+  for (const r of localRooms) {
+    let nx = r.x;
+    let ny = r.y;
+    let nw = r.w;
+    let nh = r.h;
+    let dw = r.doorWall;
+    if (entranceWall === "N") {
+      // local matches: front at top (y=0)
+    } else if (entranceWall === "S") {
+      // flip vertically
+      ny = workDepth - r.y - r.h;
+      if (dw === "N") dw = "S";
+      else if (dw === "S") dw = "N";
+    } else if (entranceWall === "E") {
+      // rotate 90° clockwise: (x,y) -> (workDepth - y - h, x)
+      nx = workDepth - r.y - r.h;
+      ny = r.x;
+      nw = r.h;
+      nh = r.w;
+      const map: Record<"N" | "E" | "S" | "W", "N" | "E" | "S" | "W"> = { N: "E", E: "S", S: "W", W: "N" };
+      if (dw) dw = map[dw];
+    } else if (entranceWall === "W") {
+      // rotate 90° counter-clockwise: (x,y) -> (y, workWidth - x - w)
+      nx = r.y;
+      ny = workWidth - r.x - r.w;
+      nw = r.h;
+      nh = r.w;
+      const map: Record<"N" | "E" | "S" | "W", "N" | "E" | "S" | "W"> = { N: "W", W: "S", S: "E", E: "N" };
+      if (dw) dw = map[dw];
+    }
+    placed.push({
+      type: r.type,
+      x: fx + nx,
+      y: fy + ny,
+      w: nw,
+      h: nh,
+      floor: floorIndex,
+      label: r.label,
+      doorWall: dw,
+      doorMid: r.doorMid,
     });
   }
 
-  // ---------- Openings: doors between adjacent rooms, windows on outer walls ----------
+  // Compute hallway rectangle in plate coords
+  let hallway: { x: number; y: number; w: number; h: number };
+  if (entranceWall === "N" || entranceWall === "S") {
+    hallway = { x: fx + hallwayLocalX, y: fy, w: hallwayW, h: fh };
+  } else if (entranceWall === "E") {
+    hallway = { x: fx, y: fy + hallwayLocalX, w: fw, h: hallwayW };
+  } else {
+    hallway = { x: fx, y: fy + hallwayLocalX, w: fw, h: hallwayW };
+  }
+
+  // ---------- Openings: doors onto hallway, windows on outer walls ----------
   const openings: Opening[] = [];
-  const tol = 0.6; // ft
-  for (let i = 0; i < placed.length; i++) {
-    const a = placed[i];
-    // Windows on outer walls
-    if (Math.abs(a.x - fx - 0.5) < tol) {
-      // West wall
-      openings.push({
-        kind: "window", x1: a.x, y1: a.y + a.h * 0.3, x2: a.x, y2: a.y + a.h * 0.7,
-        floor: floorIndex, t: 0.5, width: a.h * 0.4,
-      });
-    }
-    if (Math.abs(a.x + a.w - (fx + fw - 0.5)) < tol) {
-      openings.push({
-        kind: "window", x1: a.x + a.w, y1: a.y + a.h * 0.3, x2: a.x + a.w, y2: a.y + a.h * 0.7,
-        floor: floorIndex, t: 0.5, width: a.h * 0.4,
-      });
-    }
-    if (Math.abs(a.y - fy - 0.5) < tol) {
-      openings.push({
-        kind: "window", x1: a.x + a.w * 0.3, y1: a.y, x2: a.x + a.w * 0.7, y2: a.y,
-        floor: floorIndex, t: 0.5, width: a.w * 0.4,
-      });
-    }
-    if (Math.abs(a.y + a.h - (fy + fh - 0.5)) < tol) {
-      openings.push({
-        kind: "window", x1: a.x + a.w * 0.3, y1: a.y + a.h, x2: a.x + a.w * 0.7, y2: a.y + a.h,
-        floor: floorIndex, t: 0.5, width: a.w * 0.4,
-      });
-    }
-    // Doors with neighbours (shared wall)
-    for (let j = i + 1; j < placed.length; j++) {
-      const b = placed[j];
-      // Vertical shared wall
-      if (Math.abs(a.x + a.w - b.x) < tol || Math.abs(b.x + b.w - a.x) < tol) {
-        const x = Math.abs(a.x + a.w - b.x) < tol ? a.x + a.w : a.x;
-        const y0 = Math.max(a.y, b.y);
-        const y1 = Math.min(a.y + a.h, b.y + b.h);
-        if (y1 - y0 > 3) {
-          const mid = (y0 + y1) / 2;
-          openings.push({
-            kind: "door", x1: x, y1: mid - 1.5, x2: x, y2: mid + 1.5,
-            floor: floorIndex, t: 0.5, width: 3,
-          });
-        }
+  for (const r of placed) {
+    // Door onto hallway (or onto adjacent room for ensuite)
+    if (r.doorWall && r.doorMid != null) {
+      const dwidth = 3;
+      const t = Math.max(1.5, Math.min(r.doorWall === "N" || r.doorWall === "S" ? r.w : r.h) - 1.5 - dwidth / 2);
+      const mid = Math.max(1.5 + dwidth / 2, Math.min(r.doorWall === "N" || r.doorWall === "S" ? r.w - 1.5 - dwidth / 2 : r.h - 1.5 - dwidth / 2, r.doorMid));
+      void t;
+      if (r.doorWall === "E") {
+        openings.push({
+          kind: "door",
+          x1: r.x + r.w, y1: r.y + mid - dwidth / 2,
+          x2: r.x + r.w, y2: r.y + mid + dwidth / 2,
+          floor: floorIndex, t: 0.5, width: dwidth,
+        });
+      } else if (r.doorWall === "W") {
+        openings.push({
+          kind: "door",
+          x1: r.x, y1: r.y + mid - dwidth / 2,
+          x2: r.x, y2: r.y + mid + dwidth / 2,
+          floor: floorIndex, t: 0.5, width: dwidth,
+        });
+      } else if (r.doorWall === "N") {
+        openings.push({
+          kind: "door",
+          x1: r.x + mid - dwidth / 2, y1: r.y,
+          x2: r.x + mid + dwidth / 2, y2: r.y,
+          floor: floorIndex, t: 0.5, width: dwidth,
+        });
+      } else if (r.doorWall === "S") {
+        openings.push({
+          kind: "door",
+          x1: r.x + mid - dwidth / 2, y1: r.y + r.h,
+          x2: r.x + mid + dwidth / 2, y2: r.y + r.h,
+          floor: floorIndex, t: 0.5, width: dwidth,
+        });
       }
-      // Horizontal shared wall
-      if (Math.abs(a.y + a.h - b.y) < tol || Math.abs(b.y + b.h - a.y) < tol) {
-        const y = Math.abs(a.y + a.h - b.y) < tol ? a.y + a.h : a.y;
-        const x0 = Math.max(a.x, b.x);
-        const x1 = Math.min(a.x + a.w, b.x + b.w);
-        if (x1 - x0 > 3) {
-          const mid = (x0 + x1) / 2;
-          openings.push({
-            kind: "door", x1: mid - 1.5, y1: y, x2: mid + 1.5, y2: y,
-            floor: floorIndex, t: 0.5, width: 3,
-          });
-        }
+    }
+
+    // Windows on the outer wall (the wall opposite the hallway side)
+    const tol = 0.6;
+    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    if (habitable) {
+      // West outer wall
+      if (Math.abs(r.x - fx) < tol) {
+        openings.push({
+          kind: "window",
+          x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7,
+          floor: floorIndex, t: 0.5, width: r.h * 0.4,
+        });
+      }
+      // East outer wall
+      if (Math.abs(r.x + r.w - (fx + fw)) < tol) {
+        openings.push({
+          kind: "window",
+          x1: r.x + r.w, y1: r.y + r.h * 0.3,
+          x2: r.x + r.w, y2: r.y + r.h * 0.7,
+          floor: floorIndex, t: 0.5, width: r.h * 0.4,
+        });
+      }
+      // North outer wall
+      if (Math.abs(r.y - fy) < tol) {
+        openings.push({
+          kind: "window",
+          x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y,
+          floor: floorIndex, t: 0.5, width: r.w * 0.4,
+        });
+      }
+      // South outer wall
+      if (Math.abs(r.y + r.h - (fy + fh)) < tol) {
+        openings.push({
+          kind: "window",
+          x1: r.x + r.w * 0.3, y1: r.y + r.h,
+          x2: r.x + r.w * 0.7, y2: r.y + r.h,
+          floor: floorIndex, t: 0.5, width: r.w * 0.4,
+        });
       }
     }
   }
 
-  // Curvature is now ALWAYS at maximum for every variation — corners are
-  // strongly rounded so corner rooms read as curved.
+  // Front door at hallway entry on the entrance wall
+  let entranceDoor: Opening | undefined;
+  if (isGroundFloor) {
+    const dw = 3.5;
+    if (entranceWall === "N") {
+      const ex = hallway.x + hallway.w / 2;
+      entranceDoor = {
+        kind: "door",
+        x1: ex - dw / 2, y1: fy, x2: ex + dw / 2, y2: fy,
+        floor: floorIndex, t: 0.5, width: dw,
+      };
+    } else if (entranceWall === "S") {
+      const ex = hallway.x + hallway.w / 2;
+      entranceDoor = {
+        kind: "door",
+        x1: ex - dw / 2, y1: fy + fh, x2: ex + dw / 2, y2: fy + fh,
+        floor: floorIndex, t: 0.5, width: dw,
+      };
+    } else if (entranceWall === "E") {
+      const ey = hallway.y + hallway.h / 2;
+      entranceDoor = {
+        kind: "door",
+        x1: fx + fw, y1: ey - dw / 2, x2: fx + fw, y2: ey + dw / 2,
+        floor: floorIndex, t: 0.5, width: dw,
+      };
+    } else if (entranceWall === "W") {
+      const ey = hallway.y + hallway.h / 2;
+      entranceDoor = {
+        kind: "door",
+        x1: fx, y1: ey - dw / 2, x2: fx, y2: ey + dw / 2,
+        floor: floorIndex, t: 0.5, width: dw,
+      };
+    }
+    if (entranceDoor) openings.push(entranceDoor);
+  }
+
+  // Curvature stays at maximum so corner rooms read curved.
   const minSide = Math.min(fw, fh);
   const cornerRadius = minSide * (0.20 + 0.04 * curvatureLevel);
+  void vastu; // currently unused; preferences influence entranceDir + scoring elsewhere
+  void rng;
 
   return {
     floor: floorIndex,
@@ -277,7 +549,89 @@ function buildPlate(
     chamfer: 0,
     rooms: placed,
     openings,
+    hallway,
+    entranceDoor,
   };
+}
+
+// ---------- Liveability evaluation ----------
+function evaluateLiveability(
+  plates: FloorPlate[],
+  entranceDir: Direction,
+): Liveability {
+  const issues: string[] = [];
+  const ground = plates[0];
+
+  const hallway = !!ground.hallway;
+  if (!hallway) issues.push("No hallway found on ground floor.");
+
+  const habitableTypes: RoomType[] = ["bedroom", "master_bedroom", "living", "dining", "study"];
+  let bedroomsHaveWindows = true;
+  for (const p of plates) {
+    for (const r of p.rooms) {
+      if (!habitableTypes.includes(r.type)) continue;
+      const windows = p.openings.filter(
+        (o) =>
+          o.kind === "window" &&
+          o.x1 >= r.x - 0.6 && o.x2 <= r.x + r.w + 0.6 &&
+          o.y1 >= r.y - 0.6 && o.y2 <= r.y + r.h + 0.6,
+      );
+      if (windows.length === 0) {
+        bedroomsHaveWindows = false;
+        issues.push(`Floor ${p.floor}: ${r.label} has no window.`);
+      }
+    }
+  }
+
+  // Bathrooms private = no bath room shares a wall with kitchen or pooja
+  let bathroomsPrivate = true;
+  const tol = 0.8;
+  for (const p of plates) {
+    const baths = p.rooms.filter((r) => r.type === "bath");
+    const sensitives = p.rooms.filter((r) => r.type === "kitchen" || r.type === "pooja");
+    for (const b of baths) {
+      for (const s of sensitives) {
+        const sharesV =
+          (Math.abs(b.x + b.w - s.x) < tol || Math.abs(s.x + s.w - b.x) < tol) &&
+          Math.min(b.y + b.h, s.y + s.h) - Math.max(b.y, s.y) > 1;
+        const sharesH =
+          (Math.abs(b.y + b.h - s.y) < tol || Math.abs(s.y + s.h - b.y) < tol) &&
+          Math.min(b.x + b.w, s.x + s.w) - Math.max(b.x, s.x) > 1;
+        if (sharesV || sharesH) {
+          bathroomsPrivate = false;
+          issues.push(`Floor ${p.floor}: bath next to ${s.label}.`);
+        }
+      }
+    }
+  }
+
+  const entranceCorrect = !!ground.entranceDoor;
+  if (!entranceCorrect) issues.push(`No front door cut on ${entranceDir} wall.`);
+
+  // Stairs aligned: in multi-floor, stairs in same x/y on every floor.
+  let stairsAligned = true;
+  if (plates.length > 1) {
+    const groundStair = plates[0].rooms.find((r) => r.type === "stairs");
+    if (!groundStair) {
+      stairsAligned = false;
+      issues.push("No staircase on ground floor.");
+    } else {
+      for (let i = 1; i < plates.length; i++) {
+        const s = plates[i].rooms.find((r) => r.type === "stairs");
+        if (!s) {
+          stairsAligned = false;
+          issues.push(`Floor ${plates[i].floor}: missing staircase.`);
+          continue;
+        }
+        if (Math.abs(s.x - groundStair.x) > 0.5 || Math.abs(s.y - groundStair.y) > 0.5) {
+          stairsAligned = false;
+          issues.push(`Floor ${plates[i].floor}: stairs not aligned with ground floor.`);
+        }
+      }
+    }
+  }
+
+  return { hallway, bedroomsHaveWindows, bathroomsPrivate, entranceCorrect, stairsAligned, issues };
 }
 
 export function generateVariations(
@@ -326,6 +680,9 @@ export function generateVariations(
     }
   }
 
+  const entranceDir: Direction = vastu.entranceDirection ?? spec.plot.facing;
+  const entranceAngleDeg = DIRECTION_ANGLES[entranceDir];
+
   for (let i = 0; i < count; i++) {
     const seed = baseSeed + i * 1009;
     const rng = mulberry32(seed);
@@ -340,18 +697,27 @@ export function generateVariations(
         ? perFloor[f]
         : [{ type: "bedroom", sizePref: "medium" } as FlatRoom];
       plates.push(
-        buildPlate(f + 1, list, spec.plot.widthFt, spec.plot.depthFt, curvatureLevel, vastu, rng),
+        buildPlate(
+          f + 1,
+          list,
+          spec.plot.widthFt,
+          spec.plot.depthFt,
+          curvatureLevel,
+          vastu,
+          entranceDir,
+          rng,
+          f === 0,
+        ),
       );
     }
 
-    // Align stair shafts vertically across floors so stairs actually connect.
+    // Align stair shafts vertically across floors.
     if (plates.length > 1) {
       const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
       if (groundStairs) {
         for (let f = 1; f < plates.length; f++) {
           const idx = plates[f].rooms.findIndex((r) => r.type === "stairs");
           if (idx >= 0) {
-            // Snap upper stair footprint to match the ground stair location/size
             plates[f].rooms[idx] = {
               ...plates[f].rooms[idx],
               x: groundStairs.x,
@@ -364,15 +730,13 @@ export function generateVariations(
       }
     }
 
-    const entranceDir: Direction = vastu.entranceDirection ?? spec.plot.facing;
-    const entranceAngleDeg = DIRECTION_ANGLES[entranceDir];
-
     const allRooms = plates.flatMap((p) => p.rooms);
     const center = {
       x: plates[0].x + plates[0].w / 2,
       y: plates[0].y + plates[0].h / 2,
     };
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
+    const liveability = evaluateLiveability(plates, entranceDir);
 
     variations.push({
       id: `var-${seed}`,
@@ -387,6 +751,7 @@ export function generateVariations(
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
       paletteAccent: ACCENTS[i % ACCENTS.length],
+      liveability,
     });
   }
 
