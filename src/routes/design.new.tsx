@@ -24,6 +24,7 @@ import type {
   RoomType,
   VastuPreferences,
 } from "@/lib/design-types";
+import { validatePlotFit } from "@/lib/model-generator";
 
 export const Route = createFileRoute("/design/new")({
   head: () => ({
@@ -144,6 +145,15 @@ function NewDesignWizard() {
 
   async function handleSubmit() {
     if (!user) return;
+    const issues = validatePlotFit(spec);
+    if (issues.length > 0) {
+      toast.error(issues[0].message, {
+        description: issues.length > 1 ? `+ ${issues.length - 1} more issue(s)` : undefined,
+      });
+      if (issues[0].floor === 0) setStep(1);
+      else setStep(2);
+      return;
+    }
     setSubmitting(true);
     const { data, error } = await supabase
       .from("designs")
