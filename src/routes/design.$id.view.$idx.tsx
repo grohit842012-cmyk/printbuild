@@ -171,9 +171,9 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
   return (
     <li className="flex items-center gap-2">
       {ok ? (
-        <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
       ) : (
-        <X className="h-3.5 w-3.5 text-red-500 shrink-0" />
+        <X className="h-3.5 w-3.5 text-destructive shrink-0" />
       )}
       <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
     </li>
