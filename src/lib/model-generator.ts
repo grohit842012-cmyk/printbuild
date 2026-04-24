@@ -525,28 +525,28 @@ function buildPlate(
       entranceDoor = {
         kind: "door",
         x1: ex - dw / 2, y1: fy, x2: ex + dw / 2, y2: fy,
-        floor: floorIndex, t: 0.5, width: dw,
+        floor: floorIndex, t: 0.5, width: dw, wall: "N",
       };
     } else if (entranceWall === "S") {
       const ex = hallway.x + hallway.w / 2;
       entranceDoor = {
         kind: "door",
         x1: ex - dw / 2, y1: fy + fh, x2: ex + dw / 2, y2: fy + fh,
-        floor: floorIndex, t: 0.5, width: dw,
+        floor: floorIndex, t: 0.5, width: dw, wall: "S",
       };
     } else if (entranceWall === "E") {
       const ey = hallway.y + hallway.h / 2;
       entranceDoor = {
         kind: "door",
         x1: fx + fw, y1: ey - dw / 2, x2: fx + fw, y2: ey + dw / 2,
-        floor: floorIndex, t: 0.5, width: dw,
+        floor: floorIndex, t: 0.5, width: dw, wall: "E",
       };
     } else if (entranceWall === "W") {
       const ey = hallway.y + hallway.h / 2;
       entranceDoor = {
         kind: "door",
         x1: fx, y1: ey - dw / 2, x2: fx, y2: ey + dw / 2,
-        floor: floorIndex, t: 0.5, width: dw,
+        floor: floorIndex, t: 0.5, width: dw, wall: "W",
       };
     }
     if (entranceDoor) openings.push(entranceDoor);
