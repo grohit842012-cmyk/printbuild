@@ -602,21 +602,18 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // ------- Roof on top floor: union of rooms padded outward for overhang -------
+      // ------- Roof on top floor: single plate rectangle padded for overhang -------
       if (plate.floor === topFloor) {
         const roofY = yBase + fH;
         const overhang = ROOF_OVERHANG;
-        const overShapes: THREE.Shape[] = plate.rooms.map((r) =>
-          rectShape(r.x - overhang, r.y - overhang, r.w + overhang * 2, r.h + overhang * 2),
+        const roofShape = rectShape(
+          plate.x - overhang, plate.y - overhang,
+          plate.w + overhang * 2, plate.h + overhang * 2,
         );
-        if (plate.hallway) {
-          overShapes.push(rectShape(
-            plate.hallway.x - overhang, plate.hallway.y - overhang,
-            plate.hallway.w + overhang * 2, plate.hallway.h + overhang * 2,
-          ));
-        }
+        const roofCenterX = plate.x + plate.w / 2;
+        const roofCenterZ = plate.y + plate.h / 2;
         if (variation.roofType === "domed") {
-          const slabG = new THREE.ExtrudeGeometry(overShapes, {
+          const slabG = new THREE.ExtrudeGeometry(roofShape, {
             depth: 0.6, bevelEnabled: false,
           });
           slabG.rotateX(-Math.PI / 2);
@@ -624,23 +621,19 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           const overSlab = new THREE.Mesh(slabG, roofMat);
           overSlab.castShadow = true;
           group.add(overSlab);
-          const bw = bounds.maxX - bounds.minX;
-          const bh = bounds.maxY - bounds.minY;
+          const bw = plate.w;
+          const bh = plate.h;
           const r = Math.min(bw, bh) * 0.5;
           const dome = new THREE.Mesh(
             new THREE.SphereGeometry(r, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
             roofMat,
           );
           dome.scale.set(bw / (2 * r), 0.55, bh / (2 * r));
-          dome.position.set(
-            (bounds.minX + bounds.maxX) / 2,
-            roofY + 0.5,
-            (bounds.minY + bounds.maxY) / 2,
-          );
+          dome.position.set(roofCenterX, roofY + 0.5, roofCenterZ);
           dome.castShadow = true;
           group.add(dome);
         } else if (variation.roofType === "sloped") {
-          const slabG = new THREE.ExtrudeGeometry(overShapes, {
+          const slabG = new THREE.ExtrudeGeometry(roofShape, {
             depth: 0.5, bevelEnabled: false,
           });
           slabG.rotateX(-Math.PI / 2);
@@ -648,24 +641,20 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           const base = new THREE.Mesh(slabG, roofMat);
           base.castShadow = true;
           group.add(base);
-          const bw = bounds.maxX - bounds.minX;
-          const bh = bounds.maxY - bounds.minY;
+          const bw = plate.w;
+          const bh = plate.h;
           const peakH = Math.min(bw, bh) * 0.25;
           const cone = new THREE.Mesh(
             new THREE.ConeGeometry(Math.min(bw, bh) * 0.55, peakH, 4),
             roofMat,
           );
-          cone.position.set(
-            (bounds.minX + bounds.maxX) / 2,
-            roofY + peakH / 2 + 0.5,
-            (bounds.minY + bounds.maxY) / 2,
-          );
+          cone.position.set(roofCenterX, roofY + peakH / 2 + 0.5, roofCenterZ);
           cone.rotation.y = Math.PI / 4;
           cone.scale.set(bw / Math.min(bw, bh), 1, bh / Math.min(bw, bh));
           cone.castShadow = true;
           group.add(cone);
         } else {
-          const flatG = new THREE.ExtrudeGeometry(overShapes, {
+          const flatG = new THREE.ExtrudeGeometry(roofShape, {
             depth: 0.7, bevelEnabled: false,
           });
           flatG.rotateX(-Math.PI / 2);
