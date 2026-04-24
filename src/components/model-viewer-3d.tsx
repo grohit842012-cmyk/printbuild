@@ -495,14 +495,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
 
       const bounds = roomsBounds(plate.rooms);
 
-      // ------- Floor slab (per-room union) -------
-      const slabShapes: THREE.Shape[] = plate.rooms.map((r) =>
-        rectShape(r.x, r.y, r.w, r.h),
-      );
-      if (plate.hallway) {
-        slabShapes.push(rectShape(plate.hallway.x, plate.hallway.y, plate.hallway.w, plate.hallway.h));
-      }
-      const slabGeom = new THREE.ExtrudeGeometry(slabShapes, {
+      // ------- Floor slab: single plate rectangle (rooms fully tile this) -------
+      const slabShape = rectShape(plate.x, plate.y, plate.w, plate.h);
+      const slabGeom = new THREE.ExtrudeGeometry(slabShape, {
         depth: 0.5, bevelEnabled: false,
       });
       slabGeom.rotateX(-Math.PI / 2);
