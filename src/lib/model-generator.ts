@@ -291,7 +291,11 @@ function layoutSide(
     }
     if (i === zones.length - 1) depth = remaining; // last room takes the rest
 
-    const width = Math.min(sideWidth, Math.max(min.w, pref.w));
+    // Always fill the full side width so there are no empty bands between
+    // the hallway and the outer wall.
+    void pref;
+    void min;
+    const width = sideWidth;
     // Position: anchor against outer wall on this side
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
     const y = cursorY;
