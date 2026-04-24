@@ -467,22 +467,16 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     const groundPlate = sortedPlates[0];
     const topFloor = sortedPlates[sortedPlates.length - 1].floor;
 
-    // ------- Plinth: union of room rectangles padded outward -------
+    // ------- Plinth: plate rectangle padded outward (single clean footprint) -------
     if (groundPlate) {
       const pad = 0.8;
-      const shapes: THREE.Shape[] = groundPlate.rooms.map((r) =>
-        rectShape(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2),
+      const plinthShape = rectShape(
+        groundPlate.x - pad,
+        groundPlate.y - pad,
+        groundPlate.w + pad * 2,
+        groundPlate.h + pad * 2,
       );
-      // Include hallway too
-      if (groundPlate.hallway) {
-        shapes.push(rectShape(
-          groundPlate.hallway.x - pad,
-          groundPlate.hallway.y - pad,
-          groundPlate.hallway.w + pad * 2,
-          groundPlate.hallway.h + pad * 2,
-        ));
-      }
-      const plinthGeom = new THREE.ExtrudeGeometry(shapes, {
+      const plinthGeom = new THREE.ExtrudeGeometry(plinthShape, {
         depth: PLINTH_HEIGHT,
         bevelEnabled: false,
       });
