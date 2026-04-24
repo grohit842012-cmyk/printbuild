@@ -731,21 +731,67 @@ export function generateVariations(
       );
     }
 
-    // Align stair shafts vertically across floors.
+    // Align stair shafts vertically across floors. The ground-floor stair
+    // defines the canonical (x, y, w, h). On every upper floor, replace the
+    // stair rect with those same coordinates AND reflow any room on the same
+    // side whose vertical span overlaps the stair, by shrinking that room to
+    // the remaining vertical band (front-of-stair OR back-of-stair).
     if (plates.length > 1) {
       const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
       if (groundStairs) {
+        const sx = groundStairs.x;
+        const sy = groundStairs.y;
+        const sw = groundStairs.w;
+        const sh = groundStairs.h;
         for (let f = 1; f < plates.length; f++) {
-          const idx = plates[f].rooms.findIndex((r) => r.type === "stairs");
-          if (idx >= 0) {
-            plates[f].rooms[idx] = {
-              ...plates[f].rooms[idx],
-              x: groundStairs.x,
-              y: groundStairs.y,
-              w: groundStairs.w,
-              h: groundStairs.h,
-            };
+          const rooms = plates[f].rooms;
+          // Reflow rooms on the same vertical side as the stair (overlapping x)
+          for (let i = 0; i < rooms.length; i++) {
+            const r = rooms[i];
+            if (r.type === "stairs") continue;
+            // Same vertical band (overlaps stair x range)?
+            const xOverlap = !(r.x + r.w <= sx + 0.01 || r.x >= sx + sw - 0.01);
+            if (!xOverlap) continue;
+            // Vertical overlap with stair?
+            const yOverlap = !(r.y + r.h <= sy + 0.01 || r.y >= sy + sh - 0.01);
+            if (!yOverlap) continue;
+            // Determine where most of the room lies relative to stair
+            const roomCenter = r.y + r.h / 2;
+            const stairCenter = sy + sh / 2;
+            if (roomCenter < stairCenter) {
+              // Shrink to space above (in front of) stair
+              const newH = Math.max(0, sy - r.y);
+              if (newH < 6) {
+                // Too small — collapse this room (mark zero, will be filtered)
+                rooms[i] = { ...r, h: 0 };
+              } else {
+                rooms[i] = { ...r, h: newH, doorMid: Math.min(r.doorMid ?? newH / 2, newH - 1.5) };
+              }
+            } else {
+              // Shrink to space below (behind) stair
+              const newY = sy + sh;
+              const newH = Math.max(0, r.y + r.h - newY);
+              if (newH < 6) {
+                rooms[i] = { ...r, h: 0 };
+              } else {
+                rooms[i] = { ...r, y: newY, h: newH, doorMid: Math.min(r.doorMid ?? newH / 2, newH - 1.5) };
+              }
+            }
           }
+          // Filter zero-height casualties
+          plates[f].rooms = rooms.filter((r) => r.h > 0.5);
+          // Now stamp stair (replace existing if any, else add)
+          const stairIdx = plates[f].rooms.findIndex((r) => r.type === "stairs");
+          const stairRect: RoomRect = {
+            type: "stairs",
+            x: sx, y: sy, w: sw, h: sh,
+            floor: plates[f].floor,
+            label: LABEL.stairs,
+            doorWall: groundStairs.doorWall,
+            doorMid: groundStairs.doorMid,
+          };
+          if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
+          else plates[f].rooms.push(stairRect);
         }
       }
     }
