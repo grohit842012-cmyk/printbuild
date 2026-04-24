@@ -549,18 +549,12 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // ------- Story trim band along exterior walls (top edge highlight) -------
-      // Build as union of room rectangles inflated, minus inner shape.
-      const trimOuter: THREE.Shape[] = plate.rooms.map((r) =>
-        rectShape(r.x - 0.15, r.y - 0.15, r.w + 0.3, r.h + 0.3),
+      // ------- Story trim band along exterior walls (single plate rectangle) -------
+      const trimShape = rectShape(
+        plate.x - 0.15, plate.y - 0.15,
+        plate.w + 0.3, plate.h + 0.3,
       );
-      if (plate.hallway) {
-        trimOuter.push(rectShape(
-          plate.hallway.x - 0.15, plate.hallway.y - 0.15,
-          plate.hallway.w + 0.3, plate.hallway.h + 0.3,
-        ));
-      }
-      const trimGeom = new THREE.ExtrudeGeometry(trimOuter, {
+      const trimGeom = new THREE.ExtrudeGeometry(trimShape, {
         depth: 0.4, bevelEnabled: false,
       });
       trimGeom.rotateX(-Math.PI / 2);
