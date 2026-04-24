@@ -78,6 +78,9 @@ export interface Opening {
   // Position along the wall (0..1) and width in feet
   t: number;
   width: number;
+  // Optional fast-lookup tags so the 3D resolver doesn't need geometric matching
+  wall?: "N" | "E" | "S" | "W";
+  roomIndex?: number;
 }
 
 // Floor plate = the building footprint for a floor (in feet).
