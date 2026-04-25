@@ -592,11 +592,11 @@ function buildPlate(
     if (entranceDoor) openings.push(entranceDoor);
   }
 
-  // Keep the 2D/3D footprint tight. Large rounded clips create false-looking
-  // empty corner gaps compared with real architectural plans.
+  // Tasteful corner curvature on the plate corners — drives both the 2D
+  // corner rooms and 3D corner pillars. Scales with curvatureLevel.
   const minSide = Math.min(fw, fh);
-  const cornerRadius = Math.min(1.5, minSide * 0.02 * curvatureLevel);
-  void vastu; // currently unused; preferences influence entranceDir + scoring elsewhere
+  const cornerRadius = Math.max(0.8, Math.min(4.5, minSide * 0.06 * curvatureLevel));
+  void vastu;
   void rng;
 
   return {
