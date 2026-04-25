@@ -856,14 +856,16 @@ export function generateVariations(
           }
           // Filter zero-height casualties
           plates[f].rooms = rooms.filter((r) => r.h > 0.5);
-          // Now stamp stair (replace existing if any, else add)
+          // Now stamp stair (replace existing if any, else add) and make it
+          // read as the upper-floor stair landing, not a separate entrance.
           const stairIdx = plates[f].rooms.findIndex((r) => r.type === "stairs");
+          const doorWall = groundStairs.doorWall === "E" ? "W" : groundStairs.doorWall === "W" ? "E" : groundStairs.doorWall === "N" ? "S" : "N";
           const stairRect: RoomRect = {
             type: "stairs",
             x: sx, y: sy, w: sw, h: sh,
             floor: plates[f].floor,
             label: LABEL.stairs,
-            doorWall: groundStairs.doorWall,
+            doorWall,
             doorMid: groundStairs.doorMid,
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
