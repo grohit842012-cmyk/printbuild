@@ -273,6 +273,7 @@ function layoutSide(
   floorIndex: number,
   hallwayX: number, // x position where hallway starts (the inner edge for this side)
   hallwayW: number,
+  stairY?: number,
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
@@ -295,7 +296,7 @@ function layoutSide(
 
     let depth = Math.max(min.h, targets[i] * scale);
     if (z.type === "stairs") {
-      depth = Math.min(depth, PREF_ROOM_DIMS.stairs.h + 1);
+      depth = MIN_ROOM_DIMS.stairs.h;
     }
     // Clamp so we don't overrun
     const remaining = totalDepth - cursorY;
@@ -312,7 +313,7 @@ function layoutSide(
     const width = sideWidth;
     // Position: anchor against outer wall on this side
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
-    const y = cursorY;
+    const y = z.type === "stairs" && stairY != null ? stairY : cursorY;
 
     // Decide door wall: opens onto hallway → wall facing hallway
     const doorWall: "N" | "E" | "S" | "W" =
