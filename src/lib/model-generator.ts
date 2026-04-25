@@ -25,7 +25,17 @@ function mulberry32(seed: number) {
   };
 }
 
-const ACCENTS = ["#3b6db8", "#2f5a99", "#4a7fc1", "#5b8fd1", "#264e8a", "#6ea1df"];
+// Theme-aligned accents (navy → vibrant blue family — matches design tokens)
+const ACCENTS = ["#264e8a", "#2f5a99", "#3b6db8", "#4a7fc1", "#1e3a6e", "#5b8fd1"];
+
+const ELEVATION_STYLES: ElevationStyle[] = [
+  "modern-minimal",
+  "mediterranean-arch",
+  "contemporary-box",
+  "tropical-veranda",
+  "art-deco",
+  "scandi-pitched",
+];
 
 const LABEL: Record<RoomType, string> = {
   living: "Living",
