@@ -477,7 +477,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       if (!visibleFloors.has(plate.floor)) continue;
       const yBase = floorBaseY(plate.floor);
       const fH = floorHeight(plate.floor);
-      const wallH = fH * 0.92;
+      const wallH = fH;
 
       const bounds = roomsBounds(plate.rooms);
 
@@ -531,12 +531,23 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // ------- Story trim band along exterior walls (single plate rectangle) -------
-      const trimGeom = new THREE.BoxGeometry(plate.w + 0.3, 0.4, plate.h + 0.3);
-      const trim = new THREE.Mesh(trimGeom, trimMat);
-      trim.position.set(plate.x + plate.w / 2, yBase + wallH - 0.2, plate.y + plate.h / 2);
-      trim.castShadow = true;
-      group.add(trim);
+      // ------- Story trim band as perimeter strips, aligned to the plate edges -------
+      const trimY = yBase + wallH - 0.2;
+      const trimT = 0.35;
+      const trimH = 0.4;
+      const trimPieces: [number, number, number, number][] = [
+        [plate.x + plate.w / 2, trimY, plate.y - trimT / 2, plate.w + trimT * 2],
+        [plate.x + plate.w / 2, trimY, plate.y + plate.h + trimT / 2, plate.w + trimT * 2],
+        [plate.x - trimT / 2, trimY, plate.y + plate.h / 2, plate.h],
+        [plate.x + plate.w + trimT / 2, trimY, plate.y + plate.h / 2, plate.h],
+      ];
+      trimPieces.forEach(([tx, ty, tz, len], i) => {
+        const geom = i < 2 ? new THREE.BoxGeometry(len, trimH, trimT) : new THREE.BoxGeometry(trimT, trimH, len);
+        const trim = new THREE.Mesh(geom, trimMat);
+        trim.position.set(tx, ty, tz);
+        trim.castShadow = true;
+        group.add(trim);
+      });
 
       // ------- Staircase -------
       if (plate.floor < topFloor) {
