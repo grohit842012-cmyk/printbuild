@@ -189,9 +189,13 @@ function planFloor(
     const m = PREF_ROOM_DIMS[r.type];
     return -(m.w * m.h);
   };
-  const publicRooms = list.filter((r) => PUBLIC.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
-  const privateRooms = list.filter((r) => PRIVATE.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
-  const baths = list.filter((r) => r.type === "bath");
+  const varyOrder = (a: FlatRoom, b: FlatRoom) => {
+    const primary = sortKey(a) - sortKey(b);
+    return Math.abs(primary) > 24 ? primary : rng() - 0.5;
+  };
+  const publicRooms = list.filter((r) => PUBLIC.includes(r.type)).sort(varyOrder);
+  const privateRooms = list.filter((r) => PRIVATE.includes(r.type)).sort(varyOrder);
+  const baths = list.filter((r) => r.type === "bath").sort(() => rng() - 0.5);
   const others = list.filter(
     (r) =>
       !PUBLIC.includes(r.type) &&
