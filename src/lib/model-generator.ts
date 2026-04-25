@@ -290,8 +290,15 @@ function layoutSide(
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
+  const orderedZones = [...zones];
+  const stairIndex = orderedZones.findIndex((z) => z.type === "stairs");
+  if (stairIndex > 0) {
+    const [stair] = orderedZones.splice(stairIndex, 1);
+    orderedZones.unshift(stair);
+  }
+
   // Compute target depths (along corridor) for each zone, scaled to fit.
-  const targets = zones.map((z) => {
+  const targets = orderedZones.map((z) => {
     const pref = PREF_ROOM_DIMS[z.type];
     // Orient long side along the hallway when sensible
     const along = Math.max(pref.w, pref.h);
@@ -302,8 +309,8 @@ function layoutSide(
 
   const rooms: RoomRect[] = [];
   let cursorY = 0;
-  for (let i = 0; i < zones.length; i++) {
-    const z = zones[i];
+  for (let i = 0; i < orderedZones.length; i++) {
+    const z = orderedZones[i];
     const min = MIN_ROOM_DIMS[z.type];
     const pref = PREF_ROOM_DIMS[z.type];
 
@@ -313,7 +320,7 @@ function layoutSide(
     }
     // Clamp so we don't overrun
     const remaining = totalDepth - cursorY;
-    const remainingZones = zones.length - i;
+    const remainingZones = orderedZones.length - i;
     if (depth > remaining - (remainingZones - 1) * min.h) {
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
