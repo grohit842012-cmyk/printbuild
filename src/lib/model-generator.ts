@@ -160,6 +160,7 @@ interface PlacedZone {
 function planFloor(
   rooms: FlatRoom[],
   entranceWall: "N" | "E" | "S" | "W",
+  rng: () => number,
 ): PlacedZone[] {
   // Public zone (priority front): living, dining, kitchen, pooja
   // Private zone (priority back): bedrooms, master_bedroom, study
@@ -205,15 +206,19 @@ function planFloor(
   let leftCount = 0;
   let rightCount = 0;
   const pushAlt = (r: FlatRoom) => {
-    const side: "left" | "right" = leftCount <= rightCount ? "left" : "right";
+    const side: "left" | "right" = leftCount === rightCount
+      ? (rng() < 0.5 ? "left" : "right")
+      : leftCount < rightCount ? "left" : "right";
     order.push({ type: r.type, sizePref: r.sizePref, side, order: leftCount + rightCount });
     if (side === "left") leftCount++;
     else rightCount++;
   };
   for (const r of publicRooms) pushAlt(r);
   if (stairs) {
-    order.push({ type: "stairs", sizePref: stairs.sizePref, side: "right", order: leftCount + rightCount });
-    rightCount++;
+    const side: "left" | "right" = rng() < 0.5 ? "left" : "right";
+    order.push({ type: "stairs", sizePref: stairs.sizePref, side, order: leftCount + rightCount });
+    if (side === "left") leftCount++;
+    else rightCount++;
   }
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
