@@ -741,7 +741,51 @@ function evaluateLiveability(
   return { hallway, bedroomsHaveWindows, bathroomsPrivate, entranceCorrect, stairsAligned, issues };
 }
 
-export function generateVariations(
+function computeParking(
+  ground: FloorPlate,
+  entranceDir: Direction,
+  rng: () => number,
+): ParkingArea {
+  // 2-bay parking: 18 ft × 20 ft. Sits on the front setback band of the
+  // entrance wall, offset sideways so it doesn't overlap the porch.
+  const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
+  const door = ground.entranceDoor;
+  const bays = 2;
+  const w = bays * 9; // each bay = 9 ft wide
+  const h = 20; // depth of car
+  const covered = rng() < 0.6;
+  const setback = SETBACK; // matches building setback
+  let x = ground.x;
+  let y = ground.y;
+  if (wall === "N") {
+    y = ground.y - setback - h;
+    const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
+    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
+    x = doorMid + offset * (w / 2 + 4) - w / 2;
+    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+  } else if (wall === "S") {
+    y = ground.y + ground.h + setback;
+    const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
+    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
+    x = doorMid + offset * (w / 2 + 4) - w / 2;
+    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+  } else if (wall === "E") {
+    x = ground.x + ground.w + setback;
+    const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
+    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
+    y = doorMid + offset * (h / 2 + 4) - h / 2;
+    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+  } else {
+    x = ground.x - setback - w;
+    const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
+    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
+    y = doorMid + offset * (h / 2 + 4) - h / 2;
+    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+  }
+  return { x, y, w, h, bays, covered };
+}
+
+
   spec: DesignSpec,
   vastu: VastuPreferences,
   count = 10,
