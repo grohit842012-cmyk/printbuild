@@ -150,6 +150,8 @@ interface PlacedZone {
   isEnsuiteOf?: number; // index of master bedroom in placed list
 }
 
+type HallSide = "left" | "right";
+
 /**
  * Plan a residential floor:
  *   - hallway runs from front wall to back wall
@@ -161,6 +163,7 @@ function planFloor(
   rooms: FlatRoom[],
   entranceWall: "N" | "E" | "S" | "W",
   rng: () => number,
+  stairSide: HallSide,
 ): PlacedZone[] {
   // Public zone (priority front): living, dining, kitchen, pooja
   // Private zone (priority back): bedrooms, master_bedroom, study
@@ -209,21 +212,20 @@ function planFloor(
   const order: PlacedZone[] = [];
   let leftCount = 0;
   let rightCount = 0;
-  const pushAlt = (r: FlatRoom) => {
-    const side: "left" | "right" = leftCount === rightCount
-      ? (rng() < 0.5 ? "left" : "right")
-      : leftCount < rightCount ? "left" : "right";
-    order.push({ type: r.type, sizePref: r.sizePref, side, order: leftCount + rightCount });
+  const pushTo = (r: FlatRoom, side: HallSide) => {
+    const orderIndex = side === "left" ? leftCount : rightCount;
+    order.push({ type: r.type, sizePref: r.sizePref, side, order: orderIndex });
     if (side === "left") leftCount++;
     else rightCount++;
   };
+  const pushAlt = (r: FlatRoom) => {
+    const side: HallSide = leftCount === rightCount
+      ? (rng() < 0.5 ? "left" : "right")
+      : leftCount < rightCount ? "left" : "right";
+    pushTo(r, side);
+  };
+  if (stairs) pushTo(stairs, stairSide);
   for (const r of publicRooms) pushAlt(r);
-  if (stairs) {
-    const side: "left" | "right" = rng() < 0.5 ? "left" : "right";
-    order.push({ type: "stairs", sizePref: stairs.sizePref, side, order: leftCount + rightCount });
-    if (side === "left") leftCount++;
-    else rightCount++;
-  }
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
   for (const r of privateRooms) pushAlt(r);
@@ -246,6 +248,19 @@ function planFloor(
     }
   }
   for (const r of others) pushAlt(r);
+
+  const rebalanceStairOnlySide = () => {
+    const leftRooms = order.filter((o) => o.side === "left");
+    const rightRooms = order.filter((o) => o.side === "right");
+    if (leftRooms.length === 1 && leftRooms[0].type === "stairs" && rightRooms.length > 1) {
+      const move = rightRooms.find((o) => o.type !== "stairs");
+      if (move) move.side = "left";
+    } else if (rightRooms.length === 1 && rightRooms[0].type === "stairs" && leftRooms.length > 1) {
+      const move = leftRooms.find((o) => o.type !== "stairs");
+      if (move) move.side = "right";
+    }
+  };
+  rebalanceStairOnlySide();
 
   // Re-number order positions
   const left = order.filter((o) => o.side === "left").sort((a, b) => a.order - b.order);
@@ -271,11 +286,19 @@ function layoutSide(
   floorIndex: number,
   hallwayX: number, // x position where hallway starts (the inner edge for this side)
   hallwayW: number,
+  stairY?: number,
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
+  const orderedZones = [...zones];
+  const stairIndex = orderedZones.findIndex((z) => z.type === "stairs");
+  if (stairIndex > 0) {
+    const [stair] = orderedZones.splice(stairIndex, 1);
+    orderedZones.unshift(stair);
+  }
+
   // Compute target depths (along corridor) for each zone, scaled to fit.
-  const targets = zones.map((z) => {
+  const targets = orderedZones.map((z) => {
     const pref = PREF_ROOM_DIMS[z.type];
     // Orient long side along the hallway when sensible
     const along = Math.max(pref.w, pref.h);
@@ -286,18 +309,18 @@ function layoutSide(
 
   const rooms: RoomRect[] = [];
   let cursorY = 0;
-  for (let i = 0; i < zones.length; i++) {
-    const z = zones[i];
+  for (let i = 0; i < orderedZones.length; i++) {
+    const z = orderedZones[i];
     const min = MIN_ROOM_DIMS[z.type];
     const pref = PREF_ROOM_DIMS[z.type];
 
     let depth = Math.max(min.h, targets[i] * scale);
     if (z.type === "stairs") {
-      depth = Math.min(depth, PREF_ROOM_DIMS.stairs.h + 1);
+      depth = MIN_ROOM_DIMS.stairs.h;
     }
     // Clamp so we don't overrun
     const remaining = totalDepth - cursorY;
-    const remainingZones = zones.length - i;
+    const remainingZones = orderedZones.length - i;
     if (depth > remaining - (remainingZones - 1) * min.h) {
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
@@ -310,7 +333,7 @@ function layoutSide(
     const width = sideWidth;
     // Position: anchor against outer wall on this side
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
-    const y = cursorY;
+    const y = z.type === "stairs" && stairY != null ? stairY : cursorY;
 
     // Decide door wall: opens onto hallway → wall facing hallway
     const doorWall: "N" | "E" | "S" | "W" =
@@ -345,6 +368,7 @@ function buildPlate(
   entranceDir: Direction,
   rng: () => number,
   isGroundFloor: boolean,
+  stairSide: HallSide,
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
@@ -368,7 +392,7 @@ function buildPlate(
   const sideWidth = (workWidth - hallwayW) / 2;
   const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
 
-  const zones = planFloor(rooms, entranceWall, rng);
+  const zones = planFloor(rooms, entranceWall, rng, stairSide);
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
@@ -568,9 +592,10 @@ function buildPlate(
     if (entranceDoor) openings.push(entranceDoor);
   }
 
-  // Curvature stays at maximum so corner rooms read curved.
+  // Keep the 2D/3D footprint tight. Large rounded clips create false-looking
+  // empty corner gaps compared with real architectural plans.
   const minSide = Math.min(fw, fh);
-  const cornerRadius = minSide * (0.20 + 0.04 * curvatureLevel);
+  const cornerRadius = Math.min(1.5, minSide * 0.02 * curvatureLevel);
   void vastu; // currently unused; preferences influence entranceDir + scoring elsewhere
   void rng;
 
@@ -760,6 +785,7 @@ export function generateVariations(
     const baseCurv =
       spec.curvature === "gentle" ? 0.25 : spec.curvature === "bold" ? 0.8 : 0.5;
     const curvatureLevel = Math.max(0.1, Math.min(1, baseCurv + (rng() - 0.5) * 0.25));
+    const stairSide: HallSide = rng() < 0.5 ? "left" : "right";
 
     const plates: FloorPlate[] = [];
     for (let f = 0; f < spec.floors; f++) {
@@ -777,6 +803,7 @@ export function generateVariations(
           entranceDir,
           rng,
           f === 0,
+          stairSide,
         ),
       );
     }
@@ -830,14 +857,16 @@ export function generateVariations(
           }
           // Filter zero-height casualties
           plates[f].rooms = rooms.filter((r) => r.h > 0.5);
-          // Now stamp stair (replace existing if any, else add)
+          // Now stamp stair (replace existing if any, else add) and make it
+          // read as the upper-floor stair landing, not a separate entrance.
           const stairIdx = plates[f].rooms.findIndex((r) => r.type === "stairs");
+          const doorWall: "N" | "E" | "S" | "W" = groundStairs.doorWall === "E" ? "W" : groundStairs.doorWall === "W" ? "E" : groundStairs.doorWall === "N" ? "S" : "N";
           const stairRect: RoomRect = {
             type: "stairs",
             x: sx, y: sy, w: sw, h: sh,
             floor: plates[f].floor,
             label: LABEL.stairs,
-            doorWall: groundStairs.doorWall,
+            doorWall,
             doorMid: groundStairs.doorMid,
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
