@@ -842,6 +842,7 @@ export function generateVariations(
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
           else plates[f].rooms.push(stairRect);
+          plates[f] = rebuildInteriorOpenings(plates[f]);
         }
       }
     }
