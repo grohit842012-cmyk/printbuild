@@ -719,15 +719,6 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       door.castShadow = true;
       group.add(door);
 
-      const doorFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(dw + 0.9, DOOR_HEIGHT + 0.8, 0.35),
-        frameMat,
-      );
-      doorFrame.position.set(exMid, PLINTH_HEIGHT + DOOR_HEIGHT / 2 + 0.1, ezMid);
-      doorFrame.rotation.y = angle;
-      doorFrame.castShadow = true;
-      group.add(doorFrame);
-
       const arch = new THREE.Mesh(
         new THREE.TorusGeometry(2.5, 0.4, 10, 24, Math.PI),
         new THREE.MeshStandardMaterial({ color: variation.paletteAccent, roughness: 0.5 }),
