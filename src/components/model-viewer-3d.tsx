@@ -51,19 +51,6 @@ function roomsBounds(rooms: RoomRect[]): RoomFootprintBounds {
   return { minX, maxX, minY, maxY };
 }
 
-/** Build a THREE.Shape from union of axis-aligned rectangles by extruding each
- *  separately. We just merge by adding multiple shapes via ShapeGeometry/Extrude
- *  with multi-shape input. */
-function rectShape(x: number, y: number, w: number, h: number): THREE.Shape {
-  const s = new THREE.Shape();
-  s.moveTo(x, y);
-  s.lineTo(x + w, y);
-  s.lineTo(x + w, y + h);
-  s.lineTo(x, y + h);
-  s.lineTo(x, y);
-  return s;
-}
-
 /** Classify and build a wall segment along one side of a room.
  *  Returns segments split around any openings on that wall. */
 interface WallSegment {
