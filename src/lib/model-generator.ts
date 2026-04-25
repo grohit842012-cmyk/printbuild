@@ -785,7 +785,7 @@ function computeParking(
   return { x, y, w, h, bays, covered };
 }
 
-
+export function generateVariations(
   spec: DesignSpec,
   vastu: VastuPreferences,
   count = 10,
