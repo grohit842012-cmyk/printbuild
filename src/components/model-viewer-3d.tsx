@@ -751,6 +751,58 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       arch.rotation.y = angle;
       group.add(arch);
     }
+
+    // ------- Parking area: driveway slab + optional carport canopy -------
+    if (variation.parking) {
+      const p = variation.parking;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(p.w, 0.3, p.h),
+        drivewayMat,
+      );
+      slab.position.set(p.x + p.w / 2, 0.15, p.y + p.h / 2);
+      slab.receiveShadow = true;
+      group.add(slab);
+
+      // Bay striping (white lines)
+      const stripeMat = new THREE.MeshStandardMaterial({ color: "#f5efe2", roughness: 0.7 });
+      for (let b = 1; b < p.bays; b++) {
+        const stripe = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.05, p.h - 1.5),
+          stripeMat,
+        );
+        stripe.position.set(p.x + (p.w / p.bays) * b, 0.32, p.y + p.h / 2);
+        group.add(stripe);
+      }
+
+      if (p.covered) {
+        const colMat = new THREE.MeshStandardMaterial({ color: pal.trim, roughness: 0.7 });
+        const colH = 9;
+        const colCorners: [number, number][] = [
+          [p.x + 0.4, p.y + 0.4],
+          [p.x + p.w - 0.4, p.y + 0.4],
+          [p.x + 0.4, p.y + p.h - 0.4],
+          [p.x + p.w - 0.4, p.y + p.h - 0.4],
+        ];
+        for (const [cxC, czC] of colCorners) {
+          const col = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.3, colH, 12),
+            colMat,
+          );
+          col.position.set(cxC, colH / 2, czC);
+          col.castShadow = true;
+          group.add(col);
+        }
+        // Canopy roof
+        const canopyMat = new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.6 });
+        const canopy = new THREE.Mesh(
+          new THREE.BoxGeometry(p.w + 0.8, 0.35, p.h + 0.8),
+          canopyMat,
+        );
+        canopy.position.set(p.x + p.w / 2, colH + 0.18, p.y + p.h / 2);
+        canopy.castShadow = true;
+        group.add(canopy);
+      }
+    }
   }, [variation, visibleFloors]);
 
   return <div ref={mountRef} className={className ?? "w-full h-full"} />;
