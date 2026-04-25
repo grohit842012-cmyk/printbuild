@@ -648,6 +648,39 @@ function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
   return { ...plate, openings, entranceDoor: undefined };
 }
 
+function addUpperStairHallConnection(plate: FloorPlate, stair: RoomRect): FloorPlate {
+  if (!plate.hallway) return plate;
+  const hall = plate.hallway;
+  const overlapsY = stair.y < hall.y + hall.h && stair.y + stair.h > hall.y;
+  const overlapsX = stair.x < hall.x + hall.w && stair.x + stair.w > hall.x;
+  const connectsVertically = Math.abs(stair.x + stair.w - hall.x) < 0.8 || Math.abs(stair.x - (hall.x + hall.w)) < 0.8;
+  const connectsHorizontally = Math.abs(stair.y + stair.h - hall.y) < 0.8 || Math.abs(stair.y - (hall.y + hall.h)) < 0.8;
+  if ((overlapsY && connectsVertically) || (overlapsX && connectsHorizontally)) return plate;
+  const bridgeW = 3;
+  if (hall.h >= hall.w) {
+    const x1 = Math.min(stair.x + stair.w, hall.x);
+    const x2 = Math.max(stair.x, hall.x + hall.w);
+    if (x2 <= x1) return plate;
+    plate.hallway = {
+      x: x1,
+      y: Math.max(plate.y, Math.min(stair.y + stair.h / 2 - bridgeW / 2, plate.y + plate.h - bridgeW)),
+      w: x2 - x1,
+      h: bridgeW,
+    };
+  } else {
+    const y1 = Math.min(stair.y + stair.h, hall.y);
+    const y2 = Math.max(stair.y, hall.y + hall.h);
+    if (y2 <= y1) return plate;
+    plate.hallway = {
+      x: Math.max(plate.x, Math.min(stair.x + stair.w / 2 - bridgeW / 2, plate.x + plate.w - bridgeW)),
+      y: y1,
+      w: bridgeW,
+      h: y2 - y1,
+    };
+  }
+  return plate;
+}
+
 // ---------- Liveability evaluation ----------
 function evaluateLiveability(
   plates: FloorPlate[],
