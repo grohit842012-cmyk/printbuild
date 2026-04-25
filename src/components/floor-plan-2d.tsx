@@ -101,6 +101,51 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         fill="none" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1"
       />
 
+      {/* Parking — only on the ground floor */}
+      {floor === 1 && variation.parking && (() => {
+        const p = variation.parking;
+        const px = ox + p.x * scale;
+        const py = oy + p.y * scale;
+        const pw = p.w * scale;
+        const ph = p.h * scale;
+        const stripes = [];
+        for (let b = 1; b < p.bays; b++) {
+          stripes.push(
+            <line
+              key={b}
+              x1={px + (pw / p.bays) * b}
+              x2={px + (pw / p.bays) * b}
+              y1={py + 4}
+              y2={py + ph - 4}
+              stroke="#64748b"
+              strokeDasharray="3 2"
+              strokeWidth="0.8"
+            />,
+          );
+        }
+        return (
+          <g>
+            <rect
+              x={px} y={py} width={pw} height={ph}
+              fill={p.covered ? "#cbd5e1" : "#e2e8f0"}
+              stroke="#475569" strokeWidth="1"
+              strokeDasharray={p.covered ? undefined : "4 2"}
+            />
+            {stripes}
+            <text
+              x={px + pw / 2}
+              y={py + ph / 2 + 3}
+              textAnchor="middle"
+              fontSize="9"
+              fontWeight="600"
+              fill="#334155"
+            >
+              {p.covered ? "Carport" : "Parking"}
+            </text>
+          </g>
+        );
+      })()}
+
       {/* Floor plate footprint */}
       <path
         d={plateD}
