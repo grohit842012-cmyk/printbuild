@@ -101,6 +101,51 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         fill="none" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1"
       />
 
+      {/* Parking — only on the ground floor */}
+      {floor === 1 && variation.parking && (() => {
+        const p = variation.parking;
+        const px = ox + p.x * scale;
+        const py = oy + p.y * scale;
+        const pw = p.w * scale;
+        const ph = p.h * scale;
+        const stripes = [];
+        for (let b = 1; b < p.bays; b++) {
+          stripes.push(
+            <line
+              key={b}
+              x1={px + (pw / p.bays) * b}
+              x2={px + (pw / p.bays) * b}
+              y1={py + 4}
+              y2={py + ph - 4}
+              stroke="#64748b"
+              strokeDasharray="3 2"
+              strokeWidth="0.8"
+            />,
+          );
+        }
+        return (
+          <g>
+            <rect
+              x={px} y={py} width={pw} height={ph}
+              fill={p.covered ? "#cbd5e1" : "#e2e8f0"}
+              stroke="#475569" strokeWidth="1"
+              strokeDasharray={p.covered ? undefined : "4 2"}
+            />
+            {stripes}
+            <text
+              x={px + pw / 2}
+              y={py + ph / 2 + 3}
+              textAnchor="middle"
+              fontSize="9"
+              fontWeight="600"
+              fill="#334155"
+            >
+              {p.covered ? "Carport" : "Parking"}
+            </text>
+          </g>
+        );
+      })()}
+
       {/* Floor plate footprint */}
       <path
         d={plateD}
@@ -124,7 +169,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
           />
         )}
 
-        {/* Rooms */}
+        {/* Rooms — corner rooms get rounded outer corners matching the plate */}
         {plate.rooms.map((r, i) => {
           const rx = ox + r.x * scale;
           const ry = oy + r.y * scale;
@@ -132,13 +177,43 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
           const rh = r.h * scale;
           const cxR = rx + rw / 2;
           const cyR = ry + rh / 2;
+          // Determine which corners of this room sit on the plate's outer corners
+          const tol = 0.6;
+          const isW = Math.abs(r.x - plate.x) < tol;
+          const isE = Math.abs(r.x + r.w - (plate.x + plate.w)) < tol;
+          const isN = Math.abs(r.y - plate.y) < tol;
+          const isS = Math.abs(r.y + r.h - (plate.y + plate.h)) < tol;
+          const cr = Math.min(plate.cornerRadius * scale, rw / 3, rh / 3);
+          const rTL = isW && isN ? cr : 0;
+          const rTR = isE && isN ? cr : 0;
+          const rBR = isE && isS ? cr : 0;
+          const rBL = isW && isS ? cr : 0;
+          const roomD =
+            cr > 0 && (rTL || rTR || rBR || rBL)
+              ? [
+                  `M ${rx + rTL} ${ry}`,
+                  `L ${rx + rw - rTR} ${ry}`,
+                  rTR ? `Q ${rx + rw} ${ry} ${rx + rw} ${ry + rTR}` : `L ${rx + rw} ${ry}`,
+                  `L ${rx + rw} ${ry + rh - rBR}`,
+                  rBR ? `Q ${rx + rw} ${ry + rh} ${rx + rw - rBR} ${ry + rh}` : `L ${rx + rw} ${ry + rh}`,
+                  `L ${rx + rBL} ${ry + rh}`,
+                  rBL ? `Q ${rx} ${ry + rh} ${rx} ${ry + rh - rBL}` : `L ${rx} ${ry + rh}`,
+                  `L ${rx} ${ry + rTL}`,
+                  rTL ? `Q ${rx} ${ry} ${rx + rTL} ${ry}` : `L ${rx} ${ry}`,
+                  "Z",
+                ].join(" ")
+              : null;
           return (
             <g key={i}>
-              <rect
-                x={rx} y={ry} width={rw} height={rh}
-                fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
-                stroke="#1e293b" strokeWidth="0.8"
-              />
+              {roomD ? (
+                <path d={roomD} fill={ROOM_COLOR[r.type] ?? "#e2e8f0"} stroke="#1e293b" strokeWidth="0.8" />
+              ) : (
+                <rect
+                  x={rx} y={ry} width={rw} height={rh}
+                  fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
+                  stroke="#1e293b" strokeWidth="0.8"
+                />
+              )}
               {r.type === "stairs" && Array.from({ length: 8 }).map((_, k) => (
                 <line
                   key={k}

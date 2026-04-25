@@ -431,19 +431,32 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     }
 
     const accent = variation.paletteAccent;
-    const wallMat = new THREE.MeshStandardMaterial({ color: "#f5efe2", roughness: 0.85 });
+    // Wall + trim palette varies per elevation style — all rooted in the
+    // cool-ivory + navy theme.
+    const stylePalette: Record<string, { wall: string; trim: string; roof: string; window: string }> = {
+      "modern-minimal": { wall: "#f4efe6", trim: "#1f2d4a", roof: "#1f2d4a", window: "#3b6db8" },
+      "mediterranean-arch": { wall: "#f8f1de", trim: "#264e8a", roof: "#8e3a2a", window: "#3b6db8" },
+      "contemporary-box": { wall: "#eae3d3", trim: "#0f1f3d", roof: "#2f5a99", window: "#4a7fc1" },
+      "tropical-veranda": { wall: "#f3ecdc", trim: "#3b6db8", roof: "#5b8fd1", window: "#9ec5e8" },
+      "art-deco": { wall: "#f1e8d0", trim: "#1e3a6e", roof: "#264e8a", window: "#4a7fc1" },
+      "scandi-pitched": { wall: "#f7f1e6", trim: "#2f5a99", roof: "#1f2d4a", window: "#9ec5e8" },
+    };
+    const pal = stylePalette[variation.elevationStyle] ?? stylePalette["modern-minimal"];
+    const wallMat = new THREE.MeshStandardMaterial({ color: pal.wall, roughness: 0.85 });
     const interiorMat = new THREE.MeshStandardMaterial({ color: "#ece2cc", roughness: 0.9 });
-    const trimMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.55 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: pal.trim, roughness: 0.55 });
     const slabMat = new THREE.MeshStandardMaterial({ color: "#cbd5e1", roughness: 0.9 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.6 });
     const stoneMat = new THREE.MeshStandardMaterial({ color: "#a89b86", roughness: 0.95 });
     const glassMat = new THREE.MeshStandardMaterial({
-      color: "#9ec5e8", roughness: 0.15, metalness: 0.1,
+      color: pal.window, roughness: 0.15, metalness: 0.1,
       transparent: true, opacity: 0.55,
     });
     const frameMat = new THREE.MeshStandardMaterial({ color: "#3a3024", roughness: 0.7 });
     const stairMat = new THREE.MeshStandardMaterial({ color: "#9ca3af", roughness: 0.75 });
     const hallwayMat = new THREE.MeshStandardMaterial({ color: "#d6cbb1", roughness: 0.9 });
+    const drivewayMat = new THREE.MeshStandardMaterial({ color: "#7d8896", roughness: 0.95 });
+    void accent;
 
     // Center building on origin
     const cx = -variation.plotWidthFt / 2;
@@ -590,7 +603,7 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         }
       }
 
-      // ------- Roof on top floor: single plate rectangle padded for overhang -------
+      // ------- Roof on top floor — combines spec roofType + elevation style -------
       if (plate.floor === topFloor) {
         const roofY = yBase + fH;
         const overhang = ROOF_OVERHANG;
@@ -598,12 +611,17 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         const roofCenterZ = plate.y + plate.h / 2;
         const roofW = plate.w + overhang * 2;
         const roofH = plate.h + overhang * 2;
-        if (variation.roofType === "domed") {
-          const slabG = new THREE.BoxGeometry(roofW, 0.6, roofH);
-          const overSlab = new THREE.Mesh(slabG, roofMat);
-          overSlab.position.set(roofCenterX, roofY + 0.3, roofCenterZ);
-          overSlab.castShadow = true;
-          group.add(overSlab);
+        // Elevation style refines the roof silhouette
+        const style = variation.elevationStyle;
+        const baseSlab = () => {
+          const flatG = new THREE.BoxGeometry(roofW, 0.6, roofH);
+          const flat = new THREE.Mesh(flatG, roofMat);
+          flat.position.set(roofCenterX, roofY + 0.3, roofCenterZ);
+          flat.castShadow = true;
+          group.add(flat);
+        };
+        if (variation.roofType === "domed" || style === "mediterranean-arch") {
+          baseSlab();
           const bw = plate.w;
           const bh = plate.h;
           const r = Math.min(bw, bh) * 0.5;
@@ -615,30 +633,94 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           dome.position.set(roofCenterX, roofY + 0.5, roofCenterZ);
           dome.castShadow = true;
           group.add(dome);
-        } else if (variation.roofType === "sloped") {
-          const slabG = new THREE.BoxGeometry(roofW, 0.5, roofH);
+        } else if (variation.roofType === "sloped" || style === "scandi-pitched") {
+          baseSlab();
+          const bw = plate.w;
+          const bh = plate.h;
+          // Pitched gable along the longer dimension
+          const peakH = Math.min(bw, bh) * 0.32;
+          const along = bw >= bh ? bw : bh;
+          const across = bw >= bh ? bh : bw;
+          // Two slopes meeting at a ridge
+          const slopeLen = Math.sqrt((across / 2) ** 2 + peakH ** 2);
+          const angle = Math.atan2(peakH, across / 2);
+          for (const sign of [-1, 1]) {
+            const slope = new THREE.Mesh(
+              new THREE.BoxGeometry(along + overhang * 2, 0.25, slopeLen + overhang),
+              roofMat,
+            );
+            const offset = (across / 4) * sign;
+            slope.rotation.x = bw >= bh ? -sign * angle : 0;
+            slope.rotation.z = bw >= bh ? 0 : sign * angle;
+            if (bw >= bh) {
+              slope.position.set(roofCenterX, roofY + 0.5 + peakH / 2, roofCenterZ + offset);
+            } else {
+              slope.position.set(roofCenterX + offset, roofY + 0.5 + peakH / 2, roofCenterZ);
+              slope.rotation.y = Math.PI / 2;
+            }
+            slope.castShadow = true;
+            group.add(slope);
+          }
+        } else if (style === "tropical-veranda") {
+          // Wide low-pitch hip with deep eaves
+          const eaveExtra = 1.2;
+          const slabG = new THREE.BoxGeometry(roofW + eaveExtra * 2, 0.5, roofH + eaveExtra * 2);
           const base = new THREE.Mesh(slabG, roofMat);
           base.position.set(roofCenterX, roofY + 0.25, roofCenterZ);
           base.castShadow = true;
           group.add(base);
-          const bw = plate.w;
-          const bh = plate.h;
-          const peakH = Math.min(bw, bh) * 0.25;
-          const cone = new THREE.Mesh(
-            new THREE.ConeGeometry(Math.min(bw, bh) * 0.55, peakH, 4),
+          const peakH = Math.min(plate.w, plate.h) * 0.15;
+          const hip = new THREE.Mesh(
+            new THREE.ConeGeometry(Math.min(plate.w, plate.h) * 0.6, peakH, 4),
             roofMat,
           );
-          cone.position.set(roofCenterX, roofY + peakH / 2 + 0.5, roofCenterZ);
-          cone.rotation.y = Math.PI / 4;
-          cone.scale.set(bw / Math.min(bw, bh), 1, bh / Math.min(bw, bh));
-          cone.castShadow = true;
-          group.add(cone);
+          hip.position.set(roofCenterX, roofY + 0.5 + peakH / 2, roofCenterZ);
+          hip.rotation.y = Math.PI / 4;
+          hip.scale.set(plate.w / Math.min(plate.w, plate.h), 1, plate.h / Math.min(plate.w, plate.h));
+          hip.castShadow = true;
+          group.add(hip);
+        } else if (style === "art-deco") {
+          // Stepped flat roof (ziggurat parapet)
+          baseSlab();
+          for (let s = 1; s <= 2; s++) {
+            const inset = s * 1.2;
+            const stepG = new THREE.BoxGeometry(plate.w - inset * 2, 0.4, plate.h - inset * 2);
+            const step = new THREE.Mesh(stepG, trimMat);
+            step.position.set(roofCenterX, roofY + 0.6 + s * 0.4, roofCenterZ);
+            step.castShadow = true;
+            group.add(step);
+          }
+        } else if (style === "contemporary-box") {
+          // Butterfly: two slopes dipping toward center
+          const peakH = Math.min(plate.w, plate.h) * 0.18;
+          for (const sign of [-1, 1]) {
+            const slope = new THREE.Mesh(
+              new THREE.BoxGeometry(roofW / 2 + 0.2, 0.35, roofH),
+              roofMat,
+            );
+            slope.position.set(roofCenterX + sign * roofW / 4, roofY + 0.5 + peakH / 2, roofCenterZ);
+            slope.rotation.z = -sign * 0.18;
+            slope.castShadow = true;
+            group.add(slope);
+            void peakH;
+          }
         } else {
-          const flatG = new THREE.BoxGeometry(roofW, 0.7, roofH);
-          const flat = new THREE.Mesh(flatG, roofMat);
-          flat.position.set(roofCenterX, roofY + 0.35, roofCenterZ);
-          flat.castShadow = true;
-          group.add(flat);
+          // modern-minimal flat roof with parapet
+          baseSlab();
+          // Parapet rim
+          const rimT = 0.4;
+          const rimH = 1.0;
+          const rims: [number, number, number, number][] = [
+            [roofCenterX, plate.y - rimT / 2, plate.w + rimT * 2, rimT],
+            [roofCenterX, plate.y + plate.h + rimT / 2, plate.w + rimT * 2, rimT],
+            [plate.x - rimT / 2, roofCenterZ, rimT, plate.h],
+            [plate.x + plate.w + rimT / 2, roofCenterZ, rimT, plate.h],
+          ];
+          for (const [rx, rz, rw, rd] of rims) {
+            const rim = new THREE.Mesh(new THREE.BoxGeometry(rw, rimH, rd), trimMat);
+            rim.position.set(rx, roofY + 0.6 + rimH / 2, rz);
+            group.add(rim);
+          }
         }
       }
     }
@@ -737,6 +819,58 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       arch.position.set(exMid, PLINTH_HEIGHT + DOOR_HEIGHT + 0.4, ezMid);
       arch.rotation.y = angle;
       group.add(arch);
+    }
+
+    // ------- Parking area: driveway slab + optional carport canopy -------
+    if (variation.parking) {
+      const p = variation.parking;
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(p.w, 0.3, p.h),
+        drivewayMat,
+      );
+      slab.position.set(p.x + p.w / 2, 0.15, p.y + p.h / 2);
+      slab.receiveShadow = true;
+      group.add(slab);
+
+      // Bay striping (white lines)
+      const stripeMat = new THREE.MeshStandardMaterial({ color: "#f5efe2", roughness: 0.7 });
+      for (let b = 1; b < p.bays; b++) {
+        const stripe = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.05, p.h - 1.5),
+          stripeMat,
+        );
+        stripe.position.set(p.x + (p.w / p.bays) * b, 0.32, p.y + p.h / 2);
+        group.add(stripe);
+      }
+
+      if (p.covered) {
+        const colMat = new THREE.MeshStandardMaterial({ color: pal.trim, roughness: 0.7 });
+        const colH = 9;
+        const colCorners: [number, number][] = [
+          [p.x + 0.4, p.y + 0.4],
+          [p.x + p.w - 0.4, p.y + 0.4],
+          [p.x + 0.4, p.y + p.h - 0.4],
+          [p.x + p.w - 0.4, p.y + p.h - 0.4],
+        ];
+        for (const [cxC, czC] of colCorners) {
+          const col = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.3, colH, 12),
+            colMat,
+          );
+          col.position.set(cxC, colH / 2, czC);
+          col.castShadow = true;
+          group.add(col);
+        }
+        // Canopy roof
+        const canopyMat = new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.6 });
+        const canopy = new THREE.Mesh(
+          new THREE.BoxGeometry(p.w + 0.8, 0.35, p.h + 0.8),
+          canopyMat,
+        );
+        canopy.position.set(p.x + p.w / 2, colH + 0.18, p.y + p.h / 2);
+        canopy.castShadow = true;
+        group.add(canopy);
+      }
     }
   }, [variation, visibleFloors]);
 

@@ -1,9 +1,11 @@
 import type {
   DesignSpec,
   Direction,
+  ElevationStyle,
   FloorPlate,
   Liveability,
   Opening,
+  ParkingArea,
   RoomRect,
   RoomType,
   Variation,
@@ -23,7 +25,17 @@ function mulberry32(seed: number) {
   };
 }
 
-const ACCENTS = ["#3b6db8", "#2f5a99", "#4a7fc1", "#5b8fd1", "#264e8a", "#6ea1df"];
+// Theme-aligned accents (navy → vibrant blue family — matches design tokens)
+const ACCENTS = ["#264e8a", "#2f5a99", "#3b6db8", "#4a7fc1", "#1e3a6e", "#5b8fd1"];
+
+const ELEVATION_STYLES: ElevationStyle[] = [
+  "modern-minimal",
+  "mediterranean-arch",
+  "contemporary-box",
+  "tropical-veranda",
+  "art-deco",
+  "scandi-pitched",
+];
 
 const LABEL: Record<RoomType, string> = {
   living: "Living",
@@ -592,11 +604,11 @@ function buildPlate(
     if (entranceDoor) openings.push(entranceDoor);
   }
 
-  // Keep the 2D/3D footprint tight. Large rounded clips create false-looking
-  // empty corner gaps compared with real architectural plans.
+  // Tasteful corner curvature on the plate corners — drives both the 2D
+  // corner rooms and 3D corner pillars. Scales with curvatureLevel.
   const minSide = Math.min(fw, fh);
-  const cornerRadius = Math.min(1.5, minSide * 0.02 * curvatureLevel);
-  void vastu; // currently unused; preferences influence entranceDir + scoring elsewhere
+  const cornerRadius = Math.max(0.8, Math.min(4.5, minSide * 0.06 * curvatureLevel));
+  void vastu;
   void rng;
 
   return {
@@ -727,6 +739,50 @@ function evaluateLiveability(
   }
 
   return { hallway, bedroomsHaveWindows, bathroomsPrivate, entranceCorrect, stairsAligned, issues };
+}
+
+function computeParking(
+  ground: FloorPlate,
+  entranceDir: Direction,
+  rng: () => number,
+): ParkingArea {
+  // 2-bay parking: 18 ft × 20 ft. Sits on the front setback band of the
+  // entrance wall, offset sideways so it doesn't overlap the porch.
+  const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
+  const door = ground.entranceDoor;
+  const bays = 2;
+  const w = bays * 9; // each bay = 9 ft wide
+  const h = 20; // depth of car
+  const covered = rng() < 0.6;
+  const setback = SETBACK; // matches building setback
+  let x = ground.x;
+  let y = ground.y;
+  if (wall === "N") {
+    y = ground.y - setback - h;
+    const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
+    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
+    x = doorMid + offset * (w / 2 + 4) - w / 2;
+    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+  } else if (wall === "S") {
+    y = ground.y + ground.h + setback;
+    const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
+    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
+    x = doorMid + offset * (w / 2 + 4) - w / 2;
+    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+  } else if (wall === "E") {
+    x = ground.x + ground.w + setback;
+    const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
+    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
+    y = doorMid + offset * (h / 2 + 4) - h / 2;
+    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+  } else {
+    x = ground.x - setback - w;
+    const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
+    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
+    y = doorMid + offset * (h / 2 + 4) - h / 2;
+    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+  }
+  return { x, y, w, h, bays, covered };
 }
 
 export function generateVariations(
@@ -884,6 +940,15 @@ export function generateVariations(
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
     const liveability = evaluateLiveability(plates, entranceDir);
 
+    // Pick a distinct elevation style per variation (cycles + jittered by rng)
+    const elevationStyle =
+      ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
+
+    // Parking: place a 2-bay carport (or open driveway) in the front setback
+    // band, offset to the side opposite of the entrance door midpoint so cars
+    // don't block the porch.
+    const parking = computeParking(plates[0], entranceDir, rng);
+
     variations.push({
       id: `var-${seed}`,
       seed,
@@ -896,6 +961,8 @@ export function generateVariations(
       vastuScore: vastuResult.score,
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
+      elevationStyle,
+      parking,
       paletteAccent: ACCENTS[i % ACCENTS.length],
       liveability,
     });
