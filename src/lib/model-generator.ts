@@ -292,6 +292,9 @@ function layoutSide(
     const pref = PREF_ROOM_DIMS[z.type];
 
     let depth = Math.max(min.h, targets[i] * scale);
+    if (z.type === "stairs") {
+      depth = Math.min(depth, PREF_ROOM_DIMS.stairs.h + 1);
+    }
     // Clamp so we don't overrun
     const remaining = totalDepth - cursorY;
     const remainingZones = zones.length - i;
