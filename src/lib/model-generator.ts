@@ -50,7 +50,7 @@ export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   pooja: { w: 5, h: 5 },
   study: { w: 8, h: 8 },
   courtyard: { w: 8, h: 8 },
-  stairs: { w: 6, h: 12 },
+  stairs: { w: 5, h: 8 },
 };
 
 // Preferred (target) dimensions used when there's plenty of room.
@@ -64,7 +64,7 @@ const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   pooja: { w: 6, h: 6 },
   study: { w: 9, h: 10 },
   courtyard: { w: 10, h: 10 },
-  stairs: { w: 7, h: 13 },
+  stairs: { w: 5.5, h: 9 },
 };
 
 interface FlatRoom {
@@ -160,6 +160,7 @@ interface PlacedZone {
 function planFloor(
   rooms: FlatRoom[],
   entranceWall: "N" | "E" | "S" | "W",
+  rng: () => number,
 ): PlacedZone[] {
   // Public zone (priority front): living, dining, kitchen, pooja
   // Private zone (priority back): bedrooms, master_bedroom, study
@@ -188,9 +189,13 @@ function planFloor(
     const m = PREF_ROOM_DIMS[r.type];
     return -(m.w * m.h);
   };
-  const publicRooms = list.filter((r) => PUBLIC.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
-  const privateRooms = list.filter((r) => PRIVATE.includes(r.type)).sort((a, b) => sortKey(a) - sortKey(b));
-  const baths = list.filter((r) => r.type === "bath");
+  const varyOrder = (a: FlatRoom, b: FlatRoom) => {
+    const primary = sortKey(a) - sortKey(b);
+    return Math.abs(primary) > 24 ? primary : rng() - 0.5;
+  };
+  const publicRooms = list.filter((r) => PUBLIC.includes(r.type)).sort(varyOrder);
+  const privateRooms = list.filter((r) => PRIVATE.includes(r.type)).sort(varyOrder);
+  const baths = list.filter((r) => r.type === "bath").sort(() => rng() - 0.5);
   const others = list.filter(
     (r) =>
       !PUBLIC.includes(r.type) &&
@@ -205,15 +210,19 @@ function planFloor(
   let leftCount = 0;
   let rightCount = 0;
   const pushAlt = (r: FlatRoom) => {
-    const side: "left" | "right" = leftCount <= rightCount ? "left" : "right";
+    const side: "left" | "right" = leftCount === rightCount
+      ? (rng() < 0.5 ? "left" : "right")
+      : leftCount < rightCount ? "left" : "right";
     order.push({ type: r.type, sizePref: r.sizePref, side, order: leftCount + rightCount });
     if (side === "left") leftCount++;
     else rightCount++;
   };
   for (const r of publicRooms) pushAlt(r);
   if (stairs) {
-    order.push({ type: "stairs", sizePref: stairs.sizePref, side: "right", order: leftCount + rightCount });
-    rightCount++;
+    const side: "left" | "right" = rng() < 0.5 ? "left" : "right";
+    order.push({ type: "stairs", sizePref: stairs.sizePref, side, order: leftCount + rightCount });
+    if (side === "left") leftCount++;
+    else rightCount++;
   }
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
@@ -283,6 +292,9 @@ function layoutSide(
     const pref = PREF_ROOM_DIMS[z.type];
 
     let depth = Math.max(min.h, targets[i] * scale);
+    if (z.type === "stairs") {
+      depth = Math.min(depth, PREF_ROOM_DIMS.stairs.h + 1);
+    }
     // Clamp so we don't overrun
     const remaining = totalDepth - cursorY;
     const remainingZones = zones.length - i;
@@ -356,7 +368,7 @@ function buildPlate(
   const sideWidth = (workWidth - hallwayW) / 2;
   const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
 
-  const zones = planFloor(rooms, entranceWall);
+  const zones = planFloor(rooms, entranceWall, rng);
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
@@ -572,6 +584,44 @@ function buildPlate(
     hallway,
     entranceDoor,
   };
+}
+
+function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
+  const openings: Opening[] = [];
+  const fx = plate.x;
+  const fy = plate.y;
+  const fw = plate.w;
+  const fh = plate.h;
+
+  for (let ri = 0; ri < plate.rooms.length; ri++) {
+    const r = plate.rooms[ri];
+    if (r.doorWall && r.doorMid != null) {
+      const dwidth = 3;
+      const wallLen = r.doorWall === "N" || r.doorWall === "S" ? r.w : r.h;
+      const mid = Math.max(1.5 + dwidth / 2, Math.min(wallLen - 1.5 - dwidth / 2, r.doorMid));
+      if (r.doorWall === "E") openings.push({ kind: "door", x1: r.x + r.w, y1: r.y + mid - dwidth / 2, x2: r.x + r.w, y2: r.y + mid + dwidth / 2, floor: plate.floor, t: 0.5, width: dwidth, wall: "E", roomIndex: ri });
+      else if (r.doorWall === "W") openings.push({ kind: "door", x1: r.x, y1: r.y + mid - dwidth / 2, x2: r.x, y2: r.y + mid + dwidth / 2, floor: plate.floor, t: 0.5, width: dwidth, wall: "W", roomIndex: ri });
+      else if (r.doorWall === "N") openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y, x2: r.x + mid + dwidth / 2, y2: r.y, floor: plate.floor, t: 0.5, width: dwidth, wall: "N", roomIndex: ri });
+      else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
+    }
+
+    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    if (!habitable) continue;
+    const tol = 0.6;
+    const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
+    if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
+    if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
+    if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
+    if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
+    const e = ext.sort((a, b) => b.len - a.len)[0];
+    if (!e) continue;
+    if (e.wall === "W") openings.push({ kind: "window", x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "W", roomIndex: ri });
+    else if (e.wall === "E") openings.push({ kind: "window", x1: r.x + r.w, y1: r.y + r.h * 0.3, x2: r.x + r.w, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "E", roomIndex: ri });
+    else if (e.wall === "N") openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "N", roomIndex: ri });
+    else openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y + r.h, x2: r.x + r.w * 0.7, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "S", roomIndex: ri });
+  }
+
+  return { ...plate, openings, entranceDoor: undefined };
 }
 
 // ---------- Liveability evaluation ----------
@@ -792,6 +842,7 @@ export function generateVariations(
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
           else plates[f].rooms.push(stairRect);
+          plates[f] = rebuildInteriorOpenings(plates[f]);
         }
       }
     }
