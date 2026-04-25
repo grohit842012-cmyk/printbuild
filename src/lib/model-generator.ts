@@ -592,9 +592,10 @@ function buildPlate(
     if (entranceDoor) openings.push(entranceDoor);
   }
 
-  // Curvature stays at maximum so corner rooms read curved.
+  // Keep the 2D/3D footprint tight. Large rounded clips create false-looking
+  // empty corner gaps compared with real architectural plans.
   const minSide = Math.min(fw, fh);
-  const cornerRadius = minSide * (0.20 + 0.04 * curvatureLevel);
+  const cornerRadius = Math.min(1.5, minSide * 0.02 * curvatureLevel);
   void vastu; // currently unused; preferences influence entranceDir + scoring elsewhere
   void rng;
 
