@@ -470,18 +470,17 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     // ------- Plinth: plate rectangle padded outward (single clean footprint) -------
     if (groundPlate) {
       const pad = 0.8;
-      const plinthShape = rectShape(
-        groundPlate.x - pad,
-        groundPlate.y - pad,
+      const plinthGeom = new THREE.BoxGeometry(
         groundPlate.w + pad * 2,
+        PLINTH_HEIGHT,
         groundPlate.h + pad * 2,
       );
-      const plinthGeom = new THREE.ExtrudeGeometry(plinthShape, {
-        depth: PLINTH_HEIGHT,
-        bevelEnabled: false,
-      });
-      plinthGeom.rotateX(-Math.PI / 2);
       const plinth = new THREE.Mesh(plinthGeom, stoneMat);
+      plinth.position.set(
+        groundPlate.x + groundPlate.w / 2,
+        PLINTH_HEIGHT / 2,
+        groundPlate.y + groundPlate.h / 2,
+      );
       plinth.castShadow = true;
       plinth.receiveShadow = true;
       group.add(plinth);
@@ -496,13 +495,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       const bounds = roomsBounds(plate.rooms);
 
       // ------- Floor slab: single plate rectangle (rooms fully tile this) -------
-      const slabShape = rectShape(plate.x, plate.y, plate.w, plate.h);
-      const slabGeom = new THREE.ExtrudeGeometry(slabShape, {
-        depth: 0.5, bevelEnabled: false,
-      });
-      slabGeom.rotateX(-Math.PI / 2);
-      slabGeom.translate(0, yBase, 0);
+      const slabGeom = new THREE.BoxGeometry(plate.w, 0.5, plate.h);
       const slab = new THREE.Mesh(slabGeom, slabMat);
+      slab.position.set(plate.x + plate.w / 2, yBase + 0.25, plate.y + plate.h / 2);
       slab.receiveShadow = true;
       group.add(slab);
 
