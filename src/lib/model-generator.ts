@@ -896,6 +896,15 @@ export function generateVariations(
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
     const liveability = evaluateLiveability(plates, entranceDir);
 
+    // Pick a distinct elevation style per variation (cycles + jittered by rng)
+    const elevationStyle =
+      ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
+
+    // Parking: place a 2-bay carport (or open driveway) in the front setback
+    // band, offset to the side opposite of the entrance door midpoint so cars
+    // don't block the porch.
+    const parking = computeParking(plates[0], entranceDir, rng);
+
     variations.push({
       id: `var-${seed}`,
       seed,
@@ -908,6 +917,8 @@ export function generateVariations(
       vastuScore: vastuResult.score,
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
+      elevationStyle,
+      parking,
       paletteAccent: ACCENTS[i % ACCENTS.length],
       liveability,
     });
