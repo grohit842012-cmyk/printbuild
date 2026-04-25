@@ -321,6 +321,24 @@ function layoutSide(
       doorMid: depth / 2,
     });
 
+    if (z.type === "stairs") {
+      const preferred = PREF_ROOM_DIMS.stairs;
+      const compactDepth = Math.min(depth, preferred.h + 1);
+      const compactWidth = Math.min(width, preferred.w + 1);
+      const stairX = startWall === "left" ? hallwayX - compactWidth : hallwayX + hallwayW;
+      rooms[rooms.length - 1] = {
+        type: z.type,
+        x: stairX,
+        y: cursorY,
+        w: compactWidth,
+        h: compactDepth,
+        floor: floorIndex,
+        label: LABEL[z.type],
+        doorWall,
+        doorMid: compactDepth / 2,
+      };
+    }
+
     cursorY += depth;
   }
 
