@@ -67,7 +67,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
 
   const plateD = platePath(plate, scale, ox, oy);
 
-  // Entrance position from entranceDoor if present, else fall back to compass.
+  // Entrance marker is only shown when the floor actually has an exterior door.
   let entX: number;
   let entY: number;
   let entLabelDx = 0;
@@ -76,12 +76,8 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
     entX = ox + ((plate.entranceDoor.x1 + plate.entranceDoor.x2) / 2) * scale;
     entY = oy + ((plate.entranceDoor.y1 + plate.entranceDoor.y2) / 2) * scale;
   } else {
-    const a = (variation.entranceAngleDeg * Math.PI) / 180;
-    const cx = ox + (plate.x + plate.w / 2) * scale;
-    const cy = oy + (plate.y + plate.h / 2) * scale;
-    const reach = Math.min(plate.w, plate.h) * scale * 0.55;
-    entX = cx + Math.sin(a) * reach;
-    entY = cy - Math.cos(a) * reach;
+    entX = 0;
+    entY = 0;
   }
   void entLabelDx;
   void entLabelDy;
@@ -223,7 +219,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
       {plate.entranceDoor && (() => {
         const o = plate.entranceDoor;
         const midX = ox + ((o.x1 + o.x2) / 2) * scale;
-        const midY = ox + ((o.y1 + o.y2) / 2) * scale;
+        const midY = oy + ((o.y1 + o.y2) / 2) * scale;
         const arcR = 14;
         // Determine inward direction (into hallway / into building)
         let start = 0;
@@ -245,9 +241,13 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
       })()}
 
       {/* Entrance marker */}
-      <circle cx={entX} cy={entY} r="6" fill="hsl(var(--primary))" />
-      <text x={entX} y={entY - 9} textAnchor="middle" fontSize="9"
-        fill="hsl(var(--primary))" fontWeight="700">Entry</text>
+      {plate.entranceDoor && (
+        <>
+          <circle cx={entX} cy={entY} r="6" fill="hsl(var(--primary))" />
+          <text x={entX} y={entY - 9} textAnchor="middle" fontSize="9"
+            fill="hsl(var(--primary))" fontWeight="700">Entry</text>
+        </>
+      )}
 
       {/* Compass */}
       <g transform={`translate(${size - 36}, 36)`}>
