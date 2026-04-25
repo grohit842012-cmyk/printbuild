@@ -348,6 +348,7 @@ function buildPlate(
   entranceDir: Direction,
   rng: () => number,
   isGroundFloor: boolean,
+  stairSide: HallSide,
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
@@ -371,7 +372,7 @@ function buildPlate(
   const sideWidth = (workWidth - hallwayW) / 2;
   const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
 
-  const zones = planFloor(rooms, entranceWall, rng);
+  const zones = planFloor(rooms, entranceWall, rng, stairSide);
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
