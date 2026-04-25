@@ -764,6 +764,7 @@ export function generateVariations(
     const baseCurv =
       spec.curvature === "gentle" ? 0.25 : spec.curvature === "bold" ? 0.8 : 0.5;
     const curvatureLevel = Math.max(0.1, Math.min(1, baseCurv + (rng() - 0.5) * 0.25));
+    const stairSide: HallSide = rng() < 0.5 ? "left" : "right";
 
     const plates: FloorPlate[] = [];
     for (let f = 0; f < spec.floors; f++) {
@@ -781,6 +782,7 @@ export function generateVariations(
           entranceDir,
           rng,
           f === 0,
+          stairSide,
         ),
       );
     }
