@@ -150,6 +150,8 @@ interface PlacedZone {
   isEnsuiteOf?: number; // index of master bedroom in placed list
 }
 
+type HallSide = "left" | "right";
+
 /**
  * Plan a residential floor:
  *   - hallway runs from front wall to back wall
@@ -161,6 +163,7 @@ function planFloor(
   rooms: FlatRoom[],
   entranceWall: "N" | "E" | "S" | "W",
   rng: () => number,
+  stairSide: HallSide,
 ): PlacedZone[] {
   // Public zone (priority front): living, dining, kitchen, pooja
   // Private zone (priority back): bedrooms, master_bedroom, study
@@ -209,21 +212,20 @@ function planFloor(
   const order: PlacedZone[] = [];
   let leftCount = 0;
   let rightCount = 0;
-  const pushAlt = (r: FlatRoom) => {
-    const side: "left" | "right" = leftCount === rightCount
-      ? (rng() < 0.5 ? "left" : "right")
-      : leftCount < rightCount ? "left" : "right";
-    order.push({ type: r.type, sizePref: r.sizePref, side, order: leftCount + rightCount });
+  const pushTo = (r: FlatRoom, side: HallSide) => {
+    const orderIndex = side === "left" ? leftCount : rightCount;
+    order.push({ type: r.type, sizePref: r.sizePref, side, order: orderIndex });
     if (side === "left") leftCount++;
     else rightCount++;
   };
+  const pushAlt = (r: FlatRoom) => {
+    const side: HallSide = leftCount === rightCount
+      ? (rng() < 0.5 ? "left" : "right")
+      : leftCount < rightCount ? "left" : "right";
+    pushTo(r, side);
+  };
+  if (stairs) pushTo(stairs, stairSide);
   for (const r of publicRooms) pushAlt(r);
-  if (stairs) {
-    const side: "left" | "right" = rng() < 0.5 ? "left" : "right";
-    order.push({ type: "stairs", sizePref: stairs.sizePref, side, order: leftCount + rightCount });
-    if (side === "left") leftCount++;
-    else rightCount++;
-  }
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
   for (const r of privateRooms) pushAlt(r);
