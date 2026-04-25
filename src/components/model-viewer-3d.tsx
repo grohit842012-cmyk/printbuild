@@ -431,19 +431,32 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
     }
 
     const accent = variation.paletteAccent;
-    const wallMat = new THREE.MeshStandardMaterial({ color: "#f5efe2", roughness: 0.85 });
+    // Wall + trim palette varies per elevation style — all rooted in the
+    // cool-ivory + navy theme.
+    const stylePalette: Record<string, { wall: string; trim: string; roof: string; window: string }> = {
+      "modern-minimal": { wall: "#f4efe6", trim: "#1f2d4a", roof: "#1f2d4a", window: "#3b6db8" },
+      "mediterranean-arch": { wall: "#f8f1de", trim: "#264e8a", roof: "#8e3a2a", window: "#3b6db8" },
+      "contemporary-box": { wall: "#eae3d3", trim: "#0f1f3d", roof: "#2f5a99", window: "#4a7fc1" },
+      "tropical-veranda": { wall: "#f3ecdc", trim: "#3b6db8", roof: "#5b8fd1", window: "#9ec5e8" },
+      "art-deco": { wall: "#f1e8d0", trim: "#1e3a6e", roof: "#264e8a", window: "#4a7fc1" },
+      "scandi-pitched": { wall: "#f7f1e6", trim: "#2f5a99", roof: "#1f2d4a", window: "#9ec5e8" },
+    };
+    const pal = stylePalette[variation.elevationStyle] ?? stylePalette["modern-minimal"];
+    const wallMat = new THREE.MeshStandardMaterial({ color: pal.wall, roughness: 0.85 });
     const interiorMat = new THREE.MeshStandardMaterial({ color: "#ece2cc", roughness: 0.9 });
-    const trimMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.55 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: pal.trim, roughness: 0.55 });
     const slabMat = new THREE.MeshStandardMaterial({ color: "#cbd5e1", roughness: 0.9 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.6 });
     const stoneMat = new THREE.MeshStandardMaterial({ color: "#a89b86", roughness: 0.95 });
     const glassMat = new THREE.MeshStandardMaterial({
-      color: "#9ec5e8", roughness: 0.15, metalness: 0.1,
+      color: pal.window, roughness: 0.15, metalness: 0.1,
       transparent: true, opacity: 0.55,
     });
     const frameMat = new THREE.MeshStandardMaterial({ color: "#3a3024", roughness: 0.7 });
     const stairMat = new THREE.MeshStandardMaterial({ color: "#9ca3af", roughness: 0.75 });
     const hallwayMat = new THREE.MeshStandardMaterial({ color: "#d6cbb1", roughness: 0.9 });
+    const drivewayMat = new THREE.MeshStandardMaterial({ color: "#7d8896", roughness: 0.95 });
+    void accent;
 
     // Center building on origin
     const cx = -variation.plotWidthFt / 2;
