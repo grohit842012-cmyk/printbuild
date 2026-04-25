@@ -543,17 +543,19 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         const stair = plate.rooms.find((r) => r.type === "stairs");
         if (stair) {
           const STEPS = 14;
-          const runLen = stair.h - 1;
+          const runLen = Math.min(stair.h - 1, 8.5);
           const treadDepth = runLen / STEPS;
-          const treadWidth = stair.w - 1;
+          const treadWidth = Math.min(stair.w - 1, 4.5);
           const riser = fH / STEPS;
+          const hallCenterX = plate.hallway ? plate.hallway.x + plate.hallway.w / 2 : stair.x + stair.w / 2;
+          const stairCenterX = Math.max(stair.x + treadWidth / 2, Math.min(stair.x + stair.w - treadWidth / 2, hallCenterX));
           for (let s = 0; s < STEPS; s++) {
             const tread = new THREE.Mesh(
               new THREE.BoxGeometry(treadWidth, riser, treadDepth),
               stairMat,
             );
             tread.position.set(
-              stair.x + stair.w / 2,
+              stairCenterX,
               yBase + (s + 0.5) * riser,
               stair.y + 0.5 + (s + 0.5) * treadDepth,
             );
@@ -563,13 +565,13 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           }
           // Landing slab at top of stairs
           const landing = new THREE.Mesh(
-            new THREE.BoxGeometry(stair.w, 0.3, 1.2),
+            new THREE.BoxGeometry(treadWidth + 0.8, 0.3, 1.2),
             stairMat,
           );
           landing.position.set(
-            stair.x + stair.w / 2,
+            stairCenterX,
             yBase + fH - 0.15,
-            stair.y + stair.h - 0.6,
+            stair.y + runLen + 0.1,
           );
           landing.castShadow = true;
           landing.receiveShadow = true;
