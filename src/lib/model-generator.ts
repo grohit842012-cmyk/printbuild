@@ -586,6 +586,44 @@ function buildPlate(
   };
 }
 
+function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
+  const openings: Opening[] = [];
+  const fx = plate.x;
+  const fy = plate.y;
+  const fw = plate.w;
+  const fh = plate.h;
+
+  for (let ri = 0; ri < plate.rooms.length; ri++) {
+    const r = plate.rooms[ri];
+    if (r.doorWall && r.doorMid != null) {
+      const dwidth = 3;
+      const wallLen = r.doorWall === "N" || r.doorWall === "S" ? r.w : r.h;
+      const mid = Math.max(1.5 + dwidth / 2, Math.min(wallLen - 1.5 - dwidth / 2, r.doorMid));
+      if (r.doorWall === "E") openings.push({ kind: "door", x1: r.x + r.w, y1: r.y + mid - dwidth / 2, x2: r.x + r.w, y2: r.y + mid + dwidth / 2, floor: plate.floor, t: 0.5, width: dwidth, wall: "E", roomIndex: ri });
+      else if (r.doorWall === "W") openings.push({ kind: "door", x1: r.x, y1: r.y + mid - dwidth / 2, x2: r.x, y2: r.y + mid + dwidth / 2, floor: plate.floor, t: 0.5, width: dwidth, wall: "W", roomIndex: ri });
+      else if (r.doorWall === "N") openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y, x2: r.x + mid + dwidth / 2, y2: r.y, floor: plate.floor, t: 0.5, width: dwidth, wall: "N", roomIndex: ri });
+      else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
+    }
+
+    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    if (!habitable) continue;
+    const tol = 0.6;
+    const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
+    if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
+    if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
+    if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
+    if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
+    const e = ext.sort((a, b) => b.len - a.len)[0];
+    if (!e) continue;
+    if (e.wall === "W") openings.push({ kind: "window", x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "W", roomIndex: ri });
+    else if (e.wall === "E") openings.push({ kind: "window", x1: r.x + r.w, y1: r.y + r.h * 0.3, x2: r.x + r.w, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "E", roomIndex: ri });
+    else if (e.wall === "N") openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "N", roomIndex: ri });
+    else openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y + r.h, x2: r.x + r.w * 0.7, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "S", roomIndex: ri });
+  }
+
+  return { ...plate, openings, entranceDoor: undefined };
+}
+
 // ---------- Liveability evaluation ----------
 function evaluateLiveability(
   plates: FloorPlate[],
