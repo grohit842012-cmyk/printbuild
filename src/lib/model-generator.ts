@@ -50,7 +50,7 @@ export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   pooja: { w: 5, h: 5 },
   study: { w: 8, h: 8 },
   courtyard: { w: 8, h: 8 },
-  stairs: { w: 6, h: 12 },
+  stairs: { w: 5, h: 8 },
 };
 
 // Preferred (target) dimensions used when there's plenty of room.
@@ -64,7 +64,7 @@ const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   pooja: { w: 6, h: 6 },
   study: { w: 9, h: 10 },
   courtyard: { w: 10, h: 10 },
-  stairs: { w: 7, h: 13 },
+  stairs: { w: 5.5, h: 9 },
 };
 
 interface FlatRoom {
