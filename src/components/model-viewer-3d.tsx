@@ -646,8 +646,8 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       const angle = isHorizontalWall ? 0 : Math.PI / 2;
       const outNorm = isHorizontalWall ? Math.sign(outZ) : Math.sign(outX);
 
-      const porchDepth = 5;
-      const porchWidth = 9;
+      const porchDepth = 6;
+      const porchWidth = 10;
       const px = exMid + (isHorizontalWall ? 0 : outNorm * porchDepth / 2);
       const pz = ezMid + (isHorizontalWall ? outNorm * porchDepth / 2 : 0);
 
@@ -664,6 +664,23 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       porch.castShadow = true;
       group.add(porch);
 
+      const step = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          isHorizontalWall ? porchWidth + 2 : 2.5,
+          0.35,
+          isHorizontalWall ? 2.5 : porchWidth + 2,
+        ),
+        stoneMat,
+      );
+      step.position.set(
+        exMid + (isHorizontalWall ? 0 : outNorm * (porchDepth + 1.1)),
+        0.9,
+        ezMid + (isHorizontalWall ? outNorm * (porchDepth + 1.1) : 0),
+      );
+      step.receiveShadow = true;
+      step.castShadow = true;
+      group.add(step);
+
       const colMat = new THREE.MeshStandardMaterial({ color: "#f1ede4", roughness: 0.8 });
       const colH = DOOR_HEIGHT + 1.5;
       for (const off of [-3.5, 3.5]) {
@@ -679,6 +696,18 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
         group.add(col);
       }
 
+      const canopy = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          isHorizontalWall ? porchWidth + 1.4 : porchDepth + 0.8,
+          0.45,
+          isHorizontalWall ? porchDepth + 0.8 : porchWidth + 1.4,
+        ),
+        roofMat,
+      );
+      canopy.position.set(px, PLINTH_HEIGHT + DOOR_HEIGHT + 1.6, pz);
+      canopy.castShadow = true;
+      group.add(canopy);
+
       // Door panel — flush in the wall plane
       const dw = Math.hypot(entDoor.x2 - entDoor.x1, entDoor.y2 - entDoor.y1);
       const door = new THREE.Mesh(
@@ -689,6 +718,15 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       door.rotation.y = angle;
       door.castShadow = true;
       group.add(door);
+
+      const doorFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(dw + 0.9, DOOR_HEIGHT + 0.8, 0.35),
+        frameMat,
+      );
+      doorFrame.position.set(exMid, PLINTH_HEIGHT + DOOR_HEIGHT / 2 + 0.1, ezMid);
+      doorFrame.rotation.y = angle;
+      doorFrame.castShadow = true;
+      group.add(doorFrame);
 
       const arch = new THREE.Mesh(
         new THREE.TorusGeometry(2.5, 0.4, 10, 24, Math.PI),
