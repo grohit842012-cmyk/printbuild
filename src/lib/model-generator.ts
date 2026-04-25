@@ -249,6 +249,19 @@ function planFloor(
   }
   for (const r of others) pushAlt(r);
 
+  const rebalanceStairOnlySide = () => {
+    const leftRooms = order.filter((o) => o.side === "left");
+    const rightRooms = order.filter((o) => o.side === "right");
+    if (leftRooms.length === 1 && leftRooms[0].type === "stairs" && rightRooms.length > 1) {
+      const move = rightRooms.find((o) => o.type !== "stairs");
+      if (move) move.side = "left";
+    } else if (rightRooms.length === 1 && rightRooms[0].type === "stairs" && leftRooms.length > 1) {
+      const move = leftRooms.find((o) => o.type !== "stairs");
+      if (move) move.side = "right";
+    }
+  };
+  rebalanceStairOnlySide();
+
   // Re-number order positions
   const left = order.filter((o) => o.side === "left").sort((a, b) => a.order - b.order);
   const right = order.filter((o) => o.side === "right").sort((a, b) => a.order - b.order);
