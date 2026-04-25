@@ -112,6 +112,24 @@ export interface Liveability {
   issues: string[];
 }
 
+export type ElevationStyle =
+  | "modern-minimal"
+  | "mediterranean-arch"
+  | "contemporary-box"
+  | "tropical-veranda"
+  | "art-deco"
+  | "scandi-pitched";
+
+export interface ParkingArea {
+  // In plot-local feet, sits in the front setback band beside the entrance
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  bays: number;
+  covered: boolean;
+}
+
 export interface Variation {
   id: string;
   seed: number;
@@ -126,6 +144,8 @@ export interface Variation {
   vastuScore: number;
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "domed" | "sloped";
+  elevationStyle: ElevationStyle;
+  parking?: ParkingArea;
   paletteAccent: string;
   liveability: Liveability;
 }
