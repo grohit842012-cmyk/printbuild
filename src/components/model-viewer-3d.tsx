@@ -545,16 +545,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       }
 
       // ------- Story trim band along exterior walls (single plate rectangle) -------
-      const trimShape = rectShape(
-        plate.x - 0.15, plate.y - 0.15,
-        plate.w + 0.3, plate.h + 0.3,
-      );
-      const trimGeom = new THREE.ExtrudeGeometry(trimShape, {
-        depth: 0.4, bevelEnabled: false,
-      });
-      trimGeom.rotateX(-Math.PI / 2);
-      trimGeom.translate(0, yBase + wallH - 0.4, 0);
+      const trimGeom = new THREE.BoxGeometry(plate.w + 0.3, 0.4, plate.h + 0.3);
       const trim = new THREE.Mesh(trimGeom, trimMat);
+      trim.position.set(plate.x + plate.w / 2, yBase + wallH - 0.2, plate.y + plate.h / 2);
       trim.castShadow = true;
       group.add(trim);
 
@@ -601,19 +594,14 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
       if (plate.floor === topFloor) {
         const roofY = yBase + fH;
         const overhang = ROOF_OVERHANG;
-        const roofShape = rectShape(
-          plate.x - overhang, plate.y - overhang,
-          plate.w + overhang * 2, plate.h + overhang * 2,
-        );
         const roofCenterX = plate.x + plate.w / 2;
         const roofCenterZ = plate.y + plate.h / 2;
+        const roofW = plate.w + overhang * 2;
+        const roofH = plate.h + overhang * 2;
         if (variation.roofType === "domed") {
-          const slabG = new THREE.ExtrudeGeometry(roofShape, {
-            depth: 0.6, bevelEnabled: false,
-          });
-          slabG.rotateX(-Math.PI / 2);
-          slabG.translate(0, roofY, 0);
+          const slabG = new THREE.BoxGeometry(roofW, 0.6, roofH);
           const overSlab = new THREE.Mesh(slabG, roofMat);
+          overSlab.position.set(roofCenterX, roofY + 0.3, roofCenterZ);
           overSlab.castShadow = true;
           group.add(overSlab);
           const bw = plate.w;
@@ -628,12 +616,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           dome.castShadow = true;
           group.add(dome);
         } else if (variation.roofType === "sloped") {
-          const slabG = new THREE.ExtrudeGeometry(roofShape, {
-            depth: 0.5, bevelEnabled: false,
-          });
-          slabG.rotateX(-Math.PI / 2);
-          slabG.translate(0, roofY, 0);
+          const slabG = new THREE.BoxGeometry(roofW, 0.5, roofH);
           const base = new THREE.Mesh(slabG, roofMat);
+          base.position.set(roofCenterX, roofY + 0.25, roofCenterZ);
           base.castShadow = true;
           group.add(base);
           const bw = plate.w;
@@ -649,12 +634,9 @@ export function ModelViewer3D({ variation, visibleFloors, className }: Props) {
           cone.castShadow = true;
           group.add(cone);
         } else {
-          const flatG = new THREE.ExtrudeGeometry(roofShape, {
-            depth: 0.7, bevelEnabled: false,
-          });
-          flatG.rotateX(-Math.PI / 2);
-          flatG.translate(0, roofY, 0);
+          const flatG = new THREE.BoxGeometry(roofW, 0.7, roofH);
           const flat = new THREE.Mesh(flatG, roofMat);
+          flat.position.set(roofCenterX, roofY + 0.35, roofCenterZ);
           flat.castShadow = true;
           group.add(flat);
         }
