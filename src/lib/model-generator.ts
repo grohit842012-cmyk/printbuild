@@ -1,9 +1,11 @@
 import type {
   DesignSpec,
   Direction,
+  ElevationStyle,
   FloorPlate,
   Liveability,
   Opening,
+  ParkingArea,
   RoomRect,
   RoomType,
   Variation,
