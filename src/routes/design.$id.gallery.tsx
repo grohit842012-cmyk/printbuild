@@ -99,8 +99,11 @@ function GalleryPage() {
                     <h3 className="font-display text-lg">Design {idx + 1}</h3>
                     <Badge className={t.cls}>{t.text}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu score {v.vastuScore}/100
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {v.elevationStyle.replace(/-/g, " ")} · {v.parking?.covered ? "Carport" : "Open parking"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
                   </p>
                 </button>
               );
