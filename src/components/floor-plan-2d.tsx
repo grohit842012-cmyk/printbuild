@@ -217,17 +217,62 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                   stroke="#1e293b" strokeWidth="0.8"
                 />
               )}
-              {r.type === "stairs" && Array.from({ length: 8 }).map((_, k) => (
-                <line
-                  key={k}
-                  x1={rx + 2}
-                  x2={rx + rw - 2}
-                  y1={ry + ((k + 1) * rh) / 9}
-                  y2={ry + ((k + 1) * rh) / 9}
-                  stroke="#475569"
-                  strokeWidth="0.6"
-                />
-              ))}
+              {r.type === "stairs" && (() => {
+                const treads = 8;
+                const els: JSX.Element[] = [];
+                for (let k = 0; k < treads; k++) {
+                  els.push(
+                    <line
+                      key={k}
+                      x1={rx + 2}
+                      x2={rx + rw - 2}
+                      y1={ry + ((k + 1) * rh) / (treads + 1)}
+                      y2={ry + ((k + 1) * rh) / (treads + 1)}
+                      stroke="#475569"
+                      strokeWidth="0.6"
+                    />,
+                  );
+                }
+                // Diagonal arrow indicating up direction
+                els.push(
+                  <line
+                    key="arrow"
+                    x1={rx + rw / 2}
+                    x2={rx + rw / 2}
+                    y1={ry + rh - 4}
+                    y2={ry + 4}
+                    stroke="#1e293b"
+                    strokeWidth="1"
+                    markerEnd="url(#stair-arrow)"
+                  />,
+                );
+                return <g>{els}</g>;
+              })()}
+              {r.type === "lift" && (
+                <text x={cxR} y={cyR + 16} textAnchor="middle" fontSize="7" fill="#475569">
+                  LIFT
+                </text>
+              )}
+              {r.type === "parking" && (() => {
+                // Bay striping inside the parking room
+                const bays = 1;
+                const stripes: JSX.Element[] = [];
+                for (let b = 1; b < bays; b++) {
+                  stripes.push(
+                    <line
+                      key={b}
+                      x1={rx + (rw / bays) * b}
+                      x2={rx + (rw / bays) * b}
+                      y1={ry + 3}
+                      y2={ry + rh - 3}
+                      stroke="#64748b"
+                      strokeDasharray="3 2"
+                      strokeWidth="0.8"
+                    />,
+                  );
+                }
+                return <g>{stripes}</g>;
+              })()}
               <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
                 fill="#1e293b" fontWeight="600">{r.label}</text>
               <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">
