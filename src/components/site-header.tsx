@@ -21,9 +21,14 @@ export function SiteHeader() {
                 My designs
               </Link>
               {isAdmin && (
-                <Link to="/admin" className="text-muted-foreground hover:text-foreground">
-                  Admin
-                </Link>
+                <>
+                  <Link to="/admin" className="text-muted-foreground hover:text-foreground">
+                    Admin
+                  </Link>
+                  <Link to="/admin/reviews" className="text-muted-foreground hover:text-foreground">
+                    Reviews
+                  </Link>
+                </>
               )}
               <Button asChild size="sm" variant="default">
                 <Link to="/design/new">Start designing</Link>

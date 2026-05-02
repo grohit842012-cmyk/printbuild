@@ -14,6 +14,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
+import { Route as AdminReviewsRouteImport } from './routes/admin.reviews'
+import { Route as DesignIdReviewRouteImport } from './routes/design.$id.review'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
 import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
 import { Route as DesignIdBookRouteImport } from './routes/design.$id.book'
@@ -44,6 +46,16 @@ const DesignNewRoute = DesignNewRouteImport.update({
   path: '/design/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => AdminRoute,
+} as any)
+const DesignIdReviewRoute = DesignIdReviewRouteImport.update({
+  id: '/design/$id/review',
+  path: '/design/$id/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignIdRefineRoute = DesignIdRefineRouteImport.update({
   id: '/design/$id/refine',
   path: '/design/$id/refine',
@@ -67,36 +79,42 @@ const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/review': typeof DesignIdReviewRoute
   '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/review': typeof DesignIdReviewRoute
   '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
+  '/design/$id/review': typeof DesignIdReviewRoute
   '/design/$id/view/$idx': typeof DesignIdViewIdxRoute
 }
 export interface FileRouteTypes {
@@ -106,10 +124,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/designs'
+    | '/admin/reviews'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
+    | '/design/$id/review'
     | '/design/$id/view/$idx'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -117,10 +137,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/designs'
+    | '/admin/reviews'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
+    | '/design/$id/review'
     | '/design/$id/view/$idx'
   id:
     | '__root__'
@@ -128,22 +150,25 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/designs'
+    | '/admin/reviews'
     | '/design/new'
     | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
+    | '/design/$id/review'
     | '/design/$id/view/$idx'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   DesignsRoute: typeof DesignsRoute
   DesignNewRoute: typeof DesignNewRoute
   DesignIdBookRoute: typeof DesignIdBookRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
+  DesignIdReviewRoute: typeof DesignIdReviewRoute
   DesignIdViewIdxRoute: typeof DesignIdViewIdxRoute
 }
 
@@ -184,6 +209,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/design/$id/review': {
+      id: '/design/$id/review'
+      path: '/design/$id/review'
+      fullPath: '/design/$id/review'
+      preLoaderRoute: typeof DesignIdReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design/$id/refine': {
       id: '/design/$id/refine'
       path: '/design/$id/refine'
@@ -215,15 +254,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminReviewsRoute: typeof AdminReviewsRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminReviewsRoute: AdminReviewsRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   DesignsRoute: DesignsRoute,
   DesignNewRoute: DesignNewRoute,
   DesignIdBookRoute: DesignIdBookRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
+  DesignIdReviewRoute: DesignIdReviewRoute,
   DesignIdViewIdxRoute: DesignIdViewIdxRoute,
 }
 export const routeTree = rootRouteImport

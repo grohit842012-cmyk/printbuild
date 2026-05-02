@@ -27,7 +27,7 @@ function InspectorPage() {
   const [allFloors, setAllFloors] = useState<number[]>([]);
   const [visibleFloors, setVisibleFloors] = useState<Set<number>>(new Set());
   const [activeFloor, setActiveFloor] = useState(1);
-  const [booking, setBooking] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -48,14 +48,14 @@ function InspectorPage() {
     })();
   }, [id, idx]);
 
-  async function selectAndBook() {
-    setBooking(true);
+  async function selectAndReview() {
+    setSaving(true);
     await supabase
       .from("designs")
       .update({ selected_variation_index: Number(idx), status: "selected" })
       .eq("id", id);
-    setBooking(false);
-    void navigate({ to: "/design/$id/book", params: { id } });
+    setSaving(false);
+    void navigate({ to: "/design/$id/review", params: { id } });
   }
 
   function toggleFloor(f: number) {
@@ -157,8 +157,8 @@ function InspectorPage() {
               )}
             </div>
 
-            <Button className="w-full mt-5" size="lg" onClick={selectAndBook} disabled={booking}>
-              {booking ? "Saving…" : "I want this — book it"}
+            <Button className="w-full mt-5" size="lg" onClick={selectAndReview} disabled={saving}>
+              {saving ? "Saving…" : "I love this — leave a review"}
             </Button>
           </div>
         </div>
