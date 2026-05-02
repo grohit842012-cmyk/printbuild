@@ -949,7 +949,7 @@ export function generateVariations(
           // Reflow rooms on the same vertical side as the stair (overlapping x)
           for (let i = 0; i < rooms.length; i++) {
             const r = rooms[i];
-            if (r.type === "stairs") continue;
+            if (r.type === "stairs" || r.type === "lift") continue;
             // Same vertical band (overlaps stair x range)?
             const xOverlap = !(r.x + r.w <= sx + 0.01 || r.x >= sx + sw - 0.01);
             if (!xOverlap) continue;
