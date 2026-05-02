@@ -17,6 +17,9 @@ const ROOM_COLOR: Record<string, string> = {
   dining: "#ecd6c8",
   courtyard: "#c8e3c5",
   stairs: "#b8c5d6",
+  lift: "#94a3b8",
+  utility: "#dcd6c8",
+  parking: "#cbd5e1",
 };
 
 /** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
