@@ -616,7 +616,7 @@ function NewDesignWizard() {
             >
               Back
             </Button>
-            {step < 4 ? (
+            {step < 5 ? (
               <Button onClick={() => setStep((s) => s + 1)}>Continue</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={submitting}>
