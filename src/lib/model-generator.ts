@@ -995,6 +995,22 @@ export function generateVariations(
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
           else plates[f].rooms.push(stairRect);
+
+          // Align lift across floors too (if ground has one)
+          const groundLift = plates[0].rooms.find((r) => r.type === "lift");
+          if (groundLift) {
+            const liftIdx = plates[f].rooms.findIndex((r) => r.type === "lift");
+            const liftRect: RoomRect = {
+              type: "lift",
+              x: groundLift.x, y: groundLift.y, w: groundLift.w, h: groundLift.h,
+              floor: plates[f].floor,
+              label: LABEL.lift,
+              doorWall,
+              doorMid: groundLift.doorMid,
+            };
+            if (liftIdx >= 0) plates[f].rooms[liftIdx] = liftRect;
+            else plates[f].rooms.push(liftRect);
+          }
           plates[f] = rebuildInteriorOpenings(plates[f]);
         }
       }
