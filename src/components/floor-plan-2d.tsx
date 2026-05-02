@@ -92,6 +92,10 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
           <path d="M 16 0 L 0 0 0 16" fill="none" stroke="hsl(var(--border) / 0.5)" strokeWidth="0.5" />
         </pattern>
+        <marker id="stair-arrow" viewBox="0 0 10 10" refX="5" refY="5"
+          markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e293b" />
+        </marker>
         <clipPath id={`plate-clip-${floor}`}>
           <path d={plateD} />
         </clipPath>
