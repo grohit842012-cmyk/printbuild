@@ -89,6 +89,10 @@ function NewDesignWizard() {
     roofStyle: "domed",
     windowDensity: "medium",
     exteriorFeel: "Warm earthy palette, natural textures",
+    staircaseType: "straight",
+    lift: "none",
+    stiltParking: false,
+    stiltUtilityRoom: false,
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
   });
 
