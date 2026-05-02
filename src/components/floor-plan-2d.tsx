@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
