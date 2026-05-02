@@ -771,46 +771,61 @@ function evaluateLiveability(
 
 function computeParking(
   ground: FloorPlate,
+  plotW: number,
+  plotD: number,
   entranceDir: Direction,
   rng: () => number,
 ): ParkingArea {
-  // 2-bay parking: 18 ft × 20 ft. Sits on the front setback band of the
-  // entrance wall, offset sideways so it doesn't overlap the porch.
+  // 2-bay parking sized to fit inside the plot's setback band beside the
+  // entrance. The setback is part of the plot, so this stays inside the
+  // plot boundary.
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
   const bays = 2;
-  const w = bays * 9; // each bay = 9 ft wide
-  const h = 20; // depth of car
+  const bayW = 9;
+  const w = bays * bayW;
+  const h = 18;
   const covered = rng() < 0.6;
-  const setback = SETBACK; // matches building setback
-  let x = ground.x;
-  let y = ground.y;
+  let x = 0;
+  let y = 0;
   if (wall === "N") {
-    y = ground.y - setback - h;
+    // Parking sits in the strip between plot top (y=0) and building top (ground.y)
+    const bandH = Math.max(8, ground.y);
+    y = Math.max(0, ground.y - bandH);
+    const ph = Math.min(h, bandH);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
-    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
-    x = doorMid + offset * (w / 2 + 4) - w / 2;
-    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+    const sideOffset = doorMid > plotW / 2 ? -1 : 1;
+    x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    x = Math.max(0, Math.min(plotW - w, x));
+    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "S") {
-    y = ground.y + ground.h + setback;
+    const bandH = Math.max(8, plotD - (ground.y + ground.h));
+    y = ground.y + ground.h;
+    const ph = Math.min(h, bandH);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
-    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
-    x = doorMid + offset * (w / 2 + 4) - w / 2;
-    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+    const sideOffset = doorMid > plotW / 2 ? -1 : 1;
+    x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    x = Math.max(0, Math.min(plotW - w, x));
+    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "E") {
-    x = ground.x + ground.w + setback;
+    const bandW = Math.max(8, plotW - (ground.x + ground.w));
+    x = ground.x + ground.w;
+    const pw = Math.min(h, bandW); // narrower band, depth becomes width
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
-    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
-    y = doorMid + offset * (h / 2 + 4) - h / 2;
-    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+    const sideOffset = doorMid > plotD / 2 ? -1 : 1;
+    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = Math.max(0, Math.min(plotD - w, y));
+    return { x, y, w: pw, h: w, bays, covered };
   } else {
-    x = ground.x - setback - w;
+    const bandW = Math.max(8, ground.x);
+    x = Math.max(0, ground.x - bandW);
+    const pw = Math.min(h, bandW);
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
-    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
-    y = doorMid + offset * (h / 2 + 4) - h / 2;
-    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+    const sideOffset = doorMid > plotD / 2 ? -1 : 1;
+    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = Math.max(0, Math.min(plotD - w, y));
+    return { x, y, w: pw, h: w, bays, covered };
   }
-  return { x, y, w, h, bays, covered };
 }
 
 export function generateVariations(
