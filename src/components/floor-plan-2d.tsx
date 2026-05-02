@@ -220,7 +220,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
               )}
               {r.type === "stairs" && (() => {
                 const treads = 8;
-                const els: JSX.Element[] = [];
+                const els: ReactElement[] = [];
                 for (let k = 0; k < treads; k++) {
                   els.push(
                     <line
@@ -257,7 +257,7 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
               {r.type === "parking" && (() => {
                 // Bay striping inside the parking room
                 const bays = 1;
-                const stripes: JSX.Element[] = [];
+                const stripes: ReactElement[] = [];
                 for (let b = 1; b < bays; b++) {
                   stripes.push(
                     <line
