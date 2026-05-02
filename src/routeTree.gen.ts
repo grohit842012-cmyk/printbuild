@@ -18,7 +18,6 @@ import { Route as AdminReviewsRouteImport } from './routes/admin.reviews'
 import { Route as DesignIdReviewRouteImport } from './routes/design.$id.review'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
 import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
-import { Route as DesignIdBookRouteImport } from './routes/design.$id.book'
 import { Route as DesignIdViewIdxRouteImport } from './routes/design.$id.view.$idx'
 
 const DesignsRoute = DesignsRouteImport.update({
@@ -66,11 +65,6 @@ const DesignIdGalleryRoute = DesignIdGalleryRouteImport.update({
   path: '/design/$id/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignIdBookRoute = DesignIdBookRouteImport.update({
-  id: '/design/$id/book',
-  path: '/design/$id/book',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
   id: '/design/$id/view/$idx',
   path: '/design/$id/view/$idx',
@@ -84,7 +78,6 @@ export interface FileRoutesByFullPath {
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
-  '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
   '/design/$id/review': typeof DesignIdReviewRoute
@@ -97,7 +90,6 @@ export interface FileRoutesByTo {
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
-  '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
   '/design/$id/review': typeof DesignIdReviewRoute
@@ -111,7 +103,6 @@ export interface FileRoutesById {
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
-  '/design/$id/book': typeof DesignIdBookRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
   '/design/$id/review': typeof DesignIdReviewRoute
@@ -126,7 +117,6 @@ export interface FileRouteTypes {
     | '/designs'
     | '/admin/reviews'
     | '/design/new'
-    | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
     | '/design/$id/review'
@@ -139,7 +129,6 @@ export interface FileRouteTypes {
     | '/designs'
     | '/admin/reviews'
     | '/design/new'
-    | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
     | '/design/$id/review'
@@ -152,7 +141,6 @@ export interface FileRouteTypes {
     | '/designs'
     | '/admin/reviews'
     | '/design/new'
-    | '/design/$id/book'
     | '/design/$id/gallery'
     | '/design/$id/refine'
     | '/design/$id/review'
@@ -165,7 +153,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DesignsRoute: typeof DesignsRoute
   DesignNewRoute: typeof DesignNewRoute
-  DesignIdBookRoute: typeof DesignIdBookRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
   DesignIdReviewRoute: typeof DesignIdReviewRoute
@@ -237,13 +224,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignIdGalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design/$id/book': {
-      id: '/design/$id/book'
-      path: '/design/$id/book'
-      fullPath: '/design/$id/book'
-      preLoaderRoute: typeof DesignIdBookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/design/$id/view/$idx': {
       id: '/design/$id/view/$idx'
       path: '/design/$id/view/$idx'
@@ -270,7 +250,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DesignsRoute: DesignsRoute,
   DesignNewRoute: DesignNewRoute,
-  DesignIdBookRoute: DesignIdBookRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
   DesignIdReviewRoute: DesignIdReviewRoute,
