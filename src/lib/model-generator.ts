@@ -48,10 +48,12 @@ const LABEL: Record<RoomType, string> = {
   dining: "Dining",
   courtyard: "Courtyard",
   stairs: "Stairs",
+  lift: "Lift",
+  utility: "Utility",
+  parking: "Parking",
 };
 
 // ---------- Architectural minimum dimensions (ft) ----------
-// Width × Depth (independent of orientation: rooms can be rotated to fit)
 export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   living: { w: 14, h: 16 },
   master_bedroom: { w: 12, h: 14 },
@@ -63,9 +65,11 @@ export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   study: { w: 8, h: 8 },
   courtyard: { w: 8, h: 8 },
   stairs: { w: 5, h: 8 },
+  lift: { w: 4, h: 4 },
+  utility: { w: 6, h: 7 },
+  parking: { w: 9, h: 18 },
 };
 
-// Preferred (target) dimensions used when there's plenty of room.
 const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   living: { w: 16, h: 18 },
   master_bedroom: { w: 14, h: 16 },
@@ -77,6 +81,9 @@ const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   study: { w: 9, h: 10 },
   courtyard: { w: 10, h: 10 },
   stairs: { w: 5.5, h: 9 },
+  lift: { w: 4, h: 4 },
+  utility: { w: 7, h: 8 },
+  parking: { w: 9, h: 18 },
 };
 
 interface FlatRoom {
