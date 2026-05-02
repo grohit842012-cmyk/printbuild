@@ -184,7 +184,7 @@ function NewDesignWizard() {
       <SiteHeader />
       <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <div className="mb-8">
-          <p className="text-sm uppercase tracking-wider text-accent mb-2">Step {step} of 4</p>
+          <p className="text-sm uppercase tracking-wider text-accent mb-2">Step {step} of 5</p>
           <h1 className="text-3xl font-display">Tell us about your home</h1>
         </div>
 
