@@ -94,6 +94,17 @@ interface FlatRoom {
 const HALLWAY_WIDTH = 3.5;
 const SETBACK = 3;
 
+/** Footprint dims by staircase shape (in ft), oriented along corridor (h) × wide (w). */
+function stairDims(type: DesignSpec["staircaseType"]): { w: number; h: number } {
+  switch (type) {
+    case "spiral": return { w: 6, h: 6 };
+    case "u-shape": return { w: 8, h: 10 };
+    case "l-shape": return { w: 7, h: 9 };
+    case "straight":
+    default: return { w: 4, h: 12 };
+  }
+}
+
 // ---------- Plot validation ----------
 export interface PlotValidationIssue {
   floor: number;
