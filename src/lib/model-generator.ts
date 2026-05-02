@@ -1011,10 +1011,11 @@ export function generateVariations(
     const elevationStyle =
       ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
 
-    // Parking: place a 2-bay carport (or open driveway) in the front setback
-    // band, offset to the side opposite of the entrance door midpoint so cars
-    // don't block the porch.
-    const parking = computeParking(plates[0], entranceDir, rng);
+    // Parking lives inside the plot. When stilt-parking is enabled, parking
+    // is a room on the ground floor instead of a separate strip.
+    const parking = stiltParking
+      ? undefined
+      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, rng);
 
     variations.push({
       id: `var-${seed}`,
