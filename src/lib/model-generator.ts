@@ -851,11 +851,33 @@ export function generateVariations(
     }
   }
 
-  // For multi-floor homes inject a stair shaft on every floor (if missing).
+  const stairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
+  const withLift = spec.lift === "home";
+  const stiltParking = !!spec.stiltParking && spec.floors >= 2;
+
+  // If stilt parking, ground floor is parking + stairs (+optional utility).
+  if (stiltParking) {
+    const stilt: FlatRoom[] = [
+      { type: "parking", sizePref: "medium" },
+      { type: "parking", sizePref: "medium" },
+      { type: "stairs", sizePref: "medium" },
+    ];
+    if (spec.stiltUtilityRoom) stilt.push({ type: "utility", sizePref: "small" });
+    perFloor[0] = stilt;
+  }
+
+  // Inject stair on every floor when multi-floor.
   if (spec.floors > 1) {
     for (let f = 0; f < spec.floors; f++) {
       const has = perFloor[f].some((r) => r.type === "stairs");
       if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
+    }
+  }
+  // Inject lift on every floor when enabled (multi-floor).
+  if (withLift && spec.floors > 1) {
+    for (let f = 0; f < spec.floors; f++) {
+      const has = perFloor[f].some((r) => r.type === "lift");
+      if (!has) perFloor[f].push({ type: "lift", sizePref: "small" });
     }
   }
 
@@ -888,6 +910,8 @@ export function generateVariations(
           rng,
           f === 0,
           stairSide,
+          stairShape,
+          withLift && spec.floors > 1,
         ),
       );
     }
