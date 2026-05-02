@@ -12,7 +12,10 @@ export type RoomType =
   | "study"
   | "dining"
   | "courtyard"
-  | "stairs";
+  | "stairs"
+  | "lift"
+  | "utility"
+  | "parking";
 
 export type StaircaseType = "straight" | "l-shape" | "u-shape" | "spiral";
 export type LiftOption = "none" | "home";
