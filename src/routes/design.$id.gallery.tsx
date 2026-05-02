@@ -100,7 +100,10 @@ function GalleryPage() {
                     <Badge className={t.cls}>{t.text}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground capitalize">
-                    {v.elevationStyle.replace(/-/g, " ")} · {v.parking?.covered ? "Carport" : "Open parking"}
+                    {v.elevationStyle.replace(/-/g, " ")} ·{" "}
+                    {v.parking
+                      ? v.parking.covered ? "Carport" : "Open parking"
+                      : "Stilt parking"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
