@@ -314,9 +314,11 @@ function layoutSide(
   totalDepth: number,
   startWall: "left" | "right",
   floorIndex: number,
-  hallwayX: number, // x position where hallway starts (the inner edge for this side)
+  hallwayX: number,
   hallwayW: number,
-  stairY?: number,
+  stairY: number | undefined,
+  stairShape: DesignSpec["staircaseType"],
+  withLift: boolean,
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
@@ -327,12 +329,12 @@ function layoutSide(
     orderedZones.unshift(stair);
   }
 
-  // Compute target depths (along corridor) for each zone, scaled to fit.
+  const sDims = stairDims(stairShape);
+
   const targets = orderedZones.map((z) => {
+    if (z.type === "stairs") return sDims.h;
     const pref = PREF_ROOM_DIMS[z.type];
-    // Orient long side along the hallway when sensible
-    const along = Math.max(pref.w, pref.h);
-    return along;
+    return Math.max(pref.w, pref.h);
   });
   const sumTarget = targets.reduce((a, b) => a + b, 0);
   const scale = totalDepth / Math.max(1, sumTarget);
@@ -342,44 +344,50 @@ function layoutSide(
   for (let i = 0; i < orderedZones.length; i++) {
     const z = orderedZones[i];
     const min = MIN_ROOM_DIMS[z.type];
-    const pref = PREF_ROOM_DIMS[z.type];
 
     let depth = Math.max(min.h, targets[i] * scale);
-    if (z.type === "stairs") {
-      depth = MIN_ROOM_DIMS.stairs.h;
-    }
-    // Clamp so we don't overrun
+    if (z.type === "stairs") depth = sDims.h;
+
     const remaining = totalDepth - cursorY;
     const remainingZones = orderedZones.length - i;
     if (depth > remaining - (remainingZones - 1) * min.h) {
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
-    if (i === zones.length - 1) depth = remaining; // last room takes the rest
+    if (i === zones.length - 1) depth = remaining;
 
-    // Always fill the full side width so there are no empty bands between
-    // the hallway and the outer wall.
-    void pref;
-    void min;
     const width = sideWidth;
-    // Position: anchor against outer wall on this side
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
     const y = z.type === "stairs" && stairY != null ? stairY : cursorY;
 
-    // Decide door wall: opens onto hallway → wall facing hallway
-    const doorWall: "N" | "E" | "S" | "W" =
-      startWall === "left" ? "E" : "W";
+    const doorWall: "N" | "E" | "S" | "W" = startWall === "left" ? "E" : "W";
 
-    rooms.push({
-      type: z.type,
-      x,
-      y,
-      w: width,
-      h: depth,
-      floor: floorIndex,
-      label: LABEL[z.type],
-      doorWall,
-      doorMid: depth / 2,
-    });
+    if (z.type === "stairs") {
+      // Stair core itself uses sDims.w; rest of side band keeps its width.
+      const stairW = Math.min(sDims.w, sideWidth - (withLift ? MIN_ROOM_DIMS.lift.w + 0.5 : 0));
+      const stairX = startWall === "left" ? hallwayX - stairW : hallwayX + hallwayW;
+      rooms.push({
+        type: "stairs", x: stairX, y, w: stairW, h: depth,
+        floor: floorIndex, label: LABEL.stairs, doorWall, doorMid: depth / 2,
+      });
+      if (withLift) {
+        const liftW = MIN_ROOM_DIMS.lift.w;
+        const liftH = Math.min(MIN_ROOM_DIMS.lift.h, depth);
+        const liftX = startWall === "left" ? stairX - liftW - 0.5 : stairX + stairW + 0.5;
+        // Clamp lift inside the side band
+        const minX = startWall === "left" ? hallwayX - sideWidth : hallwayX + hallwayW;
+        const maxX = startWall === "left" ? hallwayX - liftW : hallwayX + hallwayW + sideWidth - liftW;
+        const lx = Math.max(minX, Math.min(maxX, liftX));
+        rooms.push({
+          type: "lift", x: lx, y, w: liftW, h: liftH,
+          floor: floorIndex, label: LABEL.lift, doorWall, doorMid: liftH / 2,
+        });
+      }
+    } else {
+      rooms.push({
+        type: z.type, x, y, w: width, h: depth,
+        floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
+      });
+    }
 
     cursorY += depth;
   }
