@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
@@ -17,6 +18,9 @@ const ROOM_COLOR: Record<string, string> = {
   dining: "#ecd6c8",
   courtyard: "#c8e3c5",
   stairs: "#b8c5d6",
+  lift: "#94a3b8",
+  utility: "#dcd6c8",
+  parking: "#cbd5e1",
 };
 
 /** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
@@ -88,6 +92,10 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
         <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
           <path d="M 16 0 L 0 0 0 16" fill="none" stroke="hsl(var(--border) / 0.5)" strokeWidth="0.5" />
         </pattern>
+        <marker id="stair-arrow" viewBox="0 0 10 10" refX="5" refY="5"
+          markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e293b" />
+        </marker>
         <clipPath id={`plate-clip-${floor}`}>
           <path d={plateD} />
         </clipPath>
@@ -214,17 +222,62 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                   stroke="#1e293b" strokeWidth="0.8"
                 />
               )}
-              {r.type === "stairs" && Array.from({ length: 8 }).map((_, k) => (
-                <line
-                  key={k}
-                  x1={rx + 2}
-                  x2={rx + rw - 2}
-                  y1={ry + ((k + 1) * rh) / 9}
-                  y2={ry + ((k + 1) * rh) / 9}
-                  stroke="#475569"
-                  strokeWidth="0.6"
-                />
-              ))}
+              {r.type === "stairs" && (() => {
+                const treads = 8;
+                const els: ReactElement[] = [];
+                for (let k = 0; k < treads; k++) {
+                  els.push(
+                    <line
+                      key={k}
+                      x1={rx + 2}
+                      x2={rx + rw - 2}
+                      y1={ry + ((k + 1) * rh) / (treads + 1)}
+                      y2={ry + ((k + 1) * rh) / (treads + 1)}
+                      stroke="#475569"
+                      strokeWidth="0.6"
+                    />,
+                  );
+                }
+                // Diagonal arrow indicating up direction
+                els.push(
+                  <line
+                    key="arrow"
+                    x1={rx + rw / 2}
+                    x2={rx + rw / 2}
+                    y1={ry + rh - 4}
+                    y2={ry + 4}
+                    stroke="#1e293b"
+                    strokeWidth="1"
+                    markerEnd="url(#stair-arrow)"
+                  />,
+                );
+                return <g>{els}</g>;
+              })()}
+              {r.type === "lift" && (
+                <text x={cxR} y={cyR + 16} textAnchor="middle" fontSize="7" fill="#475569">
+                  LIFT
+                </text>
+              )}
+              {r.type === "parking" && (() => {
+                // Bay striping inside the parking room
+                const bays = 1;
+                const stripes: ReactElement[] = [];
+                for (let b = 1; b < bays; b++) {
+                  stripes.push(
+                    <line
+                      key={b}
+                      x1={rx + (rw / bays) * b}
+                      x2={rx + (rw / bays) * b}
+                      y1={ry + 3}
+                      y2={ry + rh - 3}
+                      stroke="#64748b"
+                      strokeDasharray="3 2"
+                      strokeWidth="0.8"
+                    />,
+                  );
+                }
+                return <g>{stripes}</g>;
+              })()}
               <text x={cxR} y={cyR - 2} textAnchor="middle" fontSize="9"
                 fill="#1e293b" fontWeight="600">{r.label}</text>
               <text x={cxR} y={cyR + 9} textAnchor="middle" fontSize="7" fill="#475569">

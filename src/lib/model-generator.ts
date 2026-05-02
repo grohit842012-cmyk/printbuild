@@ -48,10 +48,12 @@ const LABEL: Record<RoomType, string> = {
   dining: "Dining",
   courtyard: "Courtyard",
   stairs: "Stairs",
+  lift: "Lift",
+  utility: "Utility",
+  parking: "Parking",
 };
 
 // ---------- Architectural minimum dimensions (ft) ----------
-// Width × Depth (independent of orientation: rooms can be rotated to fit)
 export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   living: { w: 14, h: 16 },
   master_bedroom: { w: 12, h: 14 },
@@ -63,9 +65,11 @@ export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   study: { w: 8, h: 8 },
   courtyard: { w: 8, h: 8 },
   stairs: { w: 5, h: 8 },
+  lift: { w: 4, h: 4 },
+  utility: { w: 6, h: 7 },
+  parking: { w: 9, h: 18 },
 };
 
-// Preferred (target) dimensions used when there's plenty of room.
 const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   living: { w: 16, h: 18 },
   master_bedroom: { w: 14, h: 16 },
@@ -77,6 +81,9 @@ const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   study: { w: 9, h: 10 },
   courtyard: { w: 10, h: 10 },
   stairs: { w: 5.5, h: 9 },
+  lift: { w: 4, h: 4 },
+  utility: { w: 7, h: 8 },
+  parking: { w: 9, h: 18 },
 };
 
 interface FlatRoom {
@@ -86,6 +93,17 @@ interface FlatRoom {
 
 const HALLWAY_WIDTH = 3.5;
 const SETBACK = 3;
+
+/** Footprint dims by staircase shape (in ft), oriented along corridor (h) × wide (w). */
+function stairDims(type: DesignSpec["staircaseType"]): { w: number; h: number } {
+  switch (type) {
+    case "spiral": return { w: 6, h: 6 };
+    case "u-shape": return { w: 8, h: 10 };
+    case "l-shape": return { w: 7, h: 9 };
+    case "straight":
+    default: return { w: 4, h: 12 };
+  }
+}
 
 // ---------- Plot validation ----------
 export interface PlotValidationIssue {
@@ -216,7 +234,8 @@ function planFloor(
       !PUBLIC.includes(r.type) &&
       !PRIVATE.includes(r.type) &&
       r.type !== "bath" &&
-      r.type !== "stairs",
+      r.type !== "stairs" &&
+      r.type !== "lift", // lift is placed beside stair, not as its own zone
   );
 
   // Order along the corridor (front → back):
@@ -296,9 +315,11 @@ function layoutSide(
   totalDepth: number,
   startWall: "left" | "right",
   floorIndex: number,
-  hallwayX: number, // x position where hallway starts (the inner edge for this side)
+  hallwayX: number,
   hallwayW: number,
-  stairY?: number,
+  stairY: number | undefined,
+  stairShape: DesignSpec["staircaseType"],
+  withLift: boolean,
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
@@ -309,12 +330,12 @@ function layoutSide(
     orderedZones.unshift(stair);
   }
 
-  // Compute target depths (along corridor) for each zone, scaled to fit.
+  const sDims = stairDims(stairShape);
+
   const targets = orderedZones.map((z) => {
+    if (z.type === "stairs") return sDims.h;
     const pref = PREF_ROOM_DIMS[z.type];
-    // Orient long side along the hallway when sensible
-    const along = Math.max(pref.w, pref.h);
-    return along;
+    return Math.max(pref.w, pref.h);
   });
   const sumTarget = targets.reduce((a, b) => a + b, 0);
   const scale = totalDepth / Math.max(1, sumTarget);
@@ -324,44 +345,50 @@ function layoutSide(
   for (let i = 0; i < orderedZones.length; i++) {
     const z = orderedZones[i];
     const min = MIN_ROOM_DIMS[z.type];
-    const pref = PREF_ROOM_DIMS[z.type];
 
     let depth = Math.max(min.h, targets[i] * scale);
-    if (z.type === "stairs") {
-      depth = MIN_ROOM_DIMS.stairs.h;
-    }
-    // Clamp so we don't overrun
+    if (z.type === "stairs") depth = sDims.h;
+
     const remaining = totalDepth - cursorY;
     const remainingZones = orderedZones.length - i;
     if (depth > remaining - (remainingZones - 1) * min.h) {
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
-    if (i === zones.length - 1) depth = remaining; // last room takes the rest
+    if (i === zones.length - 1) depth = remaining;
 
-    // Always fill the full side width so there are no empty bands between
-    // the hallway and the outer wall.
-    void pref;
-    void min;
     const width = sideWidth;
-    // Position: anchor against outer wall on this side
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
     const y = z.type === "stairs" && stairY != null ? stairY : cursorY;
 
-    // Decide door wall: opens onto hallway → wall facing hallway
-    const doorWall: "N" | "E" | "S" | "W" =
-      startWall === "left" ? "E" : "W";
+    const doorWall: "N" | "E" | "S" | "W" = startWall === "left" ? "E" : "W";
 
-    rooms.push({
-      type: z.type,
-      x,
-      y,
-      w: width,
-      h: depth,
-      floor: floorIndex,
-      label: LABEL[z.type],
-      doorWall,
-      doorMid: depth / 2,
-    });
+    if (z.type === "stairs") {
+      // Stair core itself uses sDims.w; rest of side band keeps its width.
+      const stairW = Math.min(sDims.w, sideWidth - (withLift ? MIN_ROOM_DIMS.lift.w + 0.5 : 0));
+      const stairX = startWall === "left" ? hallwayX - stairW : hallwayX + hallwayW;
+      rooms.push({
+        type: "stairs", x: stairX, y, w: stairW, h: depth,
+        floor: floorIndex, label: LABEL.stairs, doorWall, doorMid: depth / 2,
+      });
+      if (withLift) {
+        const liftW = MIN_ROOM_DIMS.lift.w;
+        const liftH = Math.min(MIN_ROOM_DIMS.lift.h, depth);
+        const liftX = startWall === "left" ? stairX - liftW - 0.5 : stairX + stairW + 0.5;
+        // Clamp lift inside the side band
+        const minX = startWall === "left" ? hallwayX - sideWidth : hallwayX + hallwayW;
+        const maxX = startWall === "left" ? hallwayX - liftW : hallwayX + hallwayW + sideWidth - liftW;
+        const lx = Math.max(minX, Math.min(maxX, liftX));
+        rooms.push({
+          type: "lift", x: lx, y, w: liftW, h: liftH,
+          floor: floorIndex, label: LABEL.lift, doorWall, doorMid: liftH / 2,
+        });
+      }
+    } else {
+      rooms.push({
+        type: z.type, x, y, w: width, h: depth,
+        floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
+      });
+    }
 
     cursorY += depth;
   }
@@ -381,6 +408,8 @@ function buildPlate(
   rng: () => number,
   isGroundFloor: boolean,
   stairSide: HallSide,
+  stairShape: DesignSpec["staircaseType"],
+  withLift: boolean,
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
@@ -408,8 +437,8 @@ function buildPlate(
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
-  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW);
-  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW);
+  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift);
+  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift);
   const localRooms = [...leftLayout.rooms, ...rightLayout.rooms];
 
   // Rotate / mirror local coords to match entranceWall.
@@ -522,7 +551,7 @@ function buildPlate(
 
     // Windows on the outer wall (the wall opposite the hallway side)
     const tol = 0.6;
-    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
     if (habitable) {
       // Determine the longest exterior wall and place ONE window there
       type ExtWall = { wall: "N" | "E" | "S" | "W"; len: number };
@@ -642,7 +671,7 @@ function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
       else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
     }
 
-    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
     if (!habitable) continue;
     const tol = 0.6;
     const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
@@ -743,46 +772,61 @@ function evaluateLiveability(
 
 function computeParking(
   ground: FloorPlate,
+  plotW: number,
+  plotD: number,
   entranceDir: Direction,
   rng: () => number,
 ): ParkingArea {
-  // 2-bay parking: 18 ft × 20 ft. Sits on the front setback band of the
-  // entrance wall, offset sideways so it doesn't overlap the porch.
+  // 2-bay parking sized to fit inside the plot's setback band beside the
+  // entrance. The setback is part of the plot, so this stays inside the
+  // plot boundary.
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
   const bays = 2;
-  const w = bays * 9; // each bay = 9 ft wide
-  const h = 20; // depth of car
+  const bayW = 9;
+  const w = bays * bayW;
+  const h = 18;
   const covered = rng() < 0.6;
-  const setback = SETBACK; // matches building setback
-  let x = ground.x;
-  let y = ground.y;
+  let x = 0;
+  let y = 0;
   if (wall === "N") {
-    y = ground.y - setback - h;
+    // Parking sits in the strip between plot top (y=0) and building top (ground.y)
+    const bandH = Math.max(8, ground.y);
+    y = Math.max(0, ground.y - bandH);
+    const ph = Math.min(h, bandH);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
-    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
-    x = doorMid + offset * (w / 2 + 4) - w / 2;
-    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+    const sideOffset = doorMid > plotW / 2 ? -1 : 1;
+    x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    x = Math.max(0, Math.min(plotW - w, x));
+    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "S") {
-    y = ground.y + ground.h + setback;
+    const bandH = Math.max(8, plotD - (ground.y + ground.h));
+    y = ground.y + ground.h;
+    const ph = Math.min(h, bandH);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
-    const offset = doorMid > ground.x + ground.w / 2 ? -1 : 1;
-    x = doorMid + offset * (w / 2 + 4) - w / 2;
-    x = Math.max(ground.x - setback, Math.min(ground.x + ground.w + setback - w, x));
+    const sideOffset = doorMid > plotW / 2 ? -1 : 1;
+    x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    x = Math.max(0, Math.min(plotW - w, x));
+    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "E") {
-    x = ground.x + ground.w + setback;
+    const bandW = Math.max(8, plotW - (ground.x + ground.w));
+    x = ground.x + ground.w;
+    const pw = Math.min(h, bandW); // narrower band, depth becomes width
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
-    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
-    y = doorMid + offset * (h / 2 + 4) - h / 2;
-    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+    const sideOffset = doorMid > plotD / 2 ? -1 : 1;
+    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = Math.max(0, Math.min(plotD - w, y));
+    return { x, y, w: pw, h: w, bays, covered };
   } else {
-    x = ground.x - setback - w;
+    const bandW = Math.max(8, ground.x);
+    x = Math.max(0, ground.x - bandW);
+    const pw = Math.min(h, bandW);
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
-    const offset = doorMid > ground.y + ground.h / 2 ? -1 : 1;
-    y = doorMid + offset * (h / 2 + 4) - h / 2;
-    y = Math.max(ground.y - setback, Math.min(ground.y + ground.h + setback - h, y));
+    const sideOffset = doorMid > plotD / 2 ? -1 : 1;
+    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = Math.max(0, Math.min(plotD - w, y));
+    return { x, y, w: pw, h: w, bays, covered };
   }
-  return { x, y, w, h, bays, covered };
 }
 
 export function generateVariations(
@@ -823,11 +867,33 @@ export function generateVariations(
     }
   }
 
-  // For multi-floor homes inject a stair shaft on every floor (if missing).
+  const stairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
+  const withLift = spec.lift === "home";
+  const stiltParking = !!spec.stiltParking && spec.floors >= 2;
+
+  // If stilt parking, ground floor is parking + stairs (+optional utility).
+  if (stiltParking) {
+    const stilt: FlatRoom[] = [
+      { type: "parking", sizePref: "medium" },
+      { type: "parking", sizePref: "medium" },
+      { type: "stairs", sizePref: "medium" },
+    ];
+    if (spec.stiltUtilityRoom) stilt.push({ type: "utility", sizePref: "small" });
+    perFloor[0] = stilt;
+  }
+
+  // Inject stair on every floor when multi-floor.
   if (spec.floors > 1) {
     for (let f = 0; f < spec.floors; f++) {
       const has = perFloor[f].some((r) => r.type === "stairs");
       if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
+    }
+  }
+  // Inject lift on every floor when enabled (multi-floor).
+  if (withLift && spec.floors > 1) {
+    for (let f = 0; f < spec.floors; f++) {
+      const has = perFloor[f].some((r) => r.type === "lift");
+      if (!has) perFloor[f].push({ type: "lift", sizePref: "small" });
     }
   }
 
@@ -860,6 +926,8 @@ export function generateVariations(
           rng,
           f === 0,
           stairSide,
+          stairShape,
+          withLift && spec.floors > 1,
         ),
       );
     }
@@ -881,7 +949,7 @@ export function generateVariations(
           // Reflow rooms on the same vertical side as the stair (overlapping x)
           for (let i = 0; i < rooms.length; i++) {
             const r = rooms[i];
-            if (r.type === "stairs") continue;
+            if (r.type === "stairs" || r.type === "lift") continue;
             // Same vertical band (overlaps stair x range)?
             const xOverlap = !(r.x + r.w <= sx + 0.01 || r.x >= sx + sw - 0.01);
             if (!xOverlap) continue;
@@ -927,6 +995,22 @@ export function generateVariations(
           };
           if (stairIdx >= 0) plates[f].rooms[stairIdx] = stairRect;
           else plates[f].rooms.push(stairRect);
+
+          // Align lift across floors too (if ground has one)
+          const groundLift = plates[0].rooms.find((r) => r.type === "lift");
+          if (groundLift) {
+            const liftIdx = plates[f].rooms.findIndex((r) => r.type === "lift");
+            const liftRect: RoomRect = {
+              type: "lift",
+              x: groundLift.x, y: groundLift.y, w: groundLift.w, h: groundLift.h,
+              floor: plates[f].floor,
+              label: LABEL.lift,
+              doorWall,
+              doorMid: groundLift.doorMid,
+            };
+            if (liftIdx >= 0) plates[f].rooms[liftIdx] = liftRect;
+            else plates[f].rooms.push(liftRect);
+          }
           plates[f] = rebuildInteriorOpenings(plates[f]);
         }
       }
@@ -944,10 +1028,11 @@ export function generateVariations(
     const elevationStyle =
       ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
 
-    // Parking: place a 2-bay carport (or open driveway) in the front setback
-    // band, offset to the side opposite of the entrance door midpoint so cars
-    // don't block the porch.
-    const parking = computeParking(plates[0], entranceDir, rng);
+    // Parking lives inside the plot. When stilt-parking is enabled, parking
+    // is a room on the ground floor instead of a separate strip.
+    const parking = stiltParking
+      ? undefined
+      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, rng);
 
     variations.push({
       id: `var-${seed}`,
