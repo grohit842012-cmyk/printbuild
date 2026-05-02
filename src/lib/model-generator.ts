@@ -234,7 +234,8 @@ function planFloor(
       !PUBLIC.includes(r.type) &&
       !PRIVATE.includes(r.type) &&
       r.type !== "bath" &&
-      r.type !== "stairs",
+      r.type !== "stairs" &&
+      r.type !== "lift", // lift is placed beside stair, not as its own zone
   );
 
   // Order along the corridor (front → back):
