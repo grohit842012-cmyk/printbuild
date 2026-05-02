@@ -550,7 +550,7 @@ function buildPlate(
 
     // Windows on the outer wall (the wall opposite the hallway side)
     const tol = 0.6;
-    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
     if (habitable) {
       // Determine the longest exterior wall and place ONE window there
       type ExtWall = { wall: "N" | "E" | "S" | "W"; len: number };
@@ -670,7 +670,7 @@ function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
       else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
     }
 
-    const habitable = r.type !== "bath" && r.type !== "stairs" && r.type !== "pooja";
+    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
     if (!habitable) continue;
     const tol = 0.6;
     const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
