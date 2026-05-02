@@ -407,6 +407,8 @@ function buildPlate(
   rng: () => number,
   isGroundFloor: boolean,
   stairSide: HallSide,
+  stairShape: DesignSpec["staircaseType"],
+  withLift: boolean,
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
