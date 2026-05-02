@@ -453,6 +453,75 @@ function NewDesignWizard() {
 
           {step === 4 && (
             <>
+              <h2 className="text-xl font-display">Vertical circulation & parking</h2>
+              <div>
+                <Label>Staircase type</Label>
+                <Select
+                  value={spec.staircaseType ?? "straight"}
+                  onValueChange={(v) =>
+                    setSpec({ ...spec, staircaseType: v as DesignSpec["staircaseType"] })
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="straight">Straight (compact, runs in one line)</SelectItem>
+                    <SelectItem value="l-shape">L-shape (90° turn at landing)</SelectItem>
+                    <SelectItem value="u-shape">U-shape (180° turn, takes more space)</SelectItem>
+                    <SelectItem value="spiral">Spiral (smallest footprint)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Home lift</Label>
+                <RadioGroup
+                  value={spec.lift ?? "none"}
+                  onValueChange={(v) => setSpec({ ...spec, lift: v as DesignSpec["lift"] })}
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="none" /> No lift
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="home" /> Add home lift (4×4 ft, beside stairs)
+                  </label>
+                </RadioGroup>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!spec.stiltParking}
+                    onCheckedChange={(c) =>
+                      setSpec({ ...spec, stiltParking: Boolean(c) })
+                    }
+                    disabled={spec.floors < 2}
+                  />
+                  Leave the ground floor for parking (stilt floor)
+                </label>
+                {spec.floors < 2 && (
+                  <p className="text-xs text-muted-foreground pl-6">
+                    Stilt parking needs at least 2 floors so rooms have a place to live.
+                  </p>
+                )}
+                {spec.stiltParking && (
+                  <label className="flex items-center gap-2 text-sm pl-6">
+                    <Checkbox
+                      checked={!!spec.stiltUtilityRoom}
+                      onCheckedChange={(c) =>
+                        setSpec({ ...spec, stiltUtilityRoom: Boolean(c) })
+                      }
+                    />
+                    Add a small utility / store room beside the staircase
+                  </label>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  When stilt parking is off we put a 2-bay parking strip inside the plot, beside the entrance.
+                </p>
+              </div>
+            </>
+          )}
+
+          {step === 5 && (
+            <>
               <h2 className="text-xl font-display">Vastu preferences</h2>
               <div>
                 <Label>How important is Vastu?</Label>
