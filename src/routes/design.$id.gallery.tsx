@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import { generateVariations } from "@/lib/model-generator";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import type { DesignSpec, VastuPreferences, Variation } from "@/lib/design-types";
 
 export const Route = createFileRoute("/design/$id/gallery")({
