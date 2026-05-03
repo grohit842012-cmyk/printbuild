@@ -519,6 +519,46 @@ function NewDesignWizard() {
                   When stilt parking is off we put a 2-bay parking strip inside the plot, beside the entrance.
                 </p>
               </div>
+
+              <div className="border-t border-border pt-4">
+                <Label>Floor plan style</Label>
+                <RadioGroup
+                  value={spec.planMode ?? "closed"}
+                  onValueChange={(v) => setSpec({ ...spec, planMode: v as "open" | "closed" })}
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-start gap-2">
+                    <RadioGroupItem value="open" />
+                    <div>
+                      <div className="text-sm font-medium">Open plan</div>
+                      <p className="text-xs text-muted-foreground">Living, dining flow together. Only bedrooms & baths get walls.</p>
+                    </div>
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-start gap-2">
+                    <RadioGroupItem value="closed" />
+                    <div>
+                      <div className="text-sm font-medium">Closed plan</div>
+                      <p className="text-xs text-muted-foreground">Every room is walled off — traditional layout.</p>
+                    </div>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label>Kitchen</Label>
+                <RadioGroup
+                  value={spec.kitchenOpen ? "open" : "closed"}
+                  onValueChange={(v) => setSpec({ ...spec, kitchenOpen: v === "open" })}
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="open" /> Open kitchen (flows into dining/living)
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="closed" /> Closed kitchen (walled-off)
+                  </label>
+                </RadioGroup>
+              </div>
             </>
           )}
 
