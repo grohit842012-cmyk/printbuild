@@ -64,9 +64,19 @@ function swingArcPath(
   return `M ${hingeX} ${hingeY} L ${sx} ${sy} A ${radius} ${radius} 0 0 1 ${ex} ${ey} Z`;
 }
 
-export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
+export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed", kitchenOpen = false }: Props) {
   const plate = variation.plates.find((p) => p.floor === floor);
   if (!plate) return null;
+  const totalFloors = variation.plates.length;
+
+  // A room is "open" (no surrounding walls drawn) when planMode=open AND
+  // the type is in OPEN_TYPES (kitchen also requires kitchenOpen).
+  const isOpenRoom = (type: string) => {
+    if (planMode !== "open") return false;
+    if (ALWAYS_WALLED.has(type)) return false;
+    if (type === "kitchen") return kitchenOpen;
+    return OPEN_TYPES.has(type);
+  };
 
   const plotW = variation.plotWidthFt;
   const plotD = variation.plotDepthFt;
