@@ -30,8 +30,11 @@ function GalleryPage() {
   const { id } = useParams({ from: "/design/$id/gallery" });
   const navigate = useNavigate();
   const [variations, setVariations] = useState<Variation[]>([]);
+  const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
+  const [kitchenOpen, setKitchenOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, [id]);
 
@@ -45,6 +48,23 @@ function GalleryPage() {
     setLoading(false);
     if (error || !data) { toast.error("Could not load designs"); return; }
     setVariations((data.generated_variations as unknown as Variation[]) ?? []);
+    const spec = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
+    setPlanMode(spec?.planMode ?? "closed");
+    setKitchenOpen(!!spec?.kitchenOpen);
+  }
+
+  async function deleteVariation(varId: string) {
+    if (!confirm("Delete this generated design? This can't be undone.")) return;
+    setDeletingId(varId);
+    const next = variations.filter((v) => v.id !== varId);
+    const { error } = await supabase
+      .from("designs")
+      .update({ generated_variations: next as never })
+      .eq("id", id);
+    setDeletingId(null);
+    if (error) { toast.error(error.message); return; }
+    setVariations(next);
+    toast.success("Design deleted");
   }
 
   async function regenerate() {
