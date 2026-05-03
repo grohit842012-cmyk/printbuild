@@ -54,15 +54,20 @@ function Index() {
               </Button>
             </div>
           </div>
-          <div className="relative">
+          <div className="relative" style={{ perspective: "1200px" }}>
             <div className="absolute -inset-6 bg-accent/10 rounded-3xl blur-3xl" aria-hidden />
-            <img
-              src={heroImg}
-              alt="Curved-wall architectural interior with compass overlay"
-              width={1536}
-              height={1024}
-              className="relative rounded-2xl shadow-2xl border border-border w-full h-auto"
-            />
+            <div
+              className="relative transition-transform duration-500 ease-out hover:[transform:rotateY(-8deg)_rotateX(4deg)] [transform:rotateY(-4deg)_rotateX(2deg)]"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <img
+                src={heroImg}
+                alt="Curved-wall architectural interior with compass overlay"
+                width={1536}
+                height={1024}
+                className="rounded-2xl shadow-[0_40px_80px_-20px_rgba(0,0,0,0.45)] border border-border w-full h-auto"
+              />
+            </div>
           </div>
         </div>
       </section>
