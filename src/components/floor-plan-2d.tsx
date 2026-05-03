@@ -5,7 +5,13 @@ interface Props {
   variation: Variation;
   floor: number;
   size?: number;
+  /** Visual mode: "open" hides interior walls between public rooms. */
+  planMode?: "open" | "closed";
+  kitchenOpen?: boolean;
 }
+
+const OPEN_TYPES = new Set(["living", "dining", "kitchen", "courtyard"]);
+const ALWAYS_WALLED = new Set(["bedroom", "master_bedroom", "bath", "pooja", "stairs", "lift", "utility", "parking", "study"]);
 
 const ROOM_COLOR: Record<string, string> = {
   living: "#cfe0f5",
