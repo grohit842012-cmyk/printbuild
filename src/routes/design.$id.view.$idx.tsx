@@ -39,11 +39,14 @@ function InspectorPage() {
   const [currency, setCurrency] = useState<Currency>("INR");
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
 
+  const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
+  const [kitchenOpen, setKitchenOpen] = useState(false);
+
   useEffect(() => {
     void (async () => {
       const { data, error } = await supabase
         .from("designs")
-        .select("generated_variations")
+        .select("generated_variations, spec")
         .eq("id", id)
         .single();
       if (error || !data) { toast.error("Not found"); return; }
@@ -51,6 +54,9 @@ function InspectorPage() {
       const v = variations[Number(idx)];
       if (!v) { toast.error("Variation not found"); return; }
       setVariation(v);
+      const spec = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
+      setPlanMode(spec?.planMode ?? "closed");
+      setKitchenOpen(!!spec?.kitchenOpen);
       const floors = v.plates.map((p) => p.floor);
       setAllFloors(floors);
       setActiveFloor(floors[0]);
@@ -122,7 +128,7 @@ function InspectorPage() {
               </div>
             </div>
             <div className="bg-secondary/40 rounded-xl p-3">
-              <FloorPlan2D variation={variation} floor={activeFloor} size={520} />
+              <FloorPlan2D variation={variation} floor={activeFloor} size={520} planMode={planMode} kitchenOpen={kitchenOpen} />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Plot {variation.plotWidthFt}′ × {variation.plotDepthFt}′ · {variation.plates.length} floor{variation.plates.length > 1 ? "s" : ""}

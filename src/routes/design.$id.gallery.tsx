@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import { generateVariations } from "@/lib/model-generator";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import type { DesignSpec, VastuPreferences, Variation } from "@/lib/design-types";
 
 export const Route = createFileRoute("/design/$id/gallery")({
@@ -30,8 +30,11 @@ function GalleryPage() {
   const { id } = useParams({ from: "/design/$id/gallery" });
   const navigate = useNavigate();
   const [variations, setVariations] = useState<Variation[]>([]);
+  const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
+  const [kitchenOpen, setKitchenOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, [id]);
 
@@ -45,6 +48,23 @@ function GalleryPage() {
     setLoading(false);
     if (error || !data) { toast.error("Could not load designs"); return; }
     setVariations((data.generated_variations as unknown as Variation[]) ?? []);
+    const spec = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
+    setPlanMode(spec?.planMode ?? "closed");
+    setKitchenOpen(!!spec?.kitchenOpen);
+  }
+
+  async function deleteVariation(varId: string) {
+    if (!confirm("Delete this generated design? This can't be undone.")) return;
+    setDeletingId(varId);
+    const next = variations.filter((v) => v.id !== varId);
+    const { error } = await supabase
+      .from("designs")
+      .update({ generated_variations: next as never })
+      .eq("id", id);
+    setDeletingId(null);
+    if (error) { toast.error(error.message); return; }
+    setVariations(next);
+    toast.success("Design deleted");
   }
 
   async function regenerate() {
@@ -87,28 +107,41 @@ function GalleryPage() {
             {variations.map((v, idx) => {
               const t = tierLabel(v.vastuTier);
               return (
-                <button
+                <div
                   key={v.id}
-                  onClick={() => navigate({ to: "/design/$id/view/$idx", params: { id, idx: String(idx) } })}
-                  className="group bg-card border border-border rounded-2xl p-4 text-left hover:shadow-lg transition-shadow"
+                  className="group relative bg-card border border-border rounded-2xl p-4 hover:shadow-lg transition-shadow"
                 >
-                  <div className="aspect-square bg-secondary/40 rounded-xl mb-3 overflow-hidden">
-                    <FloorPlan2D variation={v} floor={1} size={300} />
-                  </div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-display text-lg">Design {idx + 1}</h3>
-                    <Badge className={t.cls}>{t.text}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {v.elevationStyle.replace(/-/g, " ")} ·{" "}
-                    {v.parking
-                      ? v.parking.covered ? "Carport" : "Open parking"
-                      : "Stilt parking"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void deleteVariation(v.id); }}
+                    disabled={deletingId === v.id}
+                    aria-label="Delete design"
+                    className="absolute top-2 right-2 z-10 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => navigate({ to: "/design/$id/view/$idx", params: { id, idx: String(idx) } })}
+                    className="text-left w-full"
+                  >
+                    <div className="aspect-square bg-secondary/40 rounded-xl mb-3 overflow-hidden">
+                      <FloorPlan2D variation={v} floor={1} size={300} planMode={planMode} kitchenOpen={kitchenOpen} />
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-display text-lg">Design {idx + 1}</h3>
+                      <Badge className={t.cls}>{t.text}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {v.elevationStyle.replace(/-/g, " ")} ·{" "}
+                      {v.parking
+                        ? v.parking.covered ? "Carport" : "Open parking"
+                        : "Stilt parking"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
+                    </p>
+                  </button>
+                </div>
               );
             })}
           </div>

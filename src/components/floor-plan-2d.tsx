@@ -5,7 +5,13 @@ interface Props {
   variation: Variation;
   floor: number;
   size?: number;
+  /** Visual mode: "open" hides interior walls between public rooms. */
+  planMode?: "open" | "closed";
+  kitchenOpen?: boolean;
 }
+
+const OPEN_TYPES = new Set(["living", "dining", "kitchen", "courtyard"]);
+const ALWAYS_WALLED = new Set(["bedroom", "master_bedroom", "bath", "pooja", "stairs", "lift", "utility", "parking", "study"]);
 
 const ROOM_COLOR: Record<string, string> = {
   living: "#cfe0f5",
@@ -58,9 +64,19 @@ function swingArcPath(
   return `M ${hingeX} ${hingeY} L ${sx} ${sy} A ${radius} ${radius} 0 0 1 ${ex} ${ey} Z`;
 }
 
-export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
+export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed", kitchenOpen = false }: Props) {
   const plate = variation.plates.find((p) => p.floor === floor);
   if (!plate) return null;
+  const totalFloors = variation.plates.length;
+
+  // A room is "open" (no surrounding walls drawn) when planMode=open AND
+  // the type is in OPEN_TYPES (kitchen also requires kitchenOpen).
+  const isOpenRoom = (type: string) => {
+    if (planMode !== "open") return false;
+    if (ALWAYS_WALLED.has(type)) return false;
+    if (type === "kitchen") return kitchenOpen;
+    return OPEN_TYPES.has(type);
+  };
 
   const plotW = variation.plotWidthFt;
   const plotD = variation.plotDepthFt;
@@ -211,20 +227,27 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                   "Z",
                 ].join(" ")
               : null;
+          const open = isOpenRoom(r.type);
+          const strokeW = open ? 0 : 0.8;
           return (
             <g key={i}>
               {roomD ? (
-                <path d={roomD} fill={ROOM_COLOR[r.type] ?? "#e2e8f0"} stroke="#1e293b" strokeWidth="0.8" />
+                <path d={roomD} fill={ROOM_COLOR[r.type] ?? "#e2e8f0"} stroke="#1e293b" strokeWidth={strokeW} />
               ) : (
                 <rect
                   x={rx} y={ry} width={rw} height={rh}
                   fill={ROOM_COLOR[r.type] ?? "#e2e8f0"}
-                  stroke="#1e293b" strokeWidth="0.8"
+                  stroke="#1e293b" strokeWidth={strokeW}
                 />
               )}
               {r.type === "stairs" && (() => {
-                const treads = 8;
+                const treads = 9;
                 const els: ReactElement[] = [];
+                // Solid filled stair shape so no gap shows behind treads
+                els.push(
+                  <rect key="bg" x={rx + 1} y={ry + 1} width={rw - 2} height={rh - 2}
+                    fill="#cbd5e1" stroke="#475569" strokeWidth="0.6" />
+                );
                 for (let k = 0; k < treads; k++) {
                   els.push(
                     <line
@@ -233,12 +256,14 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                       x2={rx + rw - 2}
                       y1={ry + ((k + 1) * rh) / (treads + 1)}
                       y2={ry + ((k + 1) * rh) / (treads + 1)}
-                      stroke="#475569"
-                      strokeWidth="0.6"
+                      stroke="#334155"
+                      strokeWidth="0.7"
                     />,
                   );
                 }
-                // Diagonal arrow indicating up direction
+                // Direction arrow + UP / DN markers
+                const goingUp = floor < totalFloors;
+                const goingDown = floor > 1;
                 els.push(
                   <line
                     key="arrow"
@@ -246,10 +271,16 @@ export function FloorPlan2D({ variation, floor, size = 360 }: Props) {
                     x2={rx + rw / 2}
                     y1={ry + rh - 4}
                     y2={ry + 4}
-                    stroke="#1e293b"
-                    strokeWidth="1"
+                    stroke="#0f172a"
+                    strokeWidth="1.4"
                     markerEnd="url(#stair-arrow)"
                   />,
+                );
+                if (goingUp) els.push(
+                  <text key="up" x={rx + rw / 2} y={ry + 10} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">UP ↑</text>
+                );
+                if (goingDown) els.push(
+                  <text key="dn" x={rx + rw / 2} y={ry + rh - 4} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">DN ↓</text>
                 );
                 return <g>{els}</g>;
               })()}

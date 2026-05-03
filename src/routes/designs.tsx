@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/designs")({
   head: () => ({ meta: [{ title: "My designs — PrintBuild" }] }),
@@ -79,25 +80,45 @@ function DesignsPage() {
               const booking = bookings.find((b) => b.design_id === d.id);
               const route = nextRoute(d);
               return (
-                <Link
+                <div
                   key={d.id}
-                  to={route.to}
-                  params={route.params as never}
-                  className="block bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
+                  className="group relative bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-display text-lg">{d.name}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Created {new Date(d.created_at).toLocaleDateString()}
-                      </p>
+                  <Link
+                    to={route.to}
+                    params={route.params as never}
+                    className="block"
+                  >
+                    <div className="flex items-center justify-between gap-3 pr-10">
+                      <div>
+                        <h3 className="font-display text-lg">{d.name}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Created {new Date(d.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <Badge variant="outline">{d.status.replace("_", " ")}</Badge>
+                        {booking && <Badge>Booked: {booking.status}</Badge>}
+                      </div>
                     </div>
-                    <div className="flex gap-2 items-center">
-                      <Badge variant="outline">{d.status.replace("_", " ")}</Badge>
-                      {booking && <Badge>Booked: {booking.status}</Badge>}
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`Delete "${d.name}"? This can't be undone.`)) return;
+                      const { error } = await supabase.from("designs").delete().eq("id", d.id);
+                      if (error) toast.error(error.message);
+                      else {
+                        setDesigns((prev) => prev.filter((x) => x.id !== d.id));
+                        toast.success("Design deleted");
+                      }
+                    }}
+                    aria-label="Delete design"
+                    className="absolute top-3 right-3 p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-60 group-hover:opacity-100 transition"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               );
             })}
           </div>

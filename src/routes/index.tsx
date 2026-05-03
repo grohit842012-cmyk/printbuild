@@ -54,15 +54,20 @@ function Index() {
               </Button>
             </div>
           </div>
-          <div className="relative">
+          <div className="relative" style={{ perspective: "1200px" }}>
             <div className="absolute -inset-6 bg-accent/10 rounded-3xl blur-3xl" aria-hidden />
-            <img
-              src={heroImg}
-              alt="Curved-wall architectural interior with compass overlay"
-              width={1536}
-              height={1024}
-              className="relative rounded-2xl shadow-2xl border border-border w-full h-auto"
-            />
+            <div
+              className="relative transition-transform duration-500 ease-out hover:[transform:rotateY(-8deg)_rotateX(4deg)] [transform:rotateY(-4deg)_rotateX(2deg)]"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <img
+                src={heroImg}
+                alt="Curved-wall architectural interior with compass overlay"
+                width={1536}
+                height={1024}
+                className="rounded-2xl shadow-[0_40px_80px_-20px_rgba(0,0,0,0.45)] border border-border w-full h-auto"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -71,30 +76,18 @@ function Index() {
       <section id="how" className="border-t border-border bg-secondary/40">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-16">
           <h2 className="text-3xl font-display mb-10 text-center">How it works</h2>
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-4 gap-6" style={{ perspective: "1000px" }}>
             {[
-              {
-                icon: Home,
-                title: "Tell us about your home",
-                desc: "Plot, floors, rooms, lifestyle and Vastu preferences in a guided form.",
-              },
-              {
-                icon: Sparkles,
-                title: "Refine with AI",
-                desc: "Our assistant asks smart follow-ups to capture exactly what you envision.",
-              },
-              {
-                icon: Box,
-                title: "Explore 10 designs",
-                desc: "Walk through ten parametric variations with curved walls and 2D plans.",
-              },
-              {
-                icon: Compass,
-                title: "Book & receive",
-                desc: "Confirm your favourite — we fabricate the printable STL files for you.",
-              },
+              { icon: Home, title: "Tell us about your home", desc: "Plot, floors, rooms, lifestyle and Vastu preferences in a guided form." },
+              { icon: Sparkles, title: "Refine with AI", desc: "Our assistant asks smart follow-ups to capture exactly what you envision." },
+              { icon: Box, title: "Explore 10 designs", desc: "Walk through ten parametric variations with curved walls and 2D plans." },
+              { icon: Compass, title: "Book & receive", desc: "Confirm your favourite — we fabricate the printable STL files for you." },
             ].map((step, i) => (
-              <div key={i} className="bg-card border border-border rounded-xl p-6">
+              <div
+                key={i}
+                className="bg-card border border-border rounded-xl p-6 transition-transform duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)]"
+                style={{ transformStyle: "preserve-3d" }}
+              >
                 <step.icon className="h-6 w-6 text-accent mb-4" />
                 <h3 className="font-display text-xl mb-2">{step.title}</h3>
                 <p className="text-sm text-muted-foreground">{step.desc}</p>

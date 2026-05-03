@@ -41,6 +41,11 @@ export interface DesignSpec {
   stiltParking?: boolean;
   // If stilt parking is on, include a small utility room beside the stairs.
   stiltUtilityRoom?: boolean;
+  // Open plan = only bedrooms/baths/pooja/utility/stairs/lift get walls.
+  // Closed plan = every room is walled.
+  planMode?: "open" | "closed";
+  // Kitchen open to dining/living vs walled-off.
+  kitchenOpen?: boolean;
   lifestyle: {
     familySize: number;
     workFromHome: boolean;
