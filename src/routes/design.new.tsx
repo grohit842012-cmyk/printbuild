@@ -93,6 +93,8 @@ function NewDesignWizard() {
     lift: "none",
     stiltParking: false,
     stiltUtilityRoom: false,
+    planMode: "closed",
+    kitchenOpen: false,
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
   });
 
