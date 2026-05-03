@@ -138,7 +138,21 @@ function AdminDashboard() {
       <SiteHeader />
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <h1 className="text-3xl font-display mb-2">Admin · Bookings</h1>
-        <p className="text-sm text-muted-foreground mb-8">Manage orders, update status, download STL bundles.</p>
+        <p className="text-sm text-muted-foreground mb-6">Manage orders, update status, download STL bundles.</p>
+
+        <Link
+          to="/admin/reviews"
+          className="block mb-8 bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-accent mb-1">Customer feedback</p>
+              <h2 className="font-display text-xl">Reviews dashboard</h2>
+              <p className="text-sm text-muted-foreground">See ratings and comments across all designs.</p>
+            </div>
+            <span className="text-sm text-muted-foreground group-hover:text-foreground">Open →</span>
+          </div>
+        </Link>
 
         {loading ? (
           <p className="text-muted-foreground">Loading…</p>
