@@ -128,7 +128,7 @@ function InspectorPage() {
               </div>
             </div>
             <div className="bg-secondary/40 rounded-xl p-3">
-              <FloorPlan2D variation={variation} floor={activeFloor} size={520} />
+              <FloorPlan2D variation={variation} floor={activeFloor} size={520} planMode={planMode} kitchenOpen={kitchenOpen} />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Plot {variation.plotWidthFt}′ × {variation.plotDepthFt}′ · {variation.plates.length} floor{variation.plates.length > 1 ? "s" : ""}
