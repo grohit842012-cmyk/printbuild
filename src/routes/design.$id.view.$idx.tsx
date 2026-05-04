@@ -203,6 +203,38 @@ function InspectorPage() {
               </p>
             </div>
 
+            {/* Per-floor summary */}
+            <FloorSummary variation={variation} />
+
+            {/* Climate suitability */}
+            {(() => {
+              const fit = climateFit(variation.elevationStyle);
+              return (
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sun className="h-4 w-4 text-accent" />
+                    <h2 className="font-display text-xl">Climate suitability</h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize mb-2">
+                    Style: {variation.elevationStyle.replace(/-/g, " ")}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {fit.best.map((c) => (
+                      <span key={c} className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                        Best: {climateLabel(c)}
+                      </span>
+                    ))}
+                    {fit.avoid.map((c) => (
+                      <span key={c} className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded bg-rose-100 text-rose-900">
+                        Avoid: {climateLabel(c)}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{fit.notes}</p>
+                </div>
+              );
+            })()}
+
             {/* Vastu + liveability */}
             <div className="bg-card border border-border rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
