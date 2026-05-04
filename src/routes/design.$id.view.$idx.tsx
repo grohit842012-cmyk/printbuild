@@ -112,6 +112,15 @@ function InspectorPage() {
           <Badge>{variation.vastuTier === "strict" ? "Strict Vastu" : variation.vastuTier === "mostly" ? "Mostly Vastu" : "Partial Vastu"}</Badge>
         </div>
 
+        {/* 3D model viewer — full width */}
+        <div className="bg-card border border-border rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-xl">3D model</h2>
+            <span className="text-xs text-muted-foreground">Drag to orbit · scroll to zoom</span>
+          </div>
+          <ModelViewer3D variation={variation} planMode={planMode} kitchenOpen={kitchenOpen} />
+        </div>
+
         <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6">
           {/* 2D plan + floor switcher */}
           <div className="bg-card border border-border rounded-2xl p-5">
