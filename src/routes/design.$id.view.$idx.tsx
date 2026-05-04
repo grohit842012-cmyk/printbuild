@@ -7,9 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
+import { ModelViewer3D } from "@/components/model-viewer-3d";
+import { FloorSummary } from "@/components/floor-summary";
 import type { Variation } from "@/lib/design-types";
-import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler } from "lucide-react";
+import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler, Sun } from "lucide-react";
 import { computeEstimates, formatCurrency, type Currency } from "@/lib/estimates";
+import { climateFit, climateLabel } from "@/lib/climate";
 
 export const Route = createFileRoute("/design/$id/view/$idx")({
   head: () => ({ meta: [{ title: "Inspect design — PrintBuild" }] }),
