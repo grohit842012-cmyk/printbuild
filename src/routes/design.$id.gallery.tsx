@@ -8,8 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import { generateVariations } from "@/lib/model-generator";
-import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Sparkles } from "lucide-react";
 import type { DesignSpec, VastuPreferences, Variation } from "@/lib/design-types";
+import { recommendVariations, climateFit, climateLabel } from "@/lib/climate";
 
 export const Route = createFileRoute("/design/$id/gallery")({
   head: () => ({ meta: [{ title: "Your designs — PrintBuild" }] }),
