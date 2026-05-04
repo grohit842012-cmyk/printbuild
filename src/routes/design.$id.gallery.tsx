@@ -104,14 +104,25 @@ function GalleryPage() {
         {loading ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : (
+          <>
+          {(() => {
+            const recommended = recommendVariations(variations, 3);
+            return (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {variations.map((v, idx) => {
               const t = tierLabel(v.vastuTier);
+              const isRec = recommended.has(v.id);
+              const fit = climateFit(v.elevationStyle);
               return (
                 <div
                   key={v.id}
-                  className="group relative bg-card border border-border rounded-2xl p-4 hover:shadow-lg transition-shadow"
+                  className={`group relative bg-card border rounded-2xl p-4 hover:shadow-lg transition-shadow ${isRec ? "border-accent ring-2 ring-accent/30" : "border-border"}`}
                 >
+                  {isRec && (
+                    <span className="absolute -top-2 left-3 z-10 bg-accent text-accent-foreground text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Recommended
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); void deleteVariation(v.id); }}
@@ -141,11 +152,21 @@ function GalleryPage() {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
                     </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {fit.best.slice(0, 2).map((c) => (
+                        <span key={c} className="text-[9px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                          {climateLabel(c)}
+                        </span>
+                      ))}
+                    </div>
                   </button>
                 </div>
               );
             })}
           </div>
+            );
+          })()}
+          </>
         )}
 
         <div className="mt-8">
