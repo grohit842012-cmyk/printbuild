@@ -82,7 +82,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <AuthProvider>
-      <ThreeBackground />
       <Outlet />
       <Toaster richColors position="top-right" />
     </AuthProvider>
