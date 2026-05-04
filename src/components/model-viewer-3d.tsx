@@ -237,6 +237,9 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
   const topY = baseYs[baseYs.length - 1] + FLOOR_HEIGHT * FT_TO_M;
   const camDist = Math.max(variation.plotWidthFt, variation.plotDepthFt) * FT_TO_M * 1.4;
 
+  if (!mounted) {
+    return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 grid place-items-center text-xs text-muted-foreground">Loading 3D model…</div>;
+  }
   return (
     <div className="w-full aspect-[4/3] rounded-xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-700">
       <Canvas
