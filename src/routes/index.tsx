@@ -2,6 +2,7 @@ import heroImg from "@/assets/hero-home.jpg";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
+import { ThreeBackground } from "@/components/three-background";
 import { Compass, Home, Sparkles, Box } from "lucide-react";
 
 export const Route = createFileRoute("/")({
