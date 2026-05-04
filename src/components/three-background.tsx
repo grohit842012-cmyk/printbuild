@@ -60,6 +60,9 @@ function FloatingHouse({ pos, size, speed }: { pos: [number, number, number]; si
 }
 
 export function ThreeBackground() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   return (
     <div className="fixed inset-0 -z-10 pointer-events-none opacity-60">
       <Canvas camera={{ position: [0, 1, 8], fov: 60 }} dpr={[1, 1.5]}>
