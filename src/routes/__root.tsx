@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
+import { ThreeBackground } from "@/components/three-background";
 
 function NotFoundComponent() {
   return (
