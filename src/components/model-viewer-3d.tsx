@@ -228,6 +228,8 @@ function ParkingArea({ variation }: { variation: Variation }) {
 }
 
 export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = false }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
     [variation],
