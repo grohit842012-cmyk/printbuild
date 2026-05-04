@@ -7,9 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
+import { ModelViewer3D } from "@/components/model-viewer-3d";
+import { FloorSummary } from "@/components/floor-summary";
 import type { Variation } from "@/lib/design-types";
-import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler } from "lucide-react";
+import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler, Sun } from "lucide-react";
 import { computeEstimates, formatCurrency, type Currency } from "@/lib/estimates";
+import { climateFit, climateLabel } from "@/lib/climate";
 
 export const Route = createFileRoute("/design/$id/view/$idx")({
   head: () => ({ meta: [{ title: "Inspect design — PrintBuild" }] }),
@@ -109,6 +112,15 @@ function InspectorPage() {
           <Badge>{variation.vastuTier === "strict" ? "Strict Vastu" : variation.vastuTier === "mostly" ? "Mostly Vastu" : "Partial Vastu"}</Badge>
         </div>
 
+        {/* 3D model viewer — full width */}
+        <div className="bg-card border border-border rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-xl">3D model</h2>
+            <span className="text-xs text-muted-foreground">Drag to orbit · scroll to zoom</span>
+          </div>
+          <ModelViewer3D variation={variation} planMode={planMode} kitchenOpen={kitchenOpen} />
+        </div>
+
         <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6">
           {/* 2D plan + floor switcher */}
           <div className="bg-card border border-border rounded-2xl p-5">
@@ -190,6 +202,38 @@ function InspectorPage() {
                 Estimates are indicative. Actual cost depends on materials, finishes, site, and labour.
               </p>
             </div>
+
+            {/* Per-floor summary */}
+            <FloorSummary variation={variation} />
+
+            {/* Climate suitability */}
+            {(() => {
+              const fit = climateFit(variation.elevationStyle);
+              return (
+                <div className="bg-card border border-border rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sun className="h-4 w-4 text-accent" />
+                    <h2 className="font-display text-xl">Climate suitability</h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize mb-2">
+                    Style: {variation.elevationStyle.replace(/-/g, " ")}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {fit.best.map((c) => (
+                      <span key={c} className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                        Best: {climateLabel(c)}
+                      </span>
+                    ))}
+                    {fit.avoid.map((c) => (
+                      <span key={c} className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded bg-rose-100 text-rose-900">
+                        Avoid: {climateLabel(c)}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{fit.notes}</p>
+                </div>
+              );
+            })()}
 
             {/* Vastu + liveability */}
             <div className="bg-card border border-border rounded-2xl p-5">

@@ -363,9 +363,14 @@ function layoutSide(
     const doorWall: "N" | "E" | "S" | "W" = startWall === "left" ? "E" : "W";
 
     if (z.type === "stairs") {
-      // Stair core itself uses sDims.w; rest of side band keeps its width.
-      const stairW = Math.min(sDims.w, sideWidth - (withLift ? MIN_ROOM_DIMS.lift.w + 0.5 : 0));
-      const stairX = startWall === "left" ? hallwayX - stairW : hallwayX + hallwayW;
+      // No lift: stair fills the entire side band (no outer gap).
+      // With lift: stair takes its core size and lift fills the rest of the band.
+      const stairW = withLift
+        ? Math.min(sDims.w, sideWidth - MIN_ROOM_DIMS.lift.w - 0.5)
+        : sideWidth;
+      const stairX = startWall === "left"
+        ? hallwayX - stairW
+        : hallwayX + hallwayW + (withLift ? 0 : 0);
       rooms.push({
         type: "stairs", x: stairX, y, w: stairW, h: depth,
         floor: floorIndex, label: LABEL.stairs, doorWall, doorMid: depth / 2,

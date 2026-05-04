@@ -2,6 +2,7 @@ import heroImg from "@/assets/hero-home.jpg";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
+import { ThreeBackground } from "@/components/three-background";
 import { Compass, Home, Sparkles, Box } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -27,7 +28,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background/80 backdrop-blur-sm relative">
+      <ThreeBackground />
       <SiteHeader />
 
       {/* Hero */}

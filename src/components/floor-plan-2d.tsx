@@ -261,7 +261,7 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
                     />,
                   );
                 }
-                // Direction arrow + UP / DN markers
+                // Direction arrow + UP / DN markers (run rotated 180°)
                 const goingUp = floor < totalFloors;
                 const goingDown = floor > 1;
                 els.push(
@@ -269,18 +269,18 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
                     key="arrow"
                     x1={rx + rw / 2}
                     x2={rx + rw / 2}
-                    y1={ry + rh - 4}
-                    y2={ry + 4}
+                    y1={ry + 4}
+                    y2={ry + rh - 4}
                     stroke="#0f172a"
                     strokeWidth="1.4"
                     markerEnd="url(#stair-arrow)"
                   />,
                 );
                 if (goingUp) els.push(
-                  <text key="up" x={rx + rw / 2} y={ry + 10} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">UP ↑</text>
+                  <text key="up" x={rx + rw / 2} y={ry + rh - 4} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">UP ↓</text>
                 );
                 if (goingDown) els.push(
-                  <text key="dn" x={rx + rw / 2} y={ry + rh - 4} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">DN ↓</text>
+                  <text key="dn" x={rx + rw / 2} y={ry + 10} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#0f172a">DN ↑</text>
                 );
                 return <g>{els}</g>;
               })()}
