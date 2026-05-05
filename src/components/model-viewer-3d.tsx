@@ -65,11 +65,16 @@ function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[
 function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }) {
   const t = WALL_THICKNESS * FT_TO_M;
   const h = FLOOR_HEIGHT * FT_TO_M;
-  const winTop = 7 * FT_TO_M;   // window head height
-  const winBot = 3 * FT_TO_M;   // window sill height
+  const winTop = 7 * FT_TO_M;
+  const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Group openings by which exterior wall they sit on
+  // Warm stucco wall + crisp white trim around openings (uses accent only for sill band).
+  const WALL_COLOR = "#efe4d2";   // warm cream stucco
+  const TRIM_COLOR = "#fbfaf6";   // soft white
+  const DOOR_COLOR = "#5a3a22";   // wood
+  void accent;
+
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
     N: [], E: [], S: [], W: [],
@@ -90,19 +95,16 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
   const segments: ReactElement[] = [];
   let key = 0;
 
-  // Build wall segments per side
   const buildSide = (
     side: "N" | "S" | "E" | "W",
     length: number,
-    fixedCoord: number, // local fixed axis
+    fixedCoord: number,
   ) => {
     const cuts = byWall[side].map(c => ({ a: c.a, b: c.b }));
     const solid = subtractOpenings(0, length, cuts);
-    // Wall segments below cuts and above doors / windows
     for (const s of solid) {
       const segLen = (s.b - s.a) * FT_TO_M;
       const segMid = ((s.a + s.b) / 2) * FT_TO_M;
-      // local position relative to plate center
       const lx = side === "N" || side === "S" ? segMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
       const lz = side === "E" || side === "W" ? segMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
       const args: [number, number, number] = side === "N" || side === "S"
@@ -111,65 +113,83 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
       segments.push(
         <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
           <boxGeometry args={args} />
-          <meshStandardMaterial color={accent} roughness={0.7} />
+          <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
         </mesh>,
       );
     }
-    // For each opening: add lintel above doors, sill+lintel for windows + glass pane
     for (const c of byWall[side]) {
       const segLen = (c.b - c.a) * FT_TO_M;
       const segMid = ((c.a + c.b) / 2) * FT_TO_M;
       const lx = side === "N" || side === "S" ? segMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
       const lz = side === "E" || side === "W" ? segMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
       if (c.isDoor) {
-        // lintel above door
         const lintelH = h - doorH;
-        const args: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
+        const lintelArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
         segments.push(
           <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
-            <boxGeometry args={args} />
-            <meshStandardMaterial color={accent} roughness={0.7} />
+            <boxGeometry args={lintelArgs} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
           </mesh>,
         );
-        // door panel
-        const dArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.95, doorH * 0.98, t * 0.4] : [t * 0.4, doorH * 0.98, segLen * 0.95];
+        // door frame trim
+        const frameArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, 0.15, t * 1.05] : [t * 1.05, 0.15, segLen];
+        segments.push(
+          <mesh key={`df${key++}`} position={[lx, doorH + 0.02, lz]}>
+            <boxGeometry args={frameArgs} />
+            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+          </mesh>,
+        );
+        const dArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.95, doorH * 0.98, t * 0.45] : [t * 0.45, doorH * 0.98, segLen * 0.95];
         segments.push(
           <mesh key={`d${key++}`} position={[lx, doorH / 2, lz]} castShadow>
             <boxGeometry args={dArgs} />
-            <meshStandardMaterial color="#5a3a22" roughness={0.55} metalness={0.05} />
+            <meshStandardMaterial color={DOOR_COLOR} roughness={0.45} metalness={0.05} />
           </mesh>,
         );
       } else {
-        // window: sill + lintel + glass
         const sillH = winBot;
         const lintelH = h - winTop;
         const sillArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, sillH, t] : [t, sillH, segLen];
         segments.push(
           <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={sillArgs} />
-            <meshStandardMaterial color={accent} roughness={0.7} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+          </mesh>,
+        );
+        // sill band (trim)
+        const sillTrimArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 1.05, 0.15, t * 1.1] : [t * 1.1, 0.15, segLen * 1.05];
+        segments.push(
+          <mesh key={`st${key++}`} position={[lx, sillH + 0.02, lz]}>
+            <boxGeometry args={sillTrimArgs} />
+            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
           </mesh>,
         );
         const lintelArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
         segments.push(
           <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={accent} roughness={0.7} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
           </mesh>,
         );
-        // glass pane
+        // top trim under lintel
+        segments.push(
+          <mesh key={`lt${key++}`} position={[lx, winTop - 0.02, lz]}>
+            <boxGeometry args={sillTrimArgs} />
+            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+          </mesh>,
+        );
         const glassArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, (winTop - winBot) * 0.95, t * 0.2] : [t * 0.2, (winTop - winBot) * 0.95, segLen * 0.9];
         segments.push(
           <mesh key={`g${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={glassArgs} />
             <meshPhysicalMaterial
-              color="#9ec9e8"
-              transmission={0.85}
-              opacity={0.6}
+              color="#bcdcf2"
+              transmission={0.7}
+              opacity={0.55}
               transparent
               roughness={0.05}
               thickness={0.05}
-              metalness={0.1}
+              metalness={0.2}
             />
           </mesh>,
         );
