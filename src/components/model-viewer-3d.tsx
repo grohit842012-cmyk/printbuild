@@ -306,29 +306,74 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const d = top.h * FT_TO_M;
   const [sx, sz] = toScene(cx, cz);
   const center: [number, number, number] = [sx, topY, sz];
+  const TRIM = "#fbfaf6";
 
   if (variation.roofType === "domed") {
-    return (
-      <mesh position={center} castShadow>
-        <sphereGeometry args={[Math.min(w, d) / 2, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={variation.paletteAccent} roughness={0.5} metalness={0.2} />
-      </mesh>
-    );
-  }
-  if (variation.roofType === "sloped") {
+    const r = Math.min(w, d) * 0.42;
     return (
       <group position={center}>
-        <mesh rotation={[0, Math.PI / 4, 0]} position={[0, w * 0.18, 0]} castShadow>
-          <coneGeometry args={[Math.max(w, d) * 0.72, w * 0.45, 4]} />
-          <meshStandardMaterial color="#7c2d12" roughness={0.7} />
-        </mesh>
+        {/* roof slab */}
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[w + 0.4, 0.2, d + 0.4]} />
-          <meshStandardMaterial color="#475569" roughness={0.7} />
+          <meshStandardMaterial color={TRIM} roughness={0.8} />
+        </mesh>
+        {/* dome */}
+        <mesh position={[0, 0.2, 0]} castShadow>
+          <sphereGeometry args={[r, 40, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#c98a4b" roughness={0.45} metalness={0.25} />
+        </mesh>
+        {/* finial */}
+        <mesh position={[0, 0.2 + r + 0.1, 0]} castShadow>
+          <coneGeometry args={[0.15, 0.5, 12]} />
+          <meshStandardMaterial color="#a16234" metalness={0.4} roughness={0.4} />
         </mesh>
       </group>
     );
   }
+  if (variation.roofType === "sloped") {
+    const ridgeH = Math.min(w, d) * 0.35;
+    // Hipped roof using a 4-sided pyramid sized to the building footprint
+    return (
+      <group position={center}>
+        {/* eaves slab */}
+        <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, 0.1, d + 0.6]} />
+          <meshStandardMaterial color={TRIM} roughness={0.7} />
+        </mesh>
+        {/* terracotta hipped roof */}
+        <mesh position={[0, 0.1 + ridgeH / 2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+          <coneGeometry args={[Math.max(w, d) * 0.62, ridgeH, 4]} />
+          <meshStandardMaterial color="#a83e1a" roughness={0.65} />
+        </mesh>
+      </group>
+    );
+  }
+  // flat — slab + parapet (in cream trim, not navy)
+  return (
+    <group position={center}>
+      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w + 0.4, 0.2, d + 0.4]} />
+        <meshStandardMaterial color="#cdb89a" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.5, -d / 2 - 0.1]} castShadow>
+        <boxGeometry args={[w + 0.6, 0.7, 0.25]} />
+        <meshStandardMaterial color={TRIM} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.5, d / 2 + 0.1]} castShadow>
+        <boxGeometry args={[w + 0.6, 0.7, 0.25]} />
+        <meshStandardMaterial color={TRIM} roughness={0.7} />
+      </mesh>
+      <mesh position={[-w / 2 - 0.1, 0.5, 0]} castShadow>
+        <boxGeometry args={[0.25, 0.7, d + 0.6]} />
+        <meshStandardMaterial color={TRIM} roughness={0.7} />
+      </mesh>
+      <mesh position={[w / 2 + 0.1, 0.5, 0]} castShadow>
+        <boxGeometry args={[0.25, 0.7, d + 0.6]} />
+        <meshStandardMaterial color={TRIM} roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
   // flat — parapet
   return (
     <group position={center}>
