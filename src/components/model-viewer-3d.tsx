@@ -374,33 +374,6 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     </group>
   );
 }
-  // flat — parapet
-  return (
-    <group position={center}>
-      <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w + 0.2, 0.2, d + 0.2]} />
-        <meshStandardMaterial color="#334155" roughness={0.7} />
-      </mesh>
-      {/* parapet */}
-      <mesh position={[0, 0.4, -d / 2]} castShadow>
-        <boxGeometry args={[w + 0.2, 0.6, 0.2]} />
-        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.4, d / 2]} castShadow>
-        <boxGeometry args={[w + 0.2, 0.6, 0.2]} />
-        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
-      </mesh>
-      <mesh position={[-w / 2, 0.4, 0]} castShadow>
-        <boxGeometry args={[0.2, 0.6, d + 0.2]} />
-        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
-      </mesh>
-      <mesh position={[w / 2, 0.4, 0]} castShadow>
-        <boxGeometry args={[0.2, 0.6, d + 0.2]} />
-        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
-      </mesh>
-    </group>
-  );
-}
 
 function Plot({ variation }: { variation: Variation }) {
   const w = variation.plotWidthFt * FT_TO_M;
