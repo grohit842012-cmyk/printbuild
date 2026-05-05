@@ -87,7 +87,7 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
     else byWall.E.push({ o, isDoor, a: Math.min(o.y1, o.y2) - plate.y, b: Math.max(o.y1, o.y2) - plate.y });
   }
 
-  const segments: JSX.Element[] = [];
+  const segments: ReactElement[] = [];
   let key = 0;
 
   // Build wall segments per side
