@@ -26,7 +26,7 @@ const ROOM_COLOR: Record<string, string> = {
   stairs: "#b8c5d6",
   lift: "#94a3b8",
   utility: "#dcd6c8",
-  parking: "#cbd5e1",
+  parking: "#f7c873",
 };
 
 /** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
@@ -178,9 +178,9 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
         strokeWidth="2.5"
       />
 
-      {/* Hallway corridor — drawn before rooms so room walls overlay */}
+      {/* Hallway corridor — hidden on parking-only (stilt) floors */}
       <g clipPath={`url(#plate-clip-${floor})`}>
-        {plate.hallway && (
+        {plate.hallway && !plate.rooms.some((r) => r.type === "parking") && (
           <rect
             x={ox + plate.hallway.x * scale}
             y={oy + plate.hallway.y * scale}
