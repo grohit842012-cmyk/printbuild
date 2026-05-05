@@ -1,8 +1,8 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/drei";
+import { useEffect, useMemo, useState, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
-import type { Variation, FloorPlate, RoomRect } from "@/lib/design-types";
+import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
 
 const FLOOR_HEIGHT = 10; // ft
 const WALL_THICKNESS = 0.45;
@@ -21,7 +21,7 @@ const ROOM_COLORS: Record<string, string> = {
   stairs: "#b8c5d6",
   lift: "#94a3b8",
   utility: "#dcd6c8",
-  parking: "#cbd5e1",
+  parking: "#f7c873",
 };
 
 const PUBLIC_OPEN = new Set(["living", "dining", "kitchen", "courtyard"]);
@@ -38,26 +38,166 @@ function isOpen(type: string, planMode: string, kitchenOpen: boolean) {
   return PUBLIC_OPEN.has(type);
 }
 
+/** Convert plate-local coords (ft) to scene coords (m) centered on plot. */
+function toScene(xFt: number, yFt: number): [number, number] {
+  return [(xFt - 30) * FT_TO_M, (yFt - 30) * FT_TO_M];
+}
+
+/* -------------------- Wall segments with door/window cutouts -------------------- */
+
+interface Seg { a: number; b: number } // along the wall in ft
+
+function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[] {
+  let segs: Seg[] = [{ a: wallStart, b: wallEnd }];
+  for (const c of cuts) {
+    const next: Seg[] = [];
+    for (const s of segs) {
+      if (c.b <= s.a || c.a >= s.b) { next.push(s); continue; }
+      if (c.a > s.a) next.push({ a: s.a, b: Math.max(s.a, c.a) });
+      if (c.b < s.b) next.push({ a: Math.min(s.b, c.b), b: s.b });
+    }
+    segs = next.filter(s => s.b - s.a > 0.05);
+  }
+  return segs;
+}
+
+/** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
+function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }) {
+  const t = WALL_THICKNESS * FT_TO_M;
+  const h = FLOOR_HEIGHT * FT_TO_M;
+  const winTop = 7 * FT_TO_M;   // window head height
+  const winBot = 3 * FT_TO_M;   // window sill height
+  const doorH = 7 * FT_TO_M;
+
+  // Group openings by which exterior wall they sit on
+  const tol = 0.6;
+  const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
+    N: [], E: [], S: [], W: [],
+  };
+  for (const o of plate.openings) {
+    const onN = Math.abs(o.y1 - plate.y) < tol && Math.abs(o.y2 - plate.y) < tol;
+    const onS = Math.abs(o.y1 - (plate.y + plate.h)) < tol && Math.abs(o.y2 - (plate.y + plate.h)) < tol;
+    const onW = Math.abs(o.x1 - plate.x) < tol && Math.abs(o.x2 - plate.x) < tol;
+    const onE = Math.abs(o.x1 - (plate.x + plate.w)) < tol && Math.abs(o.x2 - (plate.x + plate.w)) < tol;
+    if (!(onN || onS || onW || onE)) continue;
+    const isDoor = o.kind === "door";
+    if (onN) byWall.N.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
+    else if (onS) byWall.S.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
+    else if (onW) byWall.W.push({ o, isDoor, a: Math.min(o.y1, o.y2) - plate.y, b: Math.max(o.y1, o.y2) - plate.y });
+    else byWall.E.push({ o, isDoor, a: Math.min(o.y1, o.y2) - plate.y, b: Math.max(o.y1, o.y2) - plate.y });
+  }
+
+  const segments: ReactElement[] = [];
+  let key = 0;
+
+  // Build wall segments per side
+  const buildSide = (
+    side: "N" | "S" | "E" | "W",
+    length: number,
+    fixedCoord: number, // local fixed axis
+  ) => {
+    const cuts = byWall[side].map(c => ({ a: c.a, b: c.b }));
+    const solid = subtractOpenings(0, length, cuts);
+    // Wall segments below cuts and above doors / windows
+    for (const s of solid) {
+      const segLen = (s.b - s.a) * FT_TO_M;
+      const segMid = ((s.a + s.b) / 2) * FT_TO_M;
+      // local position relative to plate center
+      const lx = side === "N" || side === "S" ? segMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
+      const lz = side === "E" || side === "W" ? segMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
+      const args: [number, number, number] = side === "N" || side === "S"
+        ? [segLen, h, t]
+        : [t, h, segLen];
+      segments.push(
+        <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
+          <boxGeometry args={args} />
+          <meshStandardMaterial color={accent} roughness={0.7} />
+        </mesh>,
+      );
+    }
+    // For each opening: add lintel above doors, sill+lintel for windows + glass pane
+    for (const c of byWall[side]) {
+      const segLen = (c.b - c.a) * FT_TO_M;
+      const segMid = ((c.a + c.b) / 2) * FT_TO_M;
+      const lx = side === "N" || side === "S" ? segMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
+      const lz = side === "E" || side === "W" ? segMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
+      if (c.isDoor) {
+        // lintel above door
+        const lintelH = h - doorH;
+        const args: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
+        segments.push(
+          <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
+            <boxGeometry args={args} />
+            <meshStandardMaterial color={accent} roughness={0.7} />
+          </mesh>,
+        );
+        // door panel
+        const dArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.95, doorH * 0.98, t * 0.4] : [t * 0.4, doorH * 0.98, segLen * 0.95];
+        segments.push(
+          <mesh key={`d${key++}`} position={[lx, doorH / 2, lz]} castShadow>
+            <boxGeometry args={dArgs} />
+            <meshStandardMaterial color="#5a3a22" roughness={0.55} metalness={0.05} />
+          </mesh>,
+        );
+      } else {
+        // window: sill + lintel + glass
+        const sillH = winBot;
+        const lintelH = h - winTop;
+        const sillArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, sillH, t] : [t, sillH, segLen];
+        segments.push(
+          <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
+            <boxGeometry args={sillArgs} />
+            <meshStandardMaterial color={accent} roughness={0.7} />
+          </mesh>,
+        );
+        const lintelArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
+        segments.push(
+          <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
+            <boxGeometry args={lintelArgs} />
+            <meshStandardMaterial color={accent} roughness={0.7} />
+          </mesh>,
+        );
+        // glass pane
+        const glassArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, (winTop - winBot) * 0.95, t * 0.2] : [t * 0.2, (winTop - winBot) * 0.95, segLen * 0.9];
+        segments.push(
+          <mesh key={`g${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
+            <boxGeometry args={glassArgs} />
+            <meshPhysicalMaterial
+              color="#9ec9e8"
+              transmission={0.85}
+              opacity={0.6}
+              transparent
+              roughness={0.05}
+              thickness={0.05}
+              metalness={0.1}
+            />
+          </mesh>,
+        );
+      }
+    }
+  };
+
+  buildSide("N", plate.w, 0);
+  buildSide("S", plate.w, plate.h);
+  buildSide("W", plate.h, 0);
+  buildSide("E", plate.h, plate.w);
+
+  return <group>{segments}</group>;
+}
+
 function FloorMesh({
   plate, baseY, accent, planMode, kitchenOpen,
 }: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean }) {
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
+  const [sx, sz] = toScene(cx, cz);
   return (
-    <group position={[(cx - 30) * FT_TO_M, baseY, (cz - 30) * FT_TO_M]}>
-      {/* Floor slab */}
+    <group position={[sx, baseY, sz]}>
       <mesh position={[0, -0.05, 0]} receiveShadow>
         <boxGeometry args={[plate.w * FT_TO_M, 0.1, plate.h * FT_TO_M]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.85} />
+        <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
-      {/* Outer perimeter wall */}
-      <mesh position={[0, (FLOOR_HEIGHT * FT_TO_M) / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[plate.w * FT_TO_M, FLOOR_HEIGHT * FT_TO_M, plate.h * FT_TO_M]} />
-        <meshStandardMaterial color={accent} roughness={0.7} transparent opacity={0.0} />
-      </mesh>
-      {/* Outer wall as four box walls */}
-      <OuterWalls plate={plate} accent={accent} />
-      {/* Rooms */}
+      <PerimeterWalls plate={plate} accent={accent} />
       {plate.rooms.map((r, i) => (
         <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} />
       ))}
@@ -65,38 +205,9 @@ function FloorMesh({
   );
 }
 
-function OuterWalls({ plate, accent }: { plate: FloorPlate; accent: string }) {
-  const w = plate.w * FT_TO_M;
-  const d = plate.h * FT_TO_M;
-  const h = FLOOR_HEIGHT * FT_TO_M;
-  const t = WALL_THICKNESS * FT_TO_M;
-  const mat = <meshStandardMaterial color={accent} roughness={0.65} metalness={0.05} />;
-  return (
-    <group>
-      <mesh position={[0, h / 2, -d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[w, h, t]} />
-        {mat}
-      </mesh>
-      <mesh position={[0, h / 2, d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[w, h, t]} />
-        {mat}
-      </mesh>
-      <mesh position={[-w / 2, h / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[t, h, d]} />
-        {mat}
-      </mesh>
-      <mesh position={[w / 2, h / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[t, h, d]} />
-        {mat}
-      </mesh>
-    </group>
-  );
-}
-
 function RoomBlock({
   room, plate, planMode, kitchenOpen,
 }: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean }) {
-  // Local coords relative to plate center
   const localX = (room.x + room.w / 2) - (plate.x + plate.w / 2);
   const localZ = (room.y + room.h / 2) - (plate.y + plate.h / 2);
   const w = room.w * FT_TO_M;
@@ -107,43 +218,48 @@ function RoomBlock({
 
   return (
     <group position={[localX * FT_TO_M, 0, localZ * FT_TO_M]}>
-      {/* Floor patch (color hint) */}
       <mesh position={[0, 0.01, 0]} receiveShadow>
         <boxGeometry args={[w * 0.96, 0.02, d * 0.96]} />
         <meshStandardMaterial color={color} roughness={0.9} />
       </mesh>
-      {/* Interior walls — only if not "open" */}
-      {!open && room.type !== "stairs" && room.type !== "lift" && (
+      {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
         <RoomWalls w={w} d={d} h={h} />
       )}
-      {/* Special: stairs — slanted plank */}
       {room.type === "stairs" && (
-        <mesh position={[0, h / 4, 0]} rotation={[Math.PI / 7, 0, 0]} castShadow>
-          <boxGeometry args={[w * 0.7, 0.08, d]} />
-          <meshStandardMaterial color="#64748b" roughness={0.6} />
-        </mesh>
+        <group>
+          {Array.from({ length: 9 }).map((_, k) => (
+            <mesh key={k} position={[0, k * (h / 9) * 0.5 + 0.05, -d / 2 + (k + 0.5) * (d / 9)]} castShadow>
+              <boxGeometry args={[w * 0.7, 0.18, d / 9]} />
+              <meshStandardMaterial color="#94a3b8" roughness={0.7} />
+            </mesh>
+          ))}
+        </group>
       )}
-      {/* Special: lift shaft */}
       {room.type === "lift" && (
         <mesh position={[0, h / 2, 0]} castShadow>
           <boxGeometry args={[w * 0.9, h, d * 0.9]} />
-          <meshStandardMaterial color="#475569" roughness={0.5} metalness={0.3} />
+          <meshStandardMaterial color="#475569" roughness={0.4} metalness={0.4} />
         </mesh>
       )}
-      {/* Parking — show car silhouette block */}
       {room.type === "parking" && (
-        <mesh position={[0, 0.4, 0]} castShadow>
-          <boxGeometry args={[w * 0.5, 0.6, d * 0.35]} />
-          <meshStandardMaterial color="#334155" roughness={0.4} />
-        </mesh>
+        <group>
+          <mesh position={[0, 0.02, 0]} receiveShadow>
+            <boxGeometry args={[w * 0.98, 0.04, d * 0.98]} />
+            <meshStandardMaterial color="#f7c873" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.5, 0]} castShadow>
+            <boxGeometry args={[w * 0.55, 0.7, d * 0.4]} />
+            <meshStandardMaterial color="#1e3a6e" roughness={0.4} metalness={0.3} />
+          </mesh>
+        </group>
       )}
     </group>
   );
 }
 
 function RoomWalls({ w, d, h }: { w: number; d: number; h: number }) {
-  const t = WALL_THICKNESS * 0.6 * FT_TO_M;
-  const mat = <meshStandardMaterial color="#f1f5f9" roughness={0.85} />;
+  const t = WALL_THICKNESS * 0.5 * FT_TO_M;
+  const mat = <meshStandardMaterial color="#f8fafc" roughness={0.85} />;
   return (
     <group>
       <mesh position={[0, h / 2, -d / 2]} castShadow receiveShadow>
@@ -168,7 +284,8 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const cz = top.y + top.h / 2;
   const w = top.w * FT_TO_M;
   const d = top.h * FT_TO_M;
-  const center: [number, number, number] = [(cx - 30) * FT_TO_M, topY, (cz - 30) * FT_TO_M];
+  const [sx, sz] = toScene(cx, cz);
+  const center: [number, number, number] = [sx, topY, sz];
 
   if (variation.roofType === "domed") {
     return (
@@ -185,15 +302,38 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
           <coneGeometry args={[Math.max(w, d) * 0.72, w * 0.45, 4]} />
           <meshStandardMaterial color="#7c2d12" roughness={0.7} />
         </mesh>
+        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.4, 0.2, d + 0.4]} />
+          <meshStandardMaterial color="#475569" roughness={0.7} />
+        </mesh>
       </group>
     );
   }
-  // flat
+  // flat — parapet
   return (
-    <mesh position={[center[0], topY + 0.05, center[2]]} castShadow receiveShadow>
-      <boxGeometry args={[w + 0.2, 0.2, d + 0.2]} />
-      <meshStandardMaterial color="#334155" roughness={0.7} />
-    </mesh>
+    <group position={center}>
+      <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w + 0.2, 0.2, d + 0.2]} />
+        <meshStandardMaterial color="#334155" roughness={0.7} />
+      </mesh>
+      {/* parapet */}
+      <mesh position={[0, 0.4, -d / 2]} castShadow>
+        <boxGeometry args={[w + 0.2, 0.6, 0.2]} />
+        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.4, d / 2]} castShadow>
+        <boxGeometry args={[w + 0.2, 0.6, 0.2]} />
+        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
+      </mesh>
+      <mesh position={[-w / 2, 0.4, 0]} castShadow>
+        <boxGeometry args={[0.2, 0.6, d + 0.2]} />
+        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
+      </mesh>
+      <mesh position={[w / 2, 0.4, 0]} castShadow>
+        <boxGeometry args={[0.2, 0.6, d + 0.2]} />
+        <meshStandardMaterial color={variation.paletteAccent} roughness={0.7} />
+      </mesh>
+    </group>
   );
 }
 
@@ -201,10 +341,18 @@ function Plot({ variation }: { variation: Variation }) {
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
   return (
-    <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[w + 4, d + 4]} />
-      <meshStandardMaterial color="#1e293b" roughness={0.95} />
-    </mesh>
+    <group>
+      {/* Lawn */}
+      <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w + 6, d + 6]} />
+        <meshStandardMaterial color="#3f6b3a" roughness={0.95} />
+      </mesh>
+      {/* Driveway hint */}
+      <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w * 0.6, 2]} />
+        <meshStandardMaterial color="#52525b" roughness={0.85} />
+      </mesh>
+    </group>
   );
 }
 
@@ -213,12 +361,20 @@ function ParkingArea({ variation }: { variation: Variation }) {
   const p = variation.parking;
   const cx = p.x + p.w / 2;
   const cz = p.y + p.h / 2;
+  const [sx, sz] = toScene(cx, cz);
   return (
-    <group position={[(cx - 30) * FT_TO_M, 0.02, (cz - 30) * FT_TO_M]}>
+    <group position={[sx, 0.02, sz]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[p.w * FT_TO_M, p.h * FT_TO_M]} />
-        <meshStandardMaterial color="#475569" roughness={0.85} />
+        <meshStandardMaterial color="#f7c873" roughness={0.85} />
       </mesh>
+      {/* Bay stripes */}
+      {Array.from({ length: Math.max(1, p.bays - 1) }).map((_, i) => (
+        <mesh key={i} position={[((i + 1) / p.bays - 0.5) * p.w * FT_TO_M, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.1, p.h * FT_TO_M * 0.9]} />
+          <meshStandardMaterial color="#fff" />
+        </mesh>
+      ))}
       <mesh position={[0, 0.4, 0]} castShadow>
         <boxGeometry args={[p.w * FT_TO_M * 0.45, 0.6, p.h * FT_TO_M * 0.3]} />
         <meshStandardMaterial color="#1e3a6e" roughness={0.5} metalness={0.3} />
@@ -238,28 +394,49 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
   const camDist = Math.max(variation.plotWidthFt, variation.plotDepthFt) * FT_TO_M * 1.4;
 
   if (!mounted) {
-    return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 grid place-items-center text-xs text-muted-foreground">Loading 3D model…</div>;
+    return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-orange-200 via-rose-300 to-indigo-700 grid place-items-center text-xs text-white/80">Loading 3D model…</div>;
   }
   return (
-    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-700">
+    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden">
       <Canvas
         shadows
         camera={{ position: [camDist, camDist * 0.8, camDist], fov: 45 }}
-        dpr={[1, 1.5]}
+        dpr={[1, 1.75]}
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
         }}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.55} />
-          <directionalLight
-            position={[10, 14, 6]}
-            intensity={1.2}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
+          {/* Sunset sky */}
+          <Sky
+            distance={450000}
+            sunPosition={[-1, 0.18, 0.6]}
+            inclination={0.49}
+            azimuth={0.25}
+            turbidity={8}
+            rayleigh={3}
+            mieCoefficient={0.012}
+            mieDirectionalG={0.85}
           />
-          <Environment preset="city" />
+          <fog attach="fog" args={["#f6c79a", camDist * 2, camDist * 6]} />
+          <ambientLight intensity={0.45} color="#ffd9b3" />
+          {/* Warm sunset key light */}
+          <directionalLight
+            position={[-camDist * 1.2, camDist * 0.6, camDist * 0.8]}
+            intensity={1.6}
+            color="#ffb070"
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-camera-left={-camDist}
+            shadow-camera-right={camDist}
+            shadow-camera-top={camDist}
+            shadow-camera-bottom={-camDist}
+          />
+          {/* Cool fill from opposite side */}
+          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.4} color="#9ec9ff" />
+          <Environment preset="sunset" />
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
           {variation.plates.map((plate, i) => (
@@ -273,11 +450,11 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
             />
           ))}
           <Roof variation={variation} topY={topY} />
-          <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={camDist * 2} blur={2} />
+          <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls
             enablePan={false}
             minDistance={camDist * 0.6}
-            maxDistance={camDist * 2.5}
+            maxDistance={camDist * 2.8}
             maxPolarAngle={Math.PI / 2.05}
           />
         </Suspense>

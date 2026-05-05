@@ -25,6 +25,7 @@ import type {
   VastuPreferences,
 } from "@/lib/design-types";
 import { validatePlotFit } from "@/lib/model-generator";
+import { PlotFacingPicker } from "@/components/plot-facing-picker";
 
 export const Route = createFileRoute("/design/new")({
   head: () => ({
@@ -255,9 +256,11 @@ function NewDesignWizard() {
                   <Label>Plot faces</Label>
                   <Select
                     value={spec.plot.facing}
-                    onValueChange={(v) =>
-                      setSpec({ ...spec, plot: { ...spec.plot, facing: v as Direction } })
-                    }
+                    onValueChange={(v) => {
+                      const facing = v as Direction;
+                      setSpec({ ...spec, plot: { ...spec.plot, facing } });
+                      setVastu((vp) => ({ ...vp, entranceDirection: facing }));
+                    }}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -268,6 +271,15 @@ function NewDesignWizard() {
                   </Select>
                 </div>
               </div>
+              <PlotFacingPicker
+                widthFt={spec.plot.widthFt}
+                depthFt={spec.plot.depthFt}
+                facing={spec.plot.facing}
+                onChange={(facing) => {
+                  setSpec({ ...spec, plot: { ...spec.plot, facing } });
+                  setVastu((vp) => ({ ...vp, entranceDirection: facing }));
+                }}
+              />
             </>
           )}
 
