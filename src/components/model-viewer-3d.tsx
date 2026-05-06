@@ -413,6 +413,7 @@ function ParkingArea({ variation }: { variation: Variation }) {
   const p = variation.parking;
   const cx = p.x + p.w / 2;
   const cz = p.y + p.h / 2;
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
   const [sx, sz] = toScene(cx, cz);
   return (
     <group position={[sx, 0.02, sz]}>
