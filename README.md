@@ -16,7 +16,7 @@ Families planning to build a home who want clarity on design and cost before hir
 👉 https://printbuild.lovable.app
 
 ## Built by
-Self-taught developer, 15 years old, Hyderabad India.
+Self-taught developer, 14 years old, Hyderabad India.
 Feedback welcome from anyone who has built or is building a home.
 
 please review the website with comments and Github stars
