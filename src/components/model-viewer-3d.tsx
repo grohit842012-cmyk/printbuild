@@ -446,6 +446,7 @@ function ParkingArea({ variation }: { variation: Variation }) {
 
 export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = false }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
   useEffect(() => setMounted(true), []);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
@@ -458,7 +459,20 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
     return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-orange-200 via-rose-300 to-indigo-700 grid place-items-center text-xs text-white/80">Loading 3D model…</div>;
   }
   return (
-    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden">
+    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden relative">
+      <div className="absolute top-2 left-2 z-10 flex gap-1 bg-background/85 backdrop-blur rounded-md p-1 border border-border">
+        <button
+          onClick={() => setVisibleFloor("all")}
+          className={`text-xs px-2 py-1 rounded ${visibleFloor === "all" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+        >All</button>
+        {variation.plates.map((p) => (
+          <button
+            key={p.floor}
+            onClick={() => setVisibleFloor(p.floor)}
+            className={`text-xs px-2 py-1 rounded ${visibleFloor === p.floor ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+          >Floor {p.floor}</button>
+        ))}
+      </div>
       <Canvas
         shadows
         camera={{ position: [camDist, camDist * 0.8, camDist], fov: 45 }}
