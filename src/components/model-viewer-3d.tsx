@@ -270,59 +270,80 @@ function RoomBlock({
         <RoomWalls w={w} d={d} h={h} />
       )}
       {room.type === "stairs" && (() => {
-        // Realistic stair: riser ≈ 0.18m (7"), tread ≈ 0.27m (10.5"). Build along the longer side.
+        // Switchback (U-shape) staircase: two flights running in OPPOSITE directions
+        // with a mid-landing. Realistic riser 0.18m / tread 0.27m.
         const riser = 0.18;
         const tread = 0.27;
         const totalRise = h + 0.05;
-        const nSteps = Math.max(2, Math.ceil(totalRise / riser));
-        const runLen = nSteps * tread;
+        const nSteps = Math.max(4, Math.ceil(totalRise / riser));
+        const stepsF1 = Math.ceil(nSteps / 2);
+        const stepsF2 = nSteps - stepsF1;
         const alongZ = d >= w;
-        const runDim = alongZ ? d * 0.9 : w * 0.9;
-        // If the run doesn't fit, fold into two flights with a mid-landing.
-        const twoFlight = runLen > runDim;
-        const stepsPerFlight = twoFlight ? Math.ceil(nSteps / 2) : nSteps;
-        const stepWidth = alongZ ? w * 0.55 : d * 0.55;
+        // Run length per flight (along the long axis), leaving room for the landing at the far end.
+        const longDim = alongZ ? d : w;
+        const shortDim = alongZ ? w : d;
+        const landingDepth = Math.max(tread * 2.2, 0.9);
+        const flightRun = Math.max(tread * 2, longDim * 0.9 - landingDepth);
+        const treadAdj = flightRun / Math.max(stepsF1, stepsF2); // shrink tread if cramped
+        const stepWidth = shortDim * 0.45;
+        const sideOff = stepWidth / 2 + 0.04; // half-width gap between the two flights
         const treadGeom: [number, number, number] = alongZ
-          ? [stepWidth, 0.04, tread]
-          : [tread, 0.04, stepWidth];
-        const renderFlight = (offsetX: number, offsetZ: number, dir: 1 | -1, baseY: number, count: number) =>
+          ? [stepWidth, 0.04, treadAdj]
+          : [treadAdj, 0.04, stepWidth];
+        // Flight 1: starts at near end (-long/2), climbs toward landing at +long/2 end.
+        // Flight 2: starts at landing, goes BACK in opposite direction (+long/2 → -long/2).
+        const renderFlight = (
+          sideSign: 1 | -1,
+          dir: 1 | -1,
+          baseY: number,
+          count: number,
+        ) =>
           Array.from({ length: count }).map((_, k) => {
-            const stepY = baseY + k * riser + riser / 2;
-            const along = (-runDim / 2) + (k + 0.5) * tread;
+            const stepY = baseY + (k + 1) * riser;
+            // start position along long axis
+            const startAlong = dir === 1 ? -longDim / 2 + 0.05 : longDim / 2 - 0.05;
+            const along = startAlong + dir * (k + 0.5) * treadAdj;
+            const sideX = sideSign * sideOff;
+            const px = alongZ ? sideX : along;
+            const pz = alongZ ? along : sideX;
             return (
-              <group key={`${offsetX}-${offsetZ}-${k}`}>
-                {/* riser */}
-                <mesh position={alongZ
-                  ? [offsetX, stepY - riser / 2 + 0.02, offsetZ + dir * (along - tread / 2 + 0.02)]
-                  : [offsetX + dir * (along - tread / 2 + 0.02), stepY - riser / 2 + 0.02, offsetZ]}>
+              <group key={`f-${sideSign}-${k}`}>
+                {/* riser (vertical face on the back of each step) */}
+                <mesh position={[
+                  alongZ ? px : px - dir * treadAdj / 2,
+                  stepY - riser / 2,
+                  alongZ ? pz - dir * treadAdj / 2 : pz,
+                ]}>
                   <boxGeometry args={alongZ ? [stepWidth, riser, 0.04] : [0.04, riser, stepWidth]} />
                   <meshStandardMaterial color="#e2d6c2" roughness={0.85} />
                 </mesh>
                 {/* tread */}
-                <mesh position={alongZ
-                  ? [offsetX, stepY, offsetZ + dir * along]
-                  : [offsetX + dir * along, stepY, offsetZ]} castShadow receiveShadow>
+                <mesh position={[px, stepY, pz]} castShadow receiveShadow>
                   <boxGeometry args={treadGeom} />
                   <meshStandardMaterial color="#7a5a3a" roughness={0.55} />
                 </mesh>
               </group>
             );
           });
-        if (!twoFlight) {
-          return <group>{renderFlight(0, 0, 1, 0, nSteps)}</group>;
-        }
-        const flight1Top = stepsPerFlight * riser;
-        const sideOff = alongZ ? stepWidth / 2 + 0.05 : 0;
-        const sideOff2 = alongZ ? 0 : stepWidth / 2 + 0.05;
+        const flight1TopY = stepsF1 * riser;
+        // Landing sits at the +long end, between the two flights.
+        const landingPos: [number, number, number] = alongZ
+          ? [0, flight1TopY + 0.02, longDim / 2 - landingDepth / 2 - 0.02]
+          : [longDim / 2 - landingDepth / 2 - 0.02, flight1TopY + 0.02, 0];
+        const landingSize: [number, number, number] = alongZ
+          ? [stepWidth * 2 + sideOff * 0.5, 0.06, landingDepth]
+          : [landingDepth, 0.06, stepWidth * 2 + sideOff * 0.5];
         return (
           <group>
-            {renderFlight(-sideOff, -sideOff2, 1, 0, stepsPerFlight)}
-            {/* mid-landing */}
-            <mesh position={[0, flight1Top - 0.02, alongZ ? (d / 2 - tread) : 0]} receiveShadow>
-              <boxGeometry args={[w * 0.9, 0.06, d * 0.25]} />
-              <meshStandardMaterial color="#7a5a3a" roughness={0.6} />
+            {/* Flight 1 — runs forward (+) on left side */}
+            {renderFlight(-1, 1, 0, stepsF1)}
+            {/* Mid-landing at far end */}
+            <mesh position={landingPos} castShadow receiveShadow>
+              <boxGeometry args={landingSize} />
+              <meshStandardMaterial color="#8a6a44" roughness={0.6} />
             </mesh>
-            {renderFlight(sideOff, sideOff2, -1, flight1Top, nSteps - stepsPerFlight)}
+            {/* Flight 2 — runs OPPOSITE direction (-) on right side, starting from landing */}
+            {renderFlight(1, -1, flight1TopY, stepsF2)}
           </group>
         );
       })()}
