@@ -38,9 +38,14 @@ function isOpen(type: string, planMode: string, kitchenOpen: boolean) {
   return PUBLIC_OPEN.has(type);
 }
 
-/** Convert plate-local coords (ft) to scene coords (m) centered on plot. */
-function toScene(xFt: number, yFt: number): [number, number] {
-  return [(xFt - 30) * FT_TO_M, (yFt - 30) * FT_TO_M];
+/** Convert plot-local coords (ft) to scene coords (m) centered on plot. */
+function makeToScene(plotW: number, plotD: number) {
+  const cx = plotW / 2;
+  const cy = plotD / 2;
+  return (xFt: number, yFt: number): [number, number] => [
+    (xFt - cx) * FT_TO_M,
+    (yFt - cy) * FT_TO_M,
+  ];
 }
 
 /* -------------------- Wall segments with door/window cutouts -------------------- */
@@ -69,11 +74,11 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
   const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Warm stucco wall + crisp white trim around openings (uses accent only for sill band).
-  const WALL_COLOR = "#efe4d2";   // warm cream stucco
+  // Warm stucco wall, tinted slightly toward the design's accent color so each variation reads differently.
+  const wall = new THREE.Color("#efe4d2").lerp(new THREE.Color(accent || "#efe4d2"), 0.18);
+  const WALL_COLOR = `#${wall.getHexString()}`;
   const TRIM_COLOR = "#fbfaf6";   // soft white
   const DOOR_COLOR = "#5a3a22";   // wood
-  void accent;
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
@@ -86,6 +91,14 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
     const onE = Math.abs(o.x1 - (plate.x + plate.w)) < tol && Math.abs(o.x2 - (plate.x + plate.w)) < tol;
     if (!(onN || onS || onW || onE)) continue;
     const isDoor = o.kind === "door";
+    // Doors only allowed on the exterior if it's the front entrance door (matched against plate.entranceDoor).
+    if (isDoor && plate.entranceDoor) {
+      const ed = plate.entranceDoor;
+      const same = Math.abs(ed.x1 - o.x1) < 0.01 && Math.abs(ed.y1 - o.y1) < 0.01 && Math.abs(ed.x2 - o.x2) < 0.01 && Math.abs(ed.y2 - o.y2) < 0.01;
+      if (!same) continue;
+    } else if (isDoor) {
+      continue;
+    }
     if (onN) byWall.N.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
     else if (onS) byWall.S.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
     else if (onW) byWall.W.push({ o, isDoor, a: Math.min(o.y1, o.y2) - plate.y, b: Math.max(o.y1, o.y2) - plate.y });
@@ -206,13 +219,21 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
 }
 
 function FloorMesh({
-  plate, baseY, accent, planMode, kitchenOpen,
-}: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean }) {
+  plate, baseY, accent, planMode, kitchenOpen, plotW, plotD,
+}: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number }) {
+  const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
   const [sx, sz] = toScene(cx, cz);
   return (
     <group position={[sx, baseY, sz]}>
+      {/* plinth/foundation extending down to ground */}
+      {baseY < 0.01 && (
+        <mesh position={[0, -0.6, 0]} receiveShadow castShadow>
+          <boxGeometry args={[plate.w * FT_TO_M + 0.4, 1.2, plate.h * FT_TO_M + 0.4]} />
+          <meshStandardMaterial color="#bdb3a4" roughness={0.95} />
+        </mesh>
+      )}
       <mesh position={[0, -0.05, 0]} receiveShadow>
         <boxGeometry args={[plate.w * FT_TO_M, 0.1, plate.h * FT_TO_M]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
@@ -304,6 +325,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const cz = top.y + top.h / 2;
   const w = top.w * FT_TO_M;
   const d = top.h * FT_TO_M;
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
   const [sx, sz] = toScene(cx, cz);
   const center: [number, number, number] = [sx, topY, sz];
   const TRIM = "#fbfaf6";
@@ -399,6 +421,7 @@ function ParkingArea({ variation }: { variation: Variation }) {
   const p = variation.parking;
   const cx = p.x + p.w / 2;
   const cz = p.y + p.h / 2;
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
   const [sx, sz] = toScene(cx, cz);
   return (
     <group position={[sx, 0.02, sz]}>
@@ -423,6 +446,7 @@ function ParkingArea({ variation }: { variation: Variation }) {
 
 export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = false }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
   useEffect(() => setMounted(true), []);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
@@ -435,7 +459,20 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
     return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-orange-200 via-rose-300 to-indigo-700 grid place-items-center text-xs text-white/80">Loading 3D model…</div>;
   }
   return (
-    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden">
+    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden relative">
+      <div className="absolute top-2 left-2 z-10 flex gap-1 bg-background/85 backdrop-blur rounded-md p-1 border border-border">
+        <button
+          onClick={() => setVisibleFloor("all")}
+          className={`text-xs px-2 py-1 rounded ${visibleFloor === "all" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+        >All</button>
+        {variation.plates.map((p) => (
+          <button
+            key={p.floor}
+            onClick={() => setVisibleFloor(p.floor)}
+            className={`text-xs px-2 py-1 rounded ${visibleFloor === p.floor ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+          >Floor {p.floor}</button>
+        ))}
+      </div>
       <Canvas
         shadows
         camera={{ position: [camDist, camDist * 0.8, camDist], fov: 45 }}
@@ -477,17 +514,22 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
           <Environment preset="sunset" />
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
-          {variation.plates.map((plate, i) => (
-            <FloorMesh
-              key={plate.floor}
-              plate={plate}
-              baseY={baseYs[i]}
-              accent={variation.paletteAccent}
-              planMode={planMode}
-              kitchenOpen={kitchenOpen}
-            />
-          ))}
-          <Roof variation={variation} topY={topY} />
+          {variation.plates
+            .map((plate, i) => ({ plate, i }))
+            .filter(({ plate }) => visibleFloor === "all" || plate.floor === visibleFloor)
+            .map(({ plate, i }) => (
+              <FloorMesh
+                key={plate.floor}
+                plate={plate}
+                baseY={baseYs[i]}
+                accent={variation.paletteAccent}
+                planMode={planMode}
+                kitchenOpen={kitchenOpen}
+                plotW={variation.plotWidthFt}
+                plotD={variation.plotDepthFt}
+              />
+            ))}
+          {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
           <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls
             enablePan={false}
