@@ -514,19 +514,22 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
           <Environment preset="sunset" />
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
-          {variation.plates.map((plate, i) => (
-            <FloorMesh
-              key={plate.floor}
-              plate={plate}
-              baseY={baseYs[i]}
-              accent={variation.paletteAccent}
-              planMode={planMode}
-              kitchenOpen={kitchenOpen}
-              plotW={variation.plotWidthFt}
-              plotD={variation.plotDepthFt}
-            />
-          ))}
-          <Roof variation={variation} topY={topY} />
+          {variation.plates
+            .map((plate, i) => ({ plate, i }))
+            .filter(({ plate }) => visibleFloor === "all" || plate.floor === visibleFloor)
+            .map(({ plate, i }) => (
+              <FloorMesh
+                key={plate.floor}
+                plate={plate}
+                baseY={baseYs[i]}
+                accent={variation.paletteAccent}
+                planMode={planMode}
+                kitchenOpen={kitchenOpen}
+                plotW={variation.plotWidthFt}
+                plotD={variation.plotDepthFt}
+              />
+            ))}
+          {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
           <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls
             enablePan={false}
