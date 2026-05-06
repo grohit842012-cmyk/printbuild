@@ -9,19 +9,19 @@ const WALL_THICKNESS = 0.45;
 const FT_TO_M = 0.3048;
 
 const ROOM_COLORS: Record<string, string> = {
-  living: "#cfe0f5",
-  kitchen: "#f4d9b4",
-  bedroom: "#dfe5d3",
-  master_bedroom: "#cdd9bd",
-  bath: "#bcd5e8",
-  pooja: "#f0e2c2",
-  study: "#e1dfd0",
-  dining: "#ecd6c8",
-  courtyard: "#c8e3c5",
-  stairs: "#b8c5d6",
-  lift: "#94a3b8",
-  utility: "#dcd6c8",
-  parking: "#f7c873",
+  living: "#f5e9d4",
+  kitchen: "#f1c9a5",
+  bedroom: "#dbe5d2",
+  master_bedroom: "#c5d3b8",
+  bath: "#cfe1ec",
+  pooja: "#f3d9a4",
+  study: "#e3dccb",
+  dining: "#e8c9a8",
+  courtyard: "#bdd9b6",
+  stairs: "#d6c2a4",
+  lift: "#a3a8b0",
+  utility: "#d8d1be",
+  parking: "#e8b46a",
 };
 
 const PUBLIC_OPEN = new Set(["living", "dining", "kitchen", "courtyard"]);
@@ -74,11 +74,14 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
   const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Warm stucco wall, tinted slightly toward the design's accent color so each variation reads differently.
-  const wall = new THREE.Color("#efe4d2").lerp(new THREE.Color(accent || "#efe4d2"), 0.18);
+  // Warm terracotta-tinted stucco — softly nudged by the variation accent so each design reads differently
+  // but stays in a coherent earthy palette (no cold blues / grays on exterior).
+  const base = new THREE.Color("#e6cfa8");
+  const tint = new THREE.Color(accent || "#c98a4b");
+  const wall = base.clone().lerp(tint, 0.12);
   const WALL_COLOR = `#${wall.getHexString()}`;
-  const TRIM_COLOR = "#fbfaf6";   // soft white
-  const DOOR_COLOR = "#5a3a22";   // wood
+  const TRIM_COLOR = "#fbf6ec";   // warm white
+  const DOOR_COLOR = "#5a3a22";   // walnut
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
@@ -266,16 +269,63 @@ function RoomBlock({
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
         <RoomWalls w={w} d={d} h={h} />
       )}
-      {room.type === "stairs" && (
-        <group>
-          {Array.from({ length: 9 }).map((_, k) => (
-            <mesh key={k} position={[0, k * (h / 9) * 0.5 + 0.05, -d / 2 + (k + 0.5) * (d / 9)]} castShadow>
-              <boxGeometry args={[w * 0.7, 0.18, d / 9]} />
-              <meshStandardMaterial color="#94a3b8" roughness={0.7} />
+      {room.type === "stairs" && (() => {
+        // Realistic stair: riser ≈ 0.18m (7"), tread ≈ 0.27m (10.5"). Build along the longer side.
+        const riser = 0.18;
+        const tread = 0.27;
+        const totalRise = h + 0.05;
+        const nSteps = Math.max(2, Math.ceil(totalRise / riser));
+        const runLen = nSteps * tread;
+        const alongZ = d >= w;
+        const runDim = alongZ ? d * 0.9 : w * 0.9;
+        // If the run doesn't fit, fold into two flights with a mid-landing.
+        const twoFlight = runLen > runDim;
+        const stepsPerFlight = twoFlight ? Math.ceil(nSteps / 2) : nSteps;
+        const stepWidth = alongZ ? w * 0.55 : d * 0.55;
+        const treadGeom: [number, number, number] = alongZ
+          ? [stepWidth, 0.04, tread]
+          : [tread, 0.04, stepWidth];
+        const renderFlight = (offsetX: number, offsetZ: number, dir: 1 | -1, baseY: number, count: number) =>
+          Array.from({ length: count }).map((_, k) => {
+            const stepY = baseY + k * riser + riser / 2;
+            const along = (-runDim / 2) + (k + 0.5) * tread;
+            return (
+              <group key={`${offsetX}-${offsetZ}-${k}`}>
+                {/* riser */}
+                <mesh position={alongZ
+                  ? [offsetX, stepY - riser / 2 + 0.02, offsetZ + dir * (along - tread / 2 + 0.02)]
+                  : [offsetX + dir * (along - tread / 2 + 0.02), stepY - riser / 2 + 0.02, offsetZ]}>
+                  <boxGeometry args={alongZ ? [stepWidth, riser, 0.04] : [0.04, riser, stepWidth]} />
+                  <meshStandardMaterial color="#e2d6c2" roughness={0.85} />
+                </mesh>
+                {/* tread */}
+                <mesh position={alongZ
+                  ? [offsetX, stepY, offsetZ + dir * along]
+                  : [offsetX + dir * along, stepY, offsetZ]} castShadow receiveShadow>
+                  <boxGeometry args={treadGeom} />
+                  <meshStandardMaterial color="#7a5a3a" roughness={0.55} />
+                </mesh>
+              </group>
+            );
+          });
+        if (!twoFlight) {
+          return <group>{renderFlight(0, 0, 1, 0, nSteps)}</group>;
+        }
+        const flight1Top = stepsPerFlight * riser;
+        const sideOff = alongZ ? stepWidth / 2 + 0.05 : 0;
+        const sideOff2 = alongZ ? 0 : stepWidth / 2 + 0.05;
+        return (
+          <group>
+            {renderFlight(-sideOff, -sideOff2, 1, 0, stepsPerFlight)}
+            {/* mid-landing */}
+            <mesh position={[0, flight1Top - 0.02, alongZ ? (d / 2 - tread) : 0]} receiveShadow>
+              <boxGeometry args={[w * 0.9, 0.06, d * 0.25]} />
+              <meshStandardMaterial color="#7a5a3a" roughness={0.6} />
             </mesh>
-          ))}
-        </group>
-      )}
+            {renderFlight(sideOff, sideOff2, -1, flight1Top, nSteps - stepsPerFlight)}
+          </group>
+        );
+      })()}
       {room.type === "lift" && (
         <mesh position={[0, h / 2, 0]} castShadow>
           <boxGeometry args={[w * 0.9, h, d * 0.9]} />
