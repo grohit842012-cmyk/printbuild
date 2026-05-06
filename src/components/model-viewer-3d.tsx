@@ -317,6 +317,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const cz = top.y + top.h / 2;
   const w = top.w * FT_TO_M;
   const d = top.h * FT_TO_M;
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
   const [sx, sz] = toScene(cx, cz);
   const center: [number, number, number] = [sx, topY, sz];
   const TRIM = "#fbfaf6";
