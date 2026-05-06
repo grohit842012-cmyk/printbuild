@@ -38,9 +38,14 @@ function isOpen(type: string, planMode: string, kitchenOpen: boolean) {
   return PUBLIC_OPEN.has(type);
 }
 
-/** Convert plate-local coords (ft) to scene coords (m) centered on plot. */
-function toScene(xFt: number, yFt: number): [number, number] {
-  return [(xFt - 30) * FT_TO_M, (yFt - 30) * FT_TO_M];
+/** Convert plot-local coords (ft) to scene coords (m) centered on plot. */
+function makeToScene(plotW: number, plotD: number) {
+  const cx = plotW / 2;
+  const cy = plotD / 2;
+  return (xFt: number, yFt: number): [number, number] => [
+    (xFt - cx) * FT_TO_M,
+    (yFt - cy) * FT_TO_M,
+  ];
 }
 
 /* -------------------- Wall segments with door/window cutouts -------------------- */
