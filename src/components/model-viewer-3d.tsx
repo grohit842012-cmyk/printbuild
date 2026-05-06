@@ -91,6 +91,14 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
     const onE = Math.abs(o.x1 - (plate.x + plate.w)) < tol && Math.abs(o.x2 - (plate.x + plate.w)) < tol;
     if (!(onN || onS || onW || onE)) continue;
     const isDoor = o.kind === "door";
+    // Doors only allowed on the exterior if it's the front entrance door (matched against plate.entranceDoor).
+    if (isDoor && plate.entranceDoor) {
+      const ed = plate.entranceDoor;
+      const same = Math.abs(ed.x1 - o.x1) < 0.01 && Math.abs(ed.y1 - o.y1) < 0.01 && Math.abs(ed.x2 - o.x2) < 0.01 && Math.abs(ed.y2 - o.y2) < 0.01;
+      if (!same) continue;
+    } else if (isDoor) {
+      continue;
+    }
     if (onN) byWall.N.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
     else if (onS) byWall.S.push({ o, isDoor, a: Math.min(o.x1, o.x2) - plate.x, b: Math.max(o.x1, o.x2) - plate.x });
     else if (onW) byWall.W.push({ o, isDoor, a: Math.min(o.y1, o.y2) - plate.y, b: Math.max(o.y1, o.y2) - plate.y });
