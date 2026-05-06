@@ -211,13 +211,21 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
 }
 
 function FloorMesh({
-  plate, baseY, accent, planMode, kitchenOpen,
-}: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean }) {
+  plate, baseY, accent, planMode, kitchenOpen, plotW, plotD,
+}: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number }) {
+  const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
   const [sx, sz] = toScene(cx, cz);
   return (
     <group position={[sx, baseY, sz]}>
+      {/* plinth/foundation extending down to ground */}
+      {baseY < 0.01 && (
+        <mesh position={[0, -0.6, 0]} receiveShadow castShadow>
+          <boxGeometry args={[plate.w * FT_TO_M + 0.4, 1.2, plate.h * FT_TO_M + 0.4]} />
+          <meshStandardMaterial color="#bdb3a4" roughness={0.95} />
+        </mesh>
+      )}
       <mesh position={[0, -0.05, 0]} receiveShadow>
         <boxGeometry args={[plate.w * FT_TO_M, 0.1, plate.h * FT_TO_M]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
