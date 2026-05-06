@@ -74,11 +74,14 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
   const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Warm stucco wall, tinted slightly toward the design's accent color so each variation reads differently.
-  const wall = new THREE.Color("#efe4d2").lerp(new THREE.Color(accent || "#efe4d2"), 0.18);
+  // Warm terracotta-tinted stucco — softly nudged by the variation accent so each design reads differently
+  // but stays in a coherent earthy palette (no cold blues / grays on exterior).
+  const base = new THREE.Color("#e6cfa8");
+  const tint = new THREE.Color(accent || "#c98a4b");
+  const wall = base.clone().lerp(tint, 0.12);
   const WALL_COLOR = `#${wall.getHexString()}`;
-  const TRIM_COLOR = "#fbfaf6";   // soft white
-  const DOOR_COLOR = "#5a3a22";   // wood
+  const TRIM_COLOR = "#fbf6ec";   // warm white
+  const DOOR_COLOR = "#5a3a22";   // walnut
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
