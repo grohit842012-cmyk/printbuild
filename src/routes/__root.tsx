@@ -37,7 +37,7 @@ export const Route = createRootRoute({
         content:
           "Customize a curved-wall home with Vastu guidance. See 10 AI-generated 3D models, pick your favorite, and order printable STL files.",
       },
-      { property: "og:title", content: "PrintBuild — Design your dream home" },
+      { property: "og:title", content: "PrintBuild — Design & 3D-print your dream home" },
       {
         property: "og:description",
         content: "Generate Vastu-aligned 3D home designs with curved walls, ready to print.",
@@ -48,6 +48,12 @@ export const Route = createRootRoute({
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
       } as never,
+      { name: "twitter:title", content: "PrintBuild — Design & 3D-print your dream home" },
+      { name: "description", content: "This a website which solves of the issues of construction like pricing, plans, area this is demo and cannot actually generate and  please review your experience" },
+      { property: "og:description", content: "This a website which solves of the issues of construction like pricing, plans, area this is demo and cannot actually generate and  please review your experience" },
+      { name: "twitter:description", content: "This a website which solves of the issues of construction like pricing, plans, area this is demo and cannot actually generate and  please review your experience" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9a04e8e6-98bc-46c1-8936-be1d8abfad36/id-preview-b5f74e53--ae64531e-c1da-4546-b59a-f83cc0d5c208.lovable.app-1778035740107.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9a04e8e6-98bc-46c1-8936-be1d8abfad36/id-preview-b5f74e53--ae64531e-c1da-4546-b59a-f83cc0d5c208.lovable.app-1778035740107.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
