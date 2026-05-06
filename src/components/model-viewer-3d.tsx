@@ -9,19 +9,19 @@ const WALL_THICKNESS = 0.45;
 const FT_TO_M = 0.3048;
 
 const ROOM_COLORS: Record<string, string> = {
-  living: "#cfe0f5",
-  kitchen: "#f4d9b4",
-  bedroom: "#dfe5d3",
-  master_bedroom: "#cdd9bd",
-  bath: "#bcd5e8",
-  pooja: "#f0e2c2",
-  study: "#e1dfd0",
-  dining: "#ecd6c8",
-  courtyard: "#c8e3c5",
-  stairs: "#b8c5d6",
-  lift: "#94a3b8",
-  utility: "#dcd6c8",
-  parking: "#f7c873",
+  living: "#f5e9d4",
+  kitchen: "#f1c9a5",
+  bedroom: "#dbe5d2",
+  master_bedroom: "#c5d3b8",
+  bath: "#cfe1ec",
+  pooja: "#f3d9a4",
+  study: "#e3dccb",
+  dining: "#e8c9a8",
+  courtyard: "#bdd9b6",
+  stairs: "#d6c2a4",
+  lift: "#a3a8b0",
+  utility: "#d8d1be",
+  parking: "#e8b46a",
 };
 
 const PUBLIC_OPEN = new Set(["living", "dining", "kitchen", "courtyard"]);
