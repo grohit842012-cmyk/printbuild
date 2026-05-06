@@ -500,6 +500,8 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
               accent={variation.paletteAccent}
               planMode={planMode}
               kitchenOpen={kitchenOpen}
+              plotW={variation.plotWidthFt}
+              plotD={variation.plotDepthFt}
             />
           ))}
           <Roof variation={variation} topY={topY} />
