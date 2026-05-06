@@ -74,11 +74,11 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
   const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Warm stucco wall + crisp white trim around openings (uses accent only for sill band).
-  const WALL_COLOR = "#efe4d2";   // warm cream stucco
+  // Warm stucco wall, tinted slightly toward the design's accent color so each variation reads differently.
+  const wall = new THREE.Color("#efe4d2").lerp(new THREE.Color(accent || "#efe4d2"), 0.18);
+  const WALL_COLOR = `#${wall.getHexString()}`;
   const TRIM_COLOR = "#fbfaf6";   // soft white
   const DOOR_COLOR = "#5a3a22";   // wood
-  void accent;
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
