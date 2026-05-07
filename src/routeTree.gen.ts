@@ -14,7 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
-import { Route as AdminReviewsRouteImport } from './routes/admin.reviews'
+import { Route as AdminReviewsRouteImport } from './routes/admin_.reviews'
 import { Route as DesignIdReviewRouteImport } from './routes/design.$id.review'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
 import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
@@ -46,9 +46,9 @@ const DesignNewRoute = DesignNewRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminReviewsRoute = AdminReviewsRouteImport.update({
-  id: '/reviews',
-  path: '/reviews',
-  getParentRoute: () => AdminRoute,
+  id: '/admin_/reviews',
+  path: '/admin/reviews',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DesignIdReviewRoute = DesignIdReviewRouteImport.update({
   id: '/design/$id/review',
@@ -73,7 +73,7 @@ const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
@@ -85,7 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
@@ -98,10 +98,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
-  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin_/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -139,7 +139,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/designs'
-    | '/admin/reviews'
+    | '/admin_/reviews'
     | '/design/new'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -149,9 +149,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRouteWithChildren
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   DesignsRoute: typeof DesignsRoute
+  AdminReviewsRoute: typeof AdminReviewsRoute
   DesignNewRoute: typeof DesignNewRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
@@ -196,12 +197,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignNewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/reviews': {
-      id: '/admin/reviews'
-      path: '/reviews'
+    '/admin_/reviews': {
+      id: '/admin_/reviews'
+      path: '/admin/reviews'
       fullPath: '/admin/reviews'
       preLoaderRoute: typeof AdminReviewsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/design/$id/review': {
       id: '/design/$id/review'
@@ -234,21 +235,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AdminRouteChildren {
-  AdminReviewsRoute: typeof AdminReviewsRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminReviewsRoute: AdminReviewsRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRouteWithChildren,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   DesignsRoute: DesignsRoute,
+  AdminReviewsRoute: AdminReviewsRoute,
   DesignNewRoute: DesignNewRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
@@ -258,3 +250,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
