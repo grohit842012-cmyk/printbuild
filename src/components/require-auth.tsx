@@ -26,7 +26,7 @@ export function RequireAuth({
     }
   }, [user, isAdmin, loading, requireAdmin, rolesReady, navigate]);
 
-  if (loading) {
+  if (loading || (requireAdmin && user && !rolesReady)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
