@@ -10,8 +10,10 @@ export function RequireAuth({
   children: React.ReactNode;
   requireAdmin?: boolean;
 }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, roles } = useAuth();
   const navigate = useNavigate();
+  // Roles are fetched async after the user is set; wait for them before deciding.
+  const rolesReady = !user || roles.length > 0 || !requireAdmin;
 
   useEffect(() => {
     if (loading) return;
@@ -19,12 +21,12 @@ export function RequireAuth({
       void navigate({ to: "/auth" });
       return;
     }
-    if (requireAdmin && !isAdmin) {
+    if (requireAdmin && rolesReady && !isAdmin) {
       void navigate({ to: "/" });
     }
-  }, [user, isAdmin, loading, requireAdmin, navigate]);
+  }, [user, isAdmin, loading, requireAdmin, rolesReady, navigate]);
 
-  if (loading) {
+  if (loading || (requireAdmin && user && !rolesReady)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
