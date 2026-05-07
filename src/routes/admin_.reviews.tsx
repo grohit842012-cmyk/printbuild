@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Star, Trash2 } from "lucide-react";
 
-export const Route = createFileRoute("/admin/reviews")({
+export const Route = createFileRoute("/admin_/reviews")({
   head: () => ({ meta: [{ title: "Admin · Reviews — PrintBuild" }] }),
   component: () => (
     <RequireAuth requireAdmin>
