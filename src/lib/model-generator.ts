@@ -124,13 +124,14 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
   const issues: PlotValidationIssue[] = [];
   const fw = spec.plot.widthFt - SETBACK * 2;
   const fh = spec.plot.depthFt - SETBACK * 2;
-  if (fw < 18 || fh < 22) {
+  if (fw < 22 || fh < 26) {
     issues.push({
       floor: 0,
-      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Need at least 24×28 ft.`,
+      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Rule Book v2.0 minimums need at least 28×32 ft.`,
     });
     return issues;
   }
+
   const perFloor = spec.roomsPerFloor ?? [];
   for (let f = 0; f < spec.floors; f++) {
     const rooms = perFloor[f] ?? [];
