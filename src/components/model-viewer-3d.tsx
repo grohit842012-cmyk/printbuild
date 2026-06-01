@@ -267,7 +267,7 @@ function RoomBlock({
         <meshStandardMaterial color={color} roughness={0.9} />
       </mesh>
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
-        <RoomWalls w={w} d={d} h={h} />
+        <RoomWalls w={w} d={d} h={h} room={room} />
       )}
       {room.type === "stairs" && (() => {
         // Switchback (U-shape) staircase: two flights running in OPPOSITE directions
