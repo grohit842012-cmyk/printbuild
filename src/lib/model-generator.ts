@@ -54,33 +54,35 @@ const LABEL: Record<RoomType, string> = {
 };
 
 // ---------- Architectural minimum dimensions (ft) ----------
+// Sourced from Architectural Rule Book v2.0 (mandatory minimums).
 export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
   living: { w: 14, h: 16 },
-  master_bedroom: { w: 12, h: 14 },
-  bedroom: { w: 10, h: 10 },
-  kitchen: { w: 8, h: 10 },
-  dining: { w: 8, h: 10 },
-  bath: { w: 5, h: 7 },
-  pooja: { w: 5, h: 5 },
+  master_bedroom: { w: 13, h: 14 },
+  bedroom: { w: 11, h: 12 },
+  kitchen: { w: 9, h: 11 },
+  dining: { w: 10, h: 12 },
+  bath: { w: 6, h: 7 },
+  pooja: { w: 5, h: 6 },
   study: { w: 8, h: 8 },
   courtyard: { w: 8, h: 8 },
-  stairs: { w: 5, h: 8 },
+  stairs: { w: 4, h: 8 },
   lift: { w: 4, h: 4 },
   utility: { w: 6, h: 7 },
   parking: { w: 9, h: 18 },
 };
 
+// Preferred dimensions (Rule Book v2.0 "Preferred" tier).
 const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
-  living: { w: 16, h: 18 },
+  living: { w: 16, h: 20 },
   master_bedroom: { w: 14, h: 16 },
-  bedroom: { w: 11, h: 12 },
+  bedroom: { w: 12, h: 13 },
   kitchen: { w: 10, h: 12 },
-  dining: { w: 10, h: 11 },
-  bath: { w: 6, h: 8 },
-  pooja: { w: 6, h: 6 },
+  dining: { w: 12, h: 14 },
+  bath: { w: 7, h: 8 },
+  pooja: { w: 6, h: 8 },
   study: { w: 9, h: 10 },
   courtyard: { w: 10, h: 10 },
-  stairs: { w: 5.5, h: 9 },
+  stairs: { w: 4.5, h: 9 },
   lift: { w: 4, h: 4 },
   utility: { w: 7, h: 8 },
   parking: { w: 9, h: 18 },
@@ -91,7 +93,9 @@ interface FlatRoom {
   sizePref: "small" | "medium" | "large";
 }
 
-const HALLWAY_WIDTH = 3.5;
+// Rule Book v2.0: corridor minimum 4.5 ft, preferred 5 ft.
+const HALLWAY_WIDTH = 5;
+
 const SETBACK = 3;
 
 /** Footprint dims by staircase shape (in ft), oriented along corridor (h) × wide (w). */
@@ -120,13 +124,14 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
   const issues: PlotValidationIssue[] = [];
   const fw = spec.plot.widthFt - SETBACK * 2;
   const fh = spec.plot.depthFt - SETBACK * 2;
-  if (fw < 18 || fh < 22) {
+  if (fw < 22 || fh < 26) {
     issues.push({
       floor: 0,
-      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Need at least 24×28 ft.`,
+      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Rule Book v2.0 minimums need at least 28×32 ft.`,
     });
     return issues;
   }
+
   const perFloor = spec.roomsPerFloor ?? [];
   for (let f = 0; f < spec.floors; f++) {
     const rooms = perFloor[f] ?? [];
