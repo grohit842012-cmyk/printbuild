@@ -369,23 +369,93 @@ function RoomBlock({
   );
 }
 
-function RoomWalls({ w, d, h }: { w: number; d: number; h: number }) {
+function RoomWalls({ w, d, h, room }: { w: number; d: number; h: number; room: RoomRect }) {
   const t = WALL_THICKNESS * 0.5 * FT_TO_M;
+  const doorH = 7 * FT_TO_M;
+  const doorW = 3 * FT_TO_M;
   const mat = <meshStandardMaterial color="#f8fafc" roughness={0.85} />;
+
+  // Compute door gap center along the wall (local coords, wall centered at 0)
+  // doorMid is in feet from the room's origin along the door wall
+  const wall = room.doorWall;
+  const midFt = room.doorMid ?? 0;
+  // For N/S walls the door runs along x (room width = w in scene-m)
+  // For E/W walls the door runs along z (room depth = d in scene-m)
+  const wallAlongX = wall === "N" || wall === "S";
+  const wallLenScene = wallAlongX ? w : d;
+  // midFt is measured from room.x (for N/S) or room.y (for E/W), origin at one end
+  // Local axis goes from -wallLenScene/2 to +wallLenScene/2
+  const midLocal = midFt * FT_TO_M - wallLenScene / 2;
+  const half = doorW / 2;
+  const lo = Math.max(-wallLenScene / 2, midLocal - half);
+  const hi = Math.min(wallLenScene / 2, midLocal + half);
+
+  // Render a wall as up to two segments (before + after door gap), plus a lintel above the door.
+  const renderWall = (
+    isN: boolean, isS: boolean, isE: boolean, isW: boolean,
+    key: string,
+  ) => {
+    const hasDoor =
+      (isN && wall === "N") || (isS && wall === "S") ||
+      (isE && wall === "E") || (isW && wall === "W");
+    const alongX = isN || isS;
+    const wallZ = isN ? -d / 2 : isS ? d / 2 : 0;
+    const wallX = isW ? -w / 2 : isE ? w / 2 : 0;
+    const fullLen = alongX ? w : d;
+
+    if (!hasDoor) {
+      return (
+        <mesh key={key} position={[wallX, h / 2, wallZ]} castShadow receiveShadow>
+          <boxGeometry args={alongX ? [fullLen, h, t] : [t, h, fullLen]} />
+          {mat}
+        </mesh>
+      );
+    }
+
+    const segments: ReactElement[] = [];
+    // Segment 1: from -L/2 to lo
+    const seg1Len = lo - (-fullLen / 2);
+    if (seg1Len > 0.02) {
+      const seg1Center = (-fullLen / 2 + lo) / 2;
+      segments.push(
+        <mesh key={`${key}-a`} position={[alongX ? seg1Center : wallX, h / 2, alongX ? wallZ : seg1Center]} castShadow receiveShadow>
+          <boxGeometry args={alongX ? [seg1Len, h, t] : [t, h, seg1Len]} />
+          {mat}
+        </mesh>,
+      );
+    }
+    // Segment 2: from hi to L/2
+    const seg2Len = fullLen / 2 - hi;
+    if (seg2Len > 0.02) {
+      const seg2Center = (hi + fullLen / 2) / 2;
+      segments.push(
+        <mesh key={`${key}-b`} position={[alongX ? seg2Center : wallX, h / 2, alongX ? wallZ : seg2Center]} castShadow receiveShadow>
+          <boxGeometry args={alongX ? [seg2Len, h, t] : [t, h, seg2Len]} />
+          {mat}
+        </mesh>,
+      );
+    }
+    // Lintel above the door
+    const lintelLen = hi - lo;
+    if (lintelLen > 0.02) {
+      const lintelCenter = (lo + hi) / 2;
+      const lintelH = h - doorH;
+      segments.push(
+        <mesh key={`${key}-l`} position={[alongX ? lintelCenter : wallX, doorH + lintelH / 2, alongX ? wallZ : lintelCenter]} castShadow receiveShadow>
+          <boxGeometry args={alongX ? [lintelLen, lintelH, t] : [t, lintelH, lintelLen]} />
+          {mat}
+        </mesh>,
+      );
+    }
+    return <group key={key}>{segments}</group>;
+  };
+
   return (
     <group>
-      <mesh position={[0, h / 2, -d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[w, h, t]} />{mat}
-      </mesh>
-      <mesh position={[0, h / 2, d / 2]} castShadow receiveShadow>
-        <boxGeometry args={[w, h, t]} />{mat}
-      </mesh>
-      <mesh position={[-w / 2, h / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[t, h, d]} />{mat}
-      </mesh>
-      <mesh position={[w / 2, h / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[t, h, d]} />{mat}
-      </mesh>
+      {renderWall(true, false, false, false, "N")}
+      {renderWall(false, true, false, false, "S")}
+      {renderWall(false, false, false, true, "W")}
+      {renderWall(false, false, true, false, "E")}
     </group>
   );
 }
