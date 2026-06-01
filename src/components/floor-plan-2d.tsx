@@ -318,9 +318,10 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
           );
         })}
 
-        {/* Per-room door swing arcs (skip stair openings) */}
+        {/* Per-room door swing arcs (skip stair openings and open-plan rooms with no walls) */}
         {plate.rooms.map((r, i) => {
           if (!r.doorWall || r.doorMid == null) return null;
+          if (isOpenRoom(r.type)) return null;
           const arcR = Math.min(r.w, r.h) * 0.18 * scale;
           let hx = 0;
           let hy = 0;
@@ -328,19 +329,19 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
           if (r.doorWall === "E") {
             hx = ox + (r.x + r.w) * scale;
             hy = oy + (r.y + r.doorMid - 1.5) * scale;
-            start = 90; // sweeps from south wall into room (toward west)
+            start = 90;
           } else if (r.doorWall === "W") {
             hx = ox + r.x * scale;
             hy = oy + (r.y + r.doorMid - 1.5) * scale;
-            start = -90; // toward east
+            start = -90;
           } else if (r.doorWall === "N") {
             hx = ox + (r.x + r.doorMid - 1.5) * scale;
             hy = oy + r.y * scale;
-            start = 0; // toward south
+            start = 0;
           } else if (r.doorWall === "S") {
             hx = ox + (r.x + r.doorMid - 1.5) * scale;
             hy = oy + (r.y + r.h) * scale;
-            start = 180; // toward north
+            start = 180;
           }
           return (
             <path
