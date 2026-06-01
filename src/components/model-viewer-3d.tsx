@@ -511,7 +511,9 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
       </group>
     );
   }
-  // flat — slab + parapet (in cream trim, not navy)
+  // flat — slab + parapet (in cream trim) + optional mumty (stair room) for multi-floor
+  const topStair = top.rooms.find((r) => r.type === "stairs");
+  const hasMumty = variation.plates.length > 1 && !!topStair;
   return (
     <group position={center}>
       <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
@@ -534,6 +536,53 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         <boxGeometry args={[0.25, 0.7, d + 0.6]} />
         <meshStandardMaterial color={TRIM} roughness={0.7} />
       </mesh>
+      {hasMumty && topStair && (() => {
+        // Small "stair room" sitting on top of the flat roof, directly above the stair shaft.
+        // Contains nothing but the staircase emerging onto the roof.
+        const mw = (topStair.w + 1) * FT_TO_M;
+        const md = (topStair.h + 1) * FT_TO_M;
+        const mh = 8 * FT_TO_M;
+        // Position relative to roof center (which is top-plate center):
+        const stairCx = topStair.x + topStair.w / 2;
+        const stairCz = topStair.y + topStair.h / 2;
+        const topCx = top.x + top.w / 2;
+        const topCz = top.y + top.h / 2;
+        const mx = (stairCx - topCx) * FT_TO_M;
+        const mz = (stairCz - topCz) * FT_TO_M;
+        const wallT = WALL_THICKNESS * FT_TO_M;
+        const doorW = 3 * FT_TO_M;
+        const doorH = 6.5 * FT_TO_M;
+        const wallMat = <meshStandardMaterial color="#e6cfa8" roughness={0.85} />;
+        const trimMat = <meshStandardMaterial color={TRIM} roughness={0.7} />;
+        return (
+          <group position={[mx, 0.2, mz]}>
+            {/* Three solid walls + a door opening on the front (south side) */}
+            <mesh position={[0, mh / 2, -md / 2]} castShadow receiveShadow>
+              <boxGeometry args={[mw, mh, wallT]} />{wallMat}
+            </mesh>
+            <mesh position={[-mw / 2, mh / 2, 0]} castShadow receiveShadow>
+              <boxGeometry args={[wallT, mh, md]} />{wallMat}
+            </mesh>
+            <mesh position={[mw / 2, mh / 2, 0]} castShadow receiveShadow>
+              <boxGeometry args={[wallT, mh, md]} />{wallMat}
+            </mesh>
+            {/* Front wall: two pieces flanking a door + lintel */}
+            <mesh position={[-(mw / 2 + doorW / 2) / 2 - doorW / 4, mh / 2, md / 2]} castShadow receiveShadow>
+              <boxGeometry args={[(mw - doorW) / 2, mh, wallT]} />{wallMat}
+            </mesh>
+            <mesh position={[(mw / 2 + doorW / 2) / 2 + doorW / 4, mh / 2, md / 2]} castShadow receiveShadow>
+              <boxGeometry args={[(mw - doorW) / 2, mh, wallT]} />{wallMat}
+            </mesh>
+            <mesh position={[0, doorH + (mh - doorH) / 2, md / 2]} castShadow receiveShadow>
+              <boxGeometry args={[doorW, mh - doorH, wallT]} />{wallMat}
+            </mesh>
+            {/* Flat roof slab on top of the mumty */}
+            <mesh position={[0, mh + 0.1, 0]} castShadow receiveShadow>
+              <boxGeometry args={[mw + 0.3, 0.2, md + 0.3]} />{trimMat}
+            </mesh>
+          </group>
+        );
+      })()}
     </group>
   );
 }
