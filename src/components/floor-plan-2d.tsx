@@ -364,16 +364,22 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
         strokeWidth="2.5"
       />
 
-      {/* Doors and windows (lines on walls) */}
-      {plate.openings.map((o, i) => (
-        <line key={i}
-          x1={ox + o.x1 * scale} y1={oy + o.y1 * scale}
-          x2={ox + o.x2 * scale} y2={oy + o.y2 * scale}
-          stroke={o.kind === "door" ? "hsl(var(--primary))" : "#60a5fa"}
-          strokeWidth={o.kind === "door" ? 2.5 : 2}
-          strokeLinecap="round"
-        />
-      ))}
+      {/* Doors and windows (lines on walls) — skip interior doors for open-plan rooms (no walls there) */}
+      {plate.openings.map((o, i) => {
+        if (o.kind === "door" && o.roomIndex != null) {
+          const r = plate.rooms[o.roomIndex];
+          if (r && isOpenRoom(r.type)) return null;
+        }
+        return (
+          <line key={i}
+            x1={ox + o.x1 * scale} y1={oy + o.y1 * scale}
+            x2={ox + o.x2 * scale} y2={oy + o.y2 * scale}
+            stroke={o.kind === "door" ? "hsl(var(--primary))" : "#60a5fa"}
+            strokeWidth={o.kind === "door" ? 2.5 : 2}
+            strokeLinecap="round"
+          />
+        );
+      })}
 
       {/* Front door swing arc */}
       {plate.entranceDoor && (() => {
