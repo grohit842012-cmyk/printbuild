@@ -787,9 +787,6 @@ function computeParking(
   entranceDir: Direction,
   rng: () => number,
 ): ParkingArea {
-  // 2-bay parking sized to fit inside the plot's setback band beside the
-  // entrance. The setback is part of the plot, so this stays inside the
-  // plot boundary.
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
   const bays = 2;
@@ -799,44 +796,47 @@ function computeParking(
   const covered = rng() < 0.6;
   let x = 0;
   let y = 0;
+  let pw = w;
+  let ph = h;
+
   if (wall === "N") {
-    // Parking sits in the strip between plot top (y=0) and building top (ground.y)
     const bandH = Math.max(8, ground.y);
-    y = Math.max(0, ground.y - bandH);
-    const ph = Math.min(h, bandH);
+    ph = Math.min(h, bandH);
+    y = Math.max(0, ground.y - ph);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
-    x = Math.max(0, Math.min(plotW - w, x));
-    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "S") {
     const bandH = Math.max(8, plotD - (ground.y + ground.h));
+    ph = Math.min(h, bandH);
     y = ground.y + ground.h;
-    const ph = Math.min(h, bandH);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
-    x = Math.max(0, Math.min(plotW - w, x));
-    return { x, y, w, h: ph, bays, covered };
   } else if (wall === "E") {
     const bandW = Math.max(8, plotW - (ground.x + ground.w));
+    pw = Math.min(h, bandW); // narrow band; depth swapped with width
+    ph = w;
     x = ground.x + ground.w;
-    const pw = Math.min(h, bandW); // narrower band, depth becomes width
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
     y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
-    y = Math.max(0, Math.min(plotD - w, y));
-    return { x, y, w: pw, h: w, bays, covered };
   } else {
     const bandW = Math.max(8, ground.x);
-    x = Math.max(0, ground.x - bandW);
-    const pw = Math.min(h, bandW);
+    pw = Math.min(h, bandW);
+    ph = w;
+    x = Math.max(0, ground.x - pw);
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
     y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
-    y = Math.max(0, Math.min(plotD - w, y));
-    return { x, y, w: pw, h: w, bays, covered };
   }
+
+  // Final hard clamp — carport must lie fully inside the plot rectangle.
+  pw = Math.min(pw, plotW);
+  ph = Math.min(ph, plotD);
+  x = Math.max(0, Math.min(plotW - pw, x));
+  y = Math.max(0, Math.min(plotD - ph, y));
+  return { x, y, w: pw, h: ph, bays, covered };
 }
 
 export function generateVariations(
