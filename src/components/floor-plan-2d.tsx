@@ -1,4 +1,5 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
+import { toast } from "sonner";
 import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
