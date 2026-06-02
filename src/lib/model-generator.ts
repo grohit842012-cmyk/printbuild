@@ -832,59 +832,72 @@ function computeParking(
   plotW: number,
   plotD: number,
   entranceDir: Direction,
+  parkingSpec: DesignSpec["parking"] | undefined,
   rng: () => number,
-): ParkingArea {
+): ParkingArea | undefined {
+  const fp = parkingFootprint(parkingSpec);
+  if (!fp || parkingSpec?.location === "outside") return undefined;
+
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
-  const bays = 2;
-  const bayW = 9;
-  const w = bays * bayW;
-  const h = 18;
+  const bays = parkingSpec!.count;
   const covered = rng() < 0.6;
+
+  // Bay orientation: along N/S walls, vehicle nose points N–S (depth = h on plot).
+  // On E/W walls, vehicle nose points E–W (depth runs along x).
+  let w: number;
+  let h: number;
+  if (wall === "N" || wall === "S") {
+    w = fp.w;
+    h = fp.h;
+  } else {
+    w = fp.h; // depth along x
+    h = fp.w;
+  }
+
   let x = 0;
   let y = 0;
-  let pw = w;
-  let ph = h;
 
   if (wall === "N") {
-    const bandH = Math.max(8, ground.y);
-    ph = Math.min(h, bandH);
-    y = Math.max(0, ground.y - ph);
+    y = Math.max(0, ground.y - h);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
   } else if (wall === "S") {
-    const bandH = Math.max(8, plotD - (ground.y + ground.h));
-    ph = Math.min(h, bandH);
     y = ground.y + ground.h;
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
   } else if (wall === "E") {
-    const bandW = Math.max(8, plotW - (ground.x + ground.w));
-    pw = Math.min(h, bandW); // narrow band; depth swapped with width
-    ph = w;
     x = ground.x + ground.w;
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
-    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = doorMid + sideOffset * (h / 2 + 4) - h / 2;
   } else {
-    const bandW = Math.max(8, ground.x);
-    pw = Math.min(h, bandW);
-    ph = w;
-    x = Math.max(0, ground.x - pw);
+    x = Math.max(0, ground.x - w);
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
-    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = doorMid + sideOffset * (h / 2 + 4) - h / 2;
   }
 
-  // Final hard clamp — carport must lie fully inside the plot rectangle.
-  pw = Math.min(pw, plotW);
-  ph = Math.min(ph, plotD);
-  x = Math.max(0, Math.min(plotW - pw, x));
-  y = Math.max(0, Math.min(plotD - ph, y));
-  return { x, y, w: pw, h: ph, bays, covered };
+  // Hard clamp — bay must lie fully inside the plot rectangle. We DO NOT
+  // shrink width/depth here: feasibility was already validated in
+  // validatePlotFit. If the clamp would push the bay into the building, we
+  // return undefined rather than overlap rooms.
+  x = Math.max(0, Math.min(plotW - w, x));
+  y = Math.max(0, Math.min(plotD - h, y));
+
+  // Overlap check vs. ground-floor footprint.
+  const overlaps =
+    x + w > ground.x &&
+    x < ground.x + ground.w &&
+    y + h > ground.y &&
+    y < ground.y + ground.h;
+  if (overlaps) return undefined;
+
+  return { x, y, w, h, bays, covered };
 }
+
 
 export function generateVariations(
   spec: DesignSpec,
