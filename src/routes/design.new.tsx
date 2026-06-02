@@ -87,7 +87,7 @@ function NewDesignWizard() {
       ],
     ],
     curvature: "mixed",
-    roofStyle: "domed",
+    roofStyle: "flat",
     windowDensity: "medium",
     exteriorFeel: "Warm earthy palette, natural textures",
     staircaseType: "straight",
