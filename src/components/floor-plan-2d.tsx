@@ -66,6 +66,7 @@ function swingArcPath(
 }
 
 export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed", kitchenOpen = false }: Props) {
+  const [edgeLabel, setEdgeLabel] = useState<{ side: "N" | "E" | "S" | "W" } | null>(null);
   const plate = variation.plates.find((p) => p.floor === floor);
   if (!plate) return null;
   const totalFloors = variation.plates.length;
