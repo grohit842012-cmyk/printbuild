@@ -31,7 +31,7 @@ export interface DesignSpec {
   rooms: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[];
   roomsPerFloor?: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[][];
   curvature: "gentle" | "bold" | "mixed";
-  roofStyle: "flat" | "domed" | "sloped";
+  roofStyle: "flat" | "sloped";
   windowDensity: "low" | "medium" | "high";
   exteriorFeel: string;
   // New: staircase, lift, parking choices
