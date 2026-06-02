@@ -529,7 +529,76 @@ function NewDesignWizard() {
                   </label>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  When stilt parking is off we put a 2-bay parking strip inside the plot, beside the entrance.
+                  When stilt parking is off we put a parking bay inside the plot, beside the entrance.
+                </p>
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-3">
+                <Label>Parking</Label>
+                <div className="grid sm:grid-cols-3 gap-2">
+                  <Select
+                    value={String(spec.parking?.count ?? 1)}
+                    onValueChange={(v) =>
+                      setSpec({
+                        ...spec,
+                        parking: {
+                          count: Number(v) as 0 | 1 | 2,
+                          vehicle: spec.parking?.vehicle ?? "car",
+                          location: spec.parking?.location ?? "inside",
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger><SelectValue placeholder="Vehicles" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No parking</SelectItem>
+                      <SelectItem value="1">1 vehicle</SelectItem>
+                      <SelectItem value="2">2 cars (20×18 ft)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={spec.parking?.vehicle ?? "car"}
+                    onValueChange={(v) =>
+                      setSpec({
+                        ...spec,
+                        parking: {
+                          count: spec.parking?.count ?? 1,
+                          vehicle: v as "car" | "suv",
+                          location: spec.parking?.location ?? "inside",
+                        },
+                      })
+                    }
+                    disabled={(spec.parking?.count ?? 1) !== 1}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="car">Car (10×18 ft)</SelectItem>
+                      <SelectItem value="suv">SUV (11×20 ft)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={spec.parking?.location ?? "inside"}
+                    onValueChange={(v) =>
+                      setSpec({
+                        ...spec,
+                        parking: {
+                          count: spec.parking?.count ?? 1,
+                          vehicle: spec.parking?.vehicle ?? "car",
+                          location: v as "inside" | "outside",
+                        },
+                      })
+                    }
+                    disabled={(spec.parking?.count ?? 1) === 0}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inside">Inside the plot</SelectItem>
+                      <SelectItem value="outside">On the street / outside</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  We check the parking bay fits in the setback band before generating. If not, you&apos;ll be asked to move it outside, reduce to 1 car, enable stilt, or enlarge the plot.
                 </p>
               </div>
 
