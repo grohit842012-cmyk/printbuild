@@ -41,6 +41,12 @@ export interface DesignSpec {
   stiltParking?: boolean;
   // If stilt parking is on, include a small utility room beside the stairs.
   stiltUtilityRoom?: boolean;
+  // Realistic parking spec (Rule Book v2.0 Parking Validation).
+  parking?: {
+    count: 0 | 1 | 2;
+    vehicle: "car" | "suv";
+    location: "inside" | "outside";
+  };
   // Open plan = only bedrooms/baths/pooja/utility/stairs/lift get walls.
   // Closed plan = every room is walled.
   planMode?: "open" | "closed";

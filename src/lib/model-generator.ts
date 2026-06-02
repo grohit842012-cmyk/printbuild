@@ -98,6 +98,22 @@ const HALLWAY_WIDTH = 5;
 
 const SETBACK = 3;
 
+// Rule Book v2.0 — Parking Validation. Realistic bay sizes (ft).
+export const PARKING_DIMS = {
+  car: { w: 10, h: 18 },
+  suv: { w: 11, h: 20 },
+  two: { w: 20, h: 18 }, // two cars side by side
+} as const;
+
+function parkingFootprint(
+  parking: DesignSpec["parking"] | undefined,
+): { w: number; h: number } | null {
+  if (!parking || parking.count === 0) return null;
+  if (parking.count === 2) return PARKING_DIMS.two;
+  return parking.vehicle === "suv" ? PARKING_DIMS.suv : PARKING_DIMS.car;
+}
+
+
 /** Footprint dims by staircase shape (in ft), oriented along corridor (h) × wide (w). */
 function stairDims(type: DesignSpec["staircaseType"]): { w: number; h: number } {
   switch (type) {
@@ -163,8 +179,39 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
       }
     }
   }
+
+  // ---- Parking feasibility (Rule Book v2.0) ----
+  const fp = parkingFootprint(spec.parking);
+  if (fp && spec.parking?.location === "inside" && !spec.stiltParking) {
+    // Parking must fit in the setback band beside the building (we use the
+    // front band by entrance, depth = SETBACK + a 5 ft clearance for door swing
+    // and turning). If the building consumes the full plot minus setbacks, the
+    // available band is just SETBACK ft deep — not enough for an 18 ft bay.
+    const wall = pickEntranceWall(spec.plot.facing);
+    const bandDepth = SETBACK; // setback strip between plate and plot edge
+    const bayDepth = wall === "N" || wall === "S" ? fp.h : fp.w;
+    const bayWidth = wall === "N" || wall === "S" ? fp.w : fp.h;
+    const bandWidth = wall === "N" || wall === "S" ? spec.plot.widthFt : spec.plot.depthFt;
+    if (bandDepth < bayDepth || bandWidth < bayWidth + 4) {
+      const label =
+        spec.parking!.count === 2
+          ? "2-car parking (20×18 ft)"
+          : spec.parking!.vehicle === "suv"
+            ? "SUV parking (11×20 ft)"
+            : "1-car parking (10×18 ft)";
+      issues.push({
+        floor: 0,
+        message:
+          `Plot can't fit ${label} inside without overlapping the house. ` +
+          `Try: enable stilt parking, move parking outside the plot, reduce to 1 car, ` +
+          `or enlarge the plot.`,
+      });
+    }
+  }
+
   return issues;
 }
+
 
 // ---------- Helpers ----------
 function pickEntranceWall(dir: Direction): "N" | "E" | "S" | "W" {
@@ -785,59 +832,72 @@ function computeParking(
   plotW: number,
   plotD: number,
   entranceDir: Direction,
+  parkingSpec: DesignSpec["parking"] | undefined,
   rng: () => number,
-): ParkingArea {
+): ParkingArea | undefined {
+  const fp = parkingFootprint(parkingSpec);
+  if (!fp || parkingSpec?.location === "outside") return undefined;
+
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
-  const bays = 2;
-  const bayW = 9;
-  const w = bays * bayW;
-  const h = 18;
+  const bays = parkingSpec!.count;
   const covered = rng() < 0.6;
+
+  // Bay orientation: along N/S walls, vehicle nose points N–S (depth = h on plot).
+  // On E/W walls, vehicle nose points E–W (depth runs along x).
+  let w: number;
+  let h: number;
+  if (wall === "N" || wall === "S") {
+    w = fp.w;
+    h = fp.h;
+  } else {
+    w = fp.h; // depth along x
+    h = fp.w;
+  }
+
   let x = 0;
   let y = 0;
-  let pw = w;
-  let ph = h;
 
   if (wall === "N") {
-    const bandH = Math.max(8, ground.y);
-    ph = Math.min(h, bandH);
-    y = Math.max(0, ground.y - ph);
+    y = Math.max(0, ground.y - h);
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
   } else if (wall === "S") {
-    const bandH = Math.max(8, plotD - (ground.y + ground.h));
-    ph = Math.min(h, bandH);
     y = ground.y + ground.h;
     const doorMid = door ? (door.x1 + door.x2) / 2 : ground.x + ground.w / 2;
     const sideOffset = doorMid > plotW / 2 ? -1 : 1;
     x = doorMid + sideOffset * (w / 2 + 4) - w / 2;
   } else if (wall === "E") {
-    const bandW = Math.max(8, plotW - (ground.x + ground.w));
-    pw = Math.min(h, bandW); // narrow band; depth swapped with width
-    ph = w;
     x = ground.x + ground.w;
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
-    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = doorMid + sideOffset * (h / 2 + 4) - h / 2;
   } else {
-    const bandW = Math.max(8, ground.x);
-    pw = Math.min(h, bandW);
-    ph = w;
-    x = Math.max(0, ground.x - pw);
+    x = Math.max(0, ground.x - w);
     const doorMid = door ? (door.y1 + door.y2) / 2 : ground.y + ground.h / 2;
     const sideOffset = doorMid > plotD / 2 ? -1 : 1;
-    y = doorMid + sideOffset * (w / 2 + 4) - w / 2;
+    y = doorMid + sideOffset * (h / 2 + 4) - h / 2;
   }
 
-  // Final hard clamp — carport must lie fully inside the plot rectangle.
-  pw = Math.min(pw, plotW);
-  ph = Math.min(ph, plotD);
-  x = Math.max(0, Math.min(plotW - pw, x));
-  y = Math.max(0, Math.min(plotD - ph, y));
-  return { x, y, w: pw, h: ph, bays, covered };
+  // Hard clamp — bay must lie fully inside the plot rectangle. We DO NOT
+  // shrink width/depth here: feasibility was already validated in
+  // validatePlotFit. If the clamp would push the bay into the building, we
+  // return undefined rather than overlap rooms.
+  x = Math.max(0, Math.min(plotW - w, x));
+  y = Math.max(0, Math.min(plotD - h, y));
+
+  // Overlap check vs. ground-floor footprint.
+  const overlaps =
+    x + w > ground.x &&
+    x < ground.x + ground.w &&
+    y + h > ground.y &&
+    y < ground.y + ground.h;
+  if (overlaps) return undefined;
+
+  return { x, y, w, h, bays, covered };
 }
+
 
 export function generateVariations(
   spec: DesignSpec,
@@ -1042,7 +1102,7 @@ export function generateVariations(
     // is a room on the ground floor instead of a separate strip.
     const parking = stiltParking
       ? undefined
-      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, rng);
+      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, spec.parking, rng);
 
     variations.push({
       id: `var-${seed}`,
