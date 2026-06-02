@@ -98,6 +98,22 @@ const HALLWAY_WIDTH = 5;
 
 const SETBACK = 3;
 
+// Rule Book v2.0 — Parking Validation. Realistic bay sizes (ft).
+export const PARKING_DIMS = {
+  car: { w: 10, h: 18 },
+  suv: { w: 11, h: 20 },
+  two: { w: 20, h: 18 }, // two cars side by side
+} as const;
+
+function parkingFootprint(
+  parking: DesignSpec["parking"] | undefined,
+): { w: number; h: number } | null {
+  if (!parking || parking.count === 0) return null;
+  if (parking.count === 2) return PARKING_DIMS.two;
+  return parking.vehicle === "suv" ? PARKING_DIMS.suv : PARKING_DIMS.car;
+}
+
+
 /** Footprint dims by staircase shape (in ft), oriented along corridor (h) × wide (w). */
 function stairDims(type: DesignSpec["staircaseType"]): { w: number; h: number } {
   switch (type) {
