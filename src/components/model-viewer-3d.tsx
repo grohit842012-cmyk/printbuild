@@ -517,11 +517,10 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
       </mesh>
       {hasMumty && topStair && (() => {
         // Small "stair room" sitting on top of the flat roof, directly above the stair shaft.
-        // Contains nothing but the staircase emerging onto the roof.
+        // Door faces the side with the most open terrace (largest clearance to the plate edge).
         const mw = (topStair.w + 1) * FT_TO_M;
         const md = (topStair.h + 1) * FT_TO_M;
         const mh = 8 * FT_TO_M;
-        // Position relative to roof center (which is top-plate center):
         const stairCx = topStair.x + topStair.w / 2;
         const stairCz = topStair.y + topStair.h / 2;
         const topCx = top.x + top.w / 2;
@@ -533,18 +532,74 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         const doorH = 6.5 * FT_TO_M;
         const wallMat = <meshStandardMaterial color="#e6cfa8" roughness={0.85} />;
         const trimMat = <meshStandardMaterial color={TRIM} roughness={0.7} />;
+
+        // Pick door side: maximum clearance from stair shaft to top-plate edge.
+        const distW = stairCx - topStair.w / 2 - top.x;
+        const distE = top.x + top.w - (stairCx + topStair.w / 2);
+        const distN = stairCz - topStair.h / 2 - top.y; // plot N = -y → -z in scene
+        const distS = top.y + top.h - (stairCz + topStair.h / 2);
+        const sides = [
+          { side: "S", d: distS },
+          { side: "N", d: distN },
+          { side: "E", d: distE },
+          { side: "W", d: distW },
+        ] as const;
+        const door = sides.reduce((a, b) => (b.d > a.d ? b : a)).side;
+
+        // Helper: a wall with a centered door cutout on the named side.
+        const wallWithDoor = (side: "N" | "S" | "E" | "W") => {
+          const isNS = side === "N" || side === "S";
+          const fullLen = isNS ? mw : md;
+          const segLen = (fullLen - doorW) / 2;
+          const lintelH = mh - doorH;
+          const z = side === "S" ? md / 2 : side === "N" ? -md / 2 : 0;
+          const x = side === "E" ? mw / 2 : side === "W" ? -mw / 2 : 0;
+          const a1 = -fullLen / 2 + segLen / 2;
+          const a2 = fullLen / 2 - segLen / 2;
+          return (
+            <>
+              {/* two flanking segments */}
+              <mesh position={isNS ? [a1, mh / 2, z] : [x, mh / 2, a1]} castShadow receiveShadow>
+                <boxGeometry args={isNS ? [segLen, mh, wallT] : [wallT, mh, segLen]} />{wallMat}
+              </mesh>
+              <mesh position={isNS ? [a2, mh / 2, z] : [x, mh / 2, a2]} castShadow receiveShadow>
+                <boxGeometry args={isNS ? [segLen, mh, wallT] : [wallT, mh, segLen]} />{wallMat}
+              </mesh>
+              {/* lintel */}
+              <mesh position={isNS ? [0, doorH + lintelH / 2, z] : [x, doorH + lintelH / 2, 0]} castShadow receiveShadow>
+                <boxGeometry args={isNS ? [doorW, lintelH, wallT] : [wallT, lintelH, doorW]} />{wallMat}
+              </mesh>
+            </>
+          );
+        };
+
+        // Solid wall on a side (no door).
+        const solidWall = (side: "N" | "S" | "E" | "W") => {
+          const isNS = side === "N" || side === "S";
+          const z = side === "S" ? md / 2 : side === "N" ? -md / 2 : 0;
+          const x = side === "E" ? mw / 2 : side === "W" ? -mw / 2 : 0;
+          return (
+            <mesh position={isNS ? [0, mh / 2, z] : [x, mh / 2, 0]} castShadow receiveShadow>
+              <boxGeometry args={isNS ? [mw, mh, wallT] : [wallT, mh, md]} />{wallMat}
+            </mesh>
+          );
+        };
+
+        const allSides: ("N" | "S" | "E" | "W")[] = ["N", "S", "E", "W"];
         return (
           <group position={[mx, 0.2, mz]}>
-            {/* Three solid walls + a door opening on the front (south side) */}
-            <mesh position={[0, mh / 2, -md / 2]} castShadow receiveShadow>
-              <boxGeometry args={[mw, mh, wallT]} />{wallMat}
+            {allSides.map((s) =>
+              s === door
+                ? <group key={s}>{wallWithDoor(s)}</group>
+                : <group key={s}>{solidWall(s)}</group>
+            )}
+            {/* Flat roof slab on top of the mumty */}
+            <mesh position={[0, mh + 0.1, 0]} castShadow receiveShadow>
+              <boxGeometry args={[mw + 0.3, 0.2, md + 0.3]} />{trimMat}
             </mesh>
-            <mesh position={[-mw / 2, mh / 2, 0]} castShadow receiveShadow>
-              <boxGeometry args={[wallT, mh, md]} />{wallMat}
-            </mesh>
-            <mesh position={[mw / 2, mh / 2, 0]} castShadow receiveShadow>
-              <boxGeometry args={[wallT, mh, md]} />{wallMat}
-            </mesh>
+          </group>
+        );
+      })()}
             {/* Front wall: two pieces flanking a door + lintel */}
             <mesh position={[-(mw / 2 + doorW / 2) / 2 - doorW / 4, mh / 2, md / 2]} castShadow receiveShadow>
               <boxGeometry args={[(mw - doorW) / 2, mh, wallT]} />{wallMat}
