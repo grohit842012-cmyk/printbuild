@@ -165,7 +165,7 @@ export interface Variation {
   entranceAngleDeg: number;
   vastuScore: number;
   vastuTier: "strict" | "mostly" | "partial";
-  roofType: "flat" | "domed" | "sloped";
+  roofType: "flat" | "sloped";
   elevationStyle: ElevationStyle;
   parking?: ParkingArea;
   paletteAccent: string;
