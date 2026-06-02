@@ -1102,7 +1102,7 @@ export function generateVariations(
     // is a room on the ground floor instead of a separate strip.
     const parking = stiltParking
       ? undefined
-      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, rng);
+      : computeParking(plates[0], spec.plot.widthFt, spec.plot.depthFt, entranceDir, spec.parking, rng);
 
     variations.push({
       id: `var-${seed}`,
