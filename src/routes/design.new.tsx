@@ -87,7 +87,7 @@ function NewDesignWizard() {
       ],
     ],
     curvature: "mixed",
-    roofStyle: "domed",
+    roofStyle: "flat",
     windowDensity: "medium",
     exteriorFeel: "Warm earthy palette, natural textures",
     staircaseType: "straight",
@@ -378,7 +378,6 @@ function NewDesignWizard() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="flat">Flat</SelectItem>
-                      <SelectItem value="domed">Domed</SelectItem>
                       <SelectItem value="sloped">Sloped</SelectItem>
                     </SelectContent>
                   </Select>

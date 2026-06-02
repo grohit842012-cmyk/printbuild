@@ -31,7 +31,7 @@ export interface DesignSpec {
   rooms: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[];
   roomsPerFloor?: { type: RoomType; count: number; sizePref: "small" | "medium" | "large" }[][];
   curvature: "gentle" | "bold" | "mixed";
-  roofStyle: "flat" | "domed" | "sloped";
+  roofStyle: "flat" | "sloped";
   windowDensity: "low" | "medium" | "high";
   exteriorFeel: string;
   // New: staircase, lift, parking choices
@@ -165,7 +165,7 @@ export interface Variation {
   entranceAngleDeg: number;
   vastuScore: number;
   vastuTier: "strict" | "mostly" | "partial";
-  roofType: "flat" | "domed" | "sloped";
+  roofType: "flat" | "sloped";
   elevationStyle: ElevationStyle;
   parking?: ParkingArea;
   paletteAccent: string;

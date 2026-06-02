@@ -1,4 +1,5 @@
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
+import { toast } from "sonner";
 import type { FloorPlate, Variation } from "@/lib/design-types";
 
 interface Props {
@@ -65,6 +66,7 @@ function swingArcPath(
 }
 
 export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed", kitchenOpen = false }: Props) {
+  const [edgeLabel, setEdgeLabel] = useState<{ side: "N" | "E" | "S" | "W" } | null>(null);
   const plate = variation.plates.find((p) => p.floor === floor);
   if (!plate) return null;
   const totalFloors = variation.plates.length;
@@ -124,6 +126,60 @@ export function FloorPlan2D({ variation, floor, size = 360, planMode = "closed",
         width={plotW * scale} height={plotD * scale}
         fill="none" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1"
       />
+
+      {/* Tap-to-identify direction zones — each edge of the plot is clickable */}
+      {(() => {
+        const pw = plotW * scale;
+        const ph = plotD * scale;
+        const band = 14;
+        const SIDE_LABEL: Record<"N" | "E" | "S" | "W", string> = {
+          N: "North", E: "East", S: "South", W: "West",
+        };
+        const showSide = (side: "N" | "E" | "S" | "W") => {
+          setEdgeLabel({ side });
+          toast.message(`${SIDE_LABEL[side]} side`, {
+            description: `This edge of the plot faces ${SIDE_LABEL[side].toLowerCase()}.`,
+          });
+        };
+        const zones: { side: "N" | "E" | "S" | "W"; x: number; y: number; w: number; h: number }[] = [
+          { side: "N", x: ox - band / 2, y: oy - band, w: pw + band, h: band },
+          { side: "S", x: ox - band / 2, y: oy + ph, w: pw + band, h: band },
+          { side: "W", x: ox - band, y: oy - band / 2, w: band, h: ph + band },
+          { side: "E", x: ox + pw, y: oy - band / 2, w: band, h: ph + band },
+        ];
+        return (
+          <g>
+            {zones.map((z) => (
+              <rect
+                key={z.side}
+                x={z.x} y={z.y} width={z.w} height={z.h}
+                fill={edgeLabel?.side === z.side ? "hsl(var(--primary) / 0.18)" : "transparent"}
+                stroke={edgeLabel?.side === z.side ? "hsl(var(--primary))" : "transparent"}
+                strokeWidth="1.5"
+                style={{ cursor: "pointer" }}
+                onClick={(e) => { e.stopPropagation(); showSide(z.side); }}
+                onTouchStart={(e) => { e.stopPropagation(); showSide(z.side); }}
+              >
+                <title>Tap to see direction ({SIDE_LABEL[z.side]})</title>
+              </rect>
+            ))}
+            {edgeLabel && (() => {
+              const pos = {
+                N: { x: ox + pw / 2, y: oy - 2, anchor: "middle" as const },
+                S: { x: ox + pw / 2, y: oy + ph + 12, anchor: "middle" as const },
+                W: { x: ox - 4, y: oy + ph / 2, anchor: "end" as const },
+                E: { x: ox + pw + 4, y: oy + ph / 2, anchor: "start" as const },
+              }[edgeLabel.side];
+              return (
+                <text x={pos.x} y={pos.y} textAnchor={pos.anchor}
+                  fontSize="11" fontWeight="700" fill="hsl(var(--primary))">
+                  {SIDE_LABEL[edgeLabel.side]}
+                </text>
+              );
+            })()}
+          </g>
+        );
+      })()}
 
       {/* Parking — only on the ground floor */}
       {floor === 1 && variation.parking && (() => {
