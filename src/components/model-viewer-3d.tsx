@@ -600,23 +600,6 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
           </group>
         );
       })()}
-            {/* Front wall: two pieces flanking a door + lintel */}
-            <mesh position={[-(mw / 2 + doorW / 2) / 2 - doorW / 4, mh / 2, md / 2]} castShadow receiveShadow>
-              <boxGeometry args={[(mw - doorW) / 2, mh, wallT]} />{wallMat}
-            </mesh>
-            <mesh position={[(mw / 2 + doorW / 2) / 2 + doorW / 4, mh / 2, md / 2]} castShadow receiveShadow>
-              <boxGeometry args={[(mw - doorW) / 2, mh, wallT]} />{wallMat}
-            </mesh>
-            <mesh position={[0, doorH + (mh - doorH) / 2, md / 2]} castShadow receiveShadow>
-              <boxGeometry args={[doorW, mh - doorH, wallT]} />{wallMat}
-            </mesh>
-            {/* Flat roof slab on top of the mumty */}
-            <mesh position={[0, mh + 0.1, 0]} castShadow receiveShadow>
-              <boxGeometry args={[mw + 0.3, 0.2, md + 0.3]} />{trimMat}
-            </mesh>
-          </group>
-        );
-      })()}
     </group>
   );
 }
