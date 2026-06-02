@@ -179,8 +179,39 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
       }
     }
   }
+
+  // ---- Parking feasibility (Rule Book v2.0) ----
+  const fp = parkingFootprint(spec.parking);
+  if (fp && spec.parking?.location === "inside" && !spec.stiltParking) {
+    // Parking must fit in the setback band beside the building (we use the
+    // front band by entrance, depth = SETBACK + a 5 ft clearance for door swing
+    // and turning). If the building consumes the full plot minus setbacks, the
+    // available band is just SETBACK ft deep — not enough for an 18 ft bay.
+    const wall = pickEntranceWall(spec.plot.facing);
+    const bandDepth = SETBACK; // setback strip between plate and plot edge
+    const bayDepth = wall === "N" || wall === "S" ? fp.h : fp.w;
+    const bayWidth = wall === "N" || wall === "S" ? fp.w : fp.h;
+    const bandWidth = wall === "N" || wall === "S" ? spec.plot.widthFt : spec.plot.depthFt;
+    if (bandDepth < bayDepth || bandWidth < bayWidth + 4) {
+      const label =
+        spec.parking!.count === 2
+          ? "2-car parking (20×18 ft)"
+          : spec.parking!.vehicle === "suv"
+            ? "SUV parking (11×20 ft)"
+            : "1-car parking (10×18 ft)";
+      issues.push({
+        floor: 0,
+        message:
+          `Plot can't fit ${label} inside without overlapping the house. ` +
+          `Try: enable stilt parking, move parking outside the plot, reduce to 1 car, ` +
+          `or enlarge the plot.`,
+      });
+    }
+  }
+
   return issues;
 }
+
 
 // ---------- Helpers ----------
 function pickEntranceWall(dir: Direction): "N" | "E" | "S" | "W" {
