@@ -25,8 +25,20 @@ function mulberry32(seed: number) {
   };
 }
 
-// Theme-aligned accents (navy → vibrant blue family — matches design tokens)
-const ACCENTS = ["#264e8a", "#2f5a99", "#3b6db8", "#4a7fc1", "#1e3a6e", "#5b8fd1"];
+// Distinct exterior accents — one per variation so every elevation reads
+// as its own house with its own face & colour, not a recoloured clone.
+const ACCENTS = [
+  "#264e8a", // deep navy
+  "#a83e1a", // terracotta
+  "#3b6db8", // azure
+  "#4f6b3a", // olive
+  "#7a3a5a", // plum
+  "#b07a3a", // amber
+  "#2f5a99", // ocean
+  "#5b3a2a", // cocoa
+  "#3a6b6b", // teal
+  "#8a4a3a", // brick
+];
 
 const ELEVATION_STYLES: ElevationStyle[] = [
   "modern-minimal",
@@ -36,6 +48,43 @@ const ELEVATION_STYLES: ElevationStyle[] = [
   "art-deco",
   "scandi-pitched",
 ];
+
+// ---------- Plan type catalogue (Rule Book v2.0 §Non-Box Geometry) ----------
+// The system picks the best plan shape given plot size, room count and
+// lifestyle. Each shape is realised in the existing FloorPlate via
+// cornerRadius + chamfer, since the room solver already honours both.
+export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "courtyard";
+
+/** Pick the plan family that fits the user's program & plot best. */
+export function pickPlanType(spec: DesignSpec): PlanType {
+  const area = spec.plot.widthFt * spec.plot.depthFt;
+  const aspect = Math.max(spec.plot.widthFt, spec.plot.depthFt) /
+    Math.max(1, Math.min(spec.plot.widthFt, spec.plot.depthFt));
+  const wantsCourtyard = spec.rooms.some((r) => r.type === "courtyard");
+  const bedrooms = spec.rooms
+    .filter((r) => r.type === "bedroom" || r.type === "master_bedroom")
+    .reduce((a, b) => a + b.count, 0);
+  if (wantsCourtyard && area >= 1800) return "courtyard";
+  if (area >= 2800 && bedrooms >= 4) return "u-shape";
+  if (area >= 1600 && aspect <= 1.4) return "l-shape";
+  if (aspect > 1.4) return "wide-box";
+  return "compact-box";
+}
+
+/** Pick the most space-efficient staircase given the available side band. */
+export function pickStaircase(
+  spec: DesignSpec,
+  sideWidthFt: number,
+): NonNullable<DesignSpec["staircaseType"]> {
+  if (spec.staircaseType) return spec.staircaseType;
+  // U-shape is the most compact for vertical travel and reads as a real
+  // residential stair. Use it when there's room. L when band is medium.
+  // Straight for narrow bands. Spiral only as a last resort (skipped if lift).
+  if (sideWidthFt >= 9) return "u-shape";
+  if (sideWidthFt >= 7) return "l-shape";
+  if (sideWidthFt >= 4.5) return "straight";
+  return spec.lift === "home" ? "straight" : "spiral";
+}
 
 const LABEL: Record<RoomType, string> = {
   living: "Living",
@@ -937,9 +986,22 @@ export function generateVariations(
     }
   }
 
-  const stairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
+  const baseStairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
   const withLift = spec.lift === "home";
   const stiltParking = !!spec.stiltParking && spec.floors >= 2;
+
+  // Estimate side band so the auto-picker can choose a stair shape that fits.
+  const usableW = spec.plot.widthFt - SETBACK * 2;
+  const usableD = spec.plot.depthFt - SETBACK * 2;
+  const longSide = Math.max(usableW, usableD);
+  const shortSide = Math.min(usableW, usableD);
+  const sideBand = (shortSide - HALLWAY_WIDTH) / 2;
+  const autoStair = pickStaircase(spec, sideBand);
+  const stairShape = spec.staircaseType ?? autoStair;
+  void baseStairShape;
+  void longSide;
+
+  const planType = pickPlanType(spec);
 
   // If stilt parking, ground floor is parking + stairs (+optional utility).
   if (stiltParking) {
@@ -952,9 +1014,13 @@ export function generateVariations(
     perFloor[0] = stilt;
   }
 
-  // Inject stair on every floor when multi-floor.
+  // Inject stair on every floor when multi-floor — EXCEPT the top floor for
+  // sloped/pitched roofs. There is no roof access on a pitched house, so no
+  // landing/mumty should appear up there.
   if (spec.floors > 1) {
+    const topFloor = spec.floors - 1;
     for (let f = 0; f < spec.floors; f++) {
+      if (spec.roofStyle === "sloped" && f === topFloor) continue;
       const has = perFloor[f].some((r) => r.type === "stairs");
       if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
     }
@@ -1007,6 +1073,10 @@ export function generateVariations(
     // stair rect with those same coordinates AND reflow any room on the same
     // side whose vertical span overlaps the stair, by shrinking that room to
     // the remaining vertical band (front-of-stair OR back-of-stair).
+    // For sloped roofs the topmost floor has no stair (no roof access), so
+    // limit the alignment pass to floors that actually contain a stair.
+    const lastStairFloor =
+      spec.roofStyle === "sloped" ? plates.length - 1 : plates.length;
     if (plates.length > 1) {
       const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
       if (groundStairs) {
@@ -1014,7 +1084,7 @@ export function generateVariations(
         const sy = groundStairs.y;
         const sw = groundStairs.w;
         const sh = groundStairs.h;
-        for (let f = 1; f < plates.length; f++) {
+        for (let f = 1; f < lastStairFloor; f++) {
           const rooms = plates[f].rooms;
           // Reflow rooms on the same vertical side as the stair (overlapping x)
           for (let i = 0; i < rooms.length; i++) {
@@ -1094,9 +1164,25 @@ export function generateVariations(
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
     const liveability = evaluateLiveability(plates, entranceDir);
 
-    // Pick a distinct elevation style per variation (cycles + jittered by rng)
-    const elevationStyle =
-      ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
+    // Every variation must read as its own house — unique facade style AND
+    // unique accent colour. Cycle both lists at coprime strides so 10
+    // variations get 10 distinct (style, colour) pairs.
+    const elevationStyle = ELEVATION_STYLES[i % ELEVATION_STYLES.length];
+    const accent = ACCENTS[i % ACCENTS.length];
+
+    // Apply plan-type silhouette via chamfer (existing 2D/3D both honour it).
+    // Vary the chamfer side per variation so each elevation has a different
+    // "face" — front wing, back wing, side notch — instead of identical boxes.
+    const sideAspect = Math.min(plates[0].w, plates[0].h);
+    const chamferFor: Record<PlanType, number> = {
+      "compact-box": 0,
+      "wide-box": Math.min(3, sideAspect * 0.08),
+      "l-shape": Math.min(7, sideAspect * 0.22),
+      "u-shape": Math.min(9, sideAspect * 0.3),
+      "courtyard": Math.min(5, sideAspect * 0.15),
+    };
+    const chamfer = chamferFor[planType] * (0.75 + rng() * 0.5);
+    for (const p of plates) p.chamfer = chamfer;
 
     // Parking lives inside the plot. When stilt-parking is enabled, parking
     // is a room on the ground floor instead of a separate strip.
@@ -1118,7 +1204,7 @@ export function generateVariations(
       roofType: spec.roofStyle,
       elevationStyle,
       parking,
-      paletteAccent: ACCENTS[i % ACCENTS.length],
+      paletteAccent: accent,
       liveability,
     });
   }
