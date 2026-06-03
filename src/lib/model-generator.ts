@@ -1016,7 +1016,8 @@ export function generateVariations(
   void baseStairShape;
   void longSide;
 
-  const planType = pickPlanType(spec);
+  const entranceDirEarly: Direction = vastu.entranceDirection ?? spec.plot.facing;
+  const planType = pickPlanType(spec, entranceDirEarly);
 
   // If stilt parking, ground floor is parking + stairs (+optional utility).
   if (stiltParking) {
