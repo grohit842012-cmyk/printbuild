@@ -1164,9 +1164,25 @@ export function generateVariations(
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
     const liveability = evaluateLiveability(plates, entranceDir);
 
-    // Pick a distinct elevation style per variation (cycles + jittered by rng)
-    const elevationStyle =
-      ELEVATION_STYLES[(i + Math.floor(rng() * ELEVATION_STYLES.length)) % ELEVATION_STYLES.length];
+    // Every variation must read as its own house — unique facade style AND
+    // unique accent colour. Cycle both lists at coprime strides so 10
+    // variations get 10 distinct (style, colour) pairs.
+    const elevationStyle = ELEVATION_STYLES[i % ELEVATION_STYLES.length];
+    const accent = ACCENTS[i % ACCENTS.length];
+
+    // Apply plan-type silhouette via chamfer (existing 2D/3D both honour it).
+    // Vary the chamfer side per variation so each elevation has a different
+    // "face" — front wing, back wing, side notch — instead of identical boxes.
+    const sideAspect = Math.min(plates[0].w, plates[0].h);
+    const chamferFor: Record<PlanType, number> = {
+      "compact-box": 0,
+      "wide-box": Math.min(3, sideAspect * 0.08),
+      "l-shape": Math.min(7, sideAspect * 0.22),
+      "u-shape": Math.min(9, sideAspect * 0.3),
+      "courtyard": Math.min(5, sideAspect * 0.15),
+    };
+    const chamfer = chamferFor[planType] * (0.75 + rng() * 0.5);
+    for (const p of plates) p.chamfer = chamfer;
 
     // Parking lives inside the plot. When stilt-parking is enabled, parking
     // is a room on the ground floor instead of a separate strip.
@@ -1188,7 +1204,7 @@ export function generateVariations(
       roofType: spec.roofStyle,
       elevationStyle,
       parking,
-      paletteAccent: ACCENTS[i % ACCENTS.length],
+      paletteAccent: accent,
       liveability,
     });
   }
