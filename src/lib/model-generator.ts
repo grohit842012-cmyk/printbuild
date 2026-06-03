@@ -55,8 +55,20 @@ const ELEVATION_STYLES: ElevationStyle[] = [
 // cornerRadius + chamfer, since the room solver already honours both.
 export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "courtyard";
 
-/** Pick the plan family that fits the user's program & plot best. */
-export function pickPlanType(spec: DesignSpec): PlanType {
+/** Pick the plan family that fits the user's program & plot best.
+ *
+ * Non-box shapes (L, U, courtyard) carve a notch out of the NE corner of the
+ * plate (that is how `FloorPlate.chamfer` is realised in 2D & 3D). The open
+ * arm of the L therefore points NE — and the entrance must read into that
+ * open arm for the silhouette to make architectural sense. So we only allow
+ * a non-box plan when the user's chosen entrance/facing direction is on the
+ * N, NE, or E side of the plot. For S/W/SW/SE/NW facings we fall back to a
+ * box plan so the entrance never lands on the closed back of the L.
+ */
+export function pickPlanType(
+  spec: DesignSpec,
+  entranceDir?: Direction,
+): PlanType {
   const area = spec.plot.widthFt * spec.plot.depthFt;
   const aspect = Math.max(spec.plot.widthFt, spec.plot.depthFt) /
     Math.max(1, Math.min(spec.plot.widthFt, spec.plot.depthFt));
@@ -64,9 +76,12 @@ export function pickPlanType(spec: DesignSpec): PlanType {
   const bedrooms = spec.rooms
     .filter((r) => r.type === "bedroom" || r.type === "master_bedroom")
     .reduce((a, b) => a + b.count, 0);
+  const dir = entranceDir ?? spec.plot.facing;
+  const notchAligned = dir === "N" || dir === "NE" || dir === "E";
+  // Courtyard is symmetric — allowed regardless of entrance side.
   if (wantsCourtyard && area >= 1800) return "courtyard";
-  if (area >= 2800 && bedrooms >= 4) return "u-shape";
-  if (area >= 1600 && aspect <= 1.4) return "l-shape";
+  if (notchAligned && area >= 2800 && bedrooms >= 4) return "u-shape";
+  if (notchAligned && area >= 1600 && aspect <= 1.4) return "l-shape";
   if (aspect > 1.4) return "wide-box";
   return "compact-box";
 }
@@ -1001,7 +1016,8 @@ export function generateVariations(
   void baseStairShape;
   void longSide;
 
-  const planType = pickPlanType(spec);
+  const entranceDirEarly: Direction = vastu.entranceDirection ?? spec.plot.facing;
+  const planType = pickPlanType(spec, entranceDirEarly);
 
   // If stilt parking, ground floor is parking + stairs (+optional utility).
   if (stiltParking) {
