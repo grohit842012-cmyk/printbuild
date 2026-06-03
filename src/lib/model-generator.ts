@@ -986,9 +986,22 @@ export function generateVariations(
     }
   }
 
-  const stairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
+  const baseStairShape: DesignSpec["staircaseType"] = spec.staircaseType ?? "straight";
   const withLift = spec.lift === "home";
   const stiltParking = !!spec.stiltParking && spec.floors >= 2;
+
+  // Estimate side band so the auto-picker can choose a stair shape that fits.
+  const usableW = spec.plot.widthFt - SETBACK * 2;
+  const usableD = spec.plot.depthFt - SETBACK * 2;
+  const longSide = Math.max(usableW, usableD);
+  const shortSide = Math.min(usableW, usableD);
+  const sideBand = (shortSide - HALLWAY_WIDTH) / 2;
+  const autoStair = pickStaircase(spec, sideBand);
+  const stairShape = spec.staircaseType ?? autoStair;
+  void baseStairShape;
+  void longSide;
+
+  const planType = pickPlanType(spec);
 
   // If stilt parking, ground floor is parking + stairs (+optional utility).
   if (stiltParking) {
@@ -1001,9 +1014,13 @@ export function generateVariations(
     perFloor[0] = stilt;
   }
 
-  // Inject stair on every floor when multi-floor.
+  // Inject stair on every floor when multi-floor — EXCEPT the top floor for
+  // sloped/pitched roofs. There is no roof access on a pitched house, so no
+  // landing/mumty should appear up there.
   if (spec.floors > 1) {
+    const topFloor = spec.floors - 1;
     for (let f = 0; f < spec.floors; f++) {
+      if (spec.roofStyle === "sloped" && f === topFloor) continue;
       const has = perFloor[f].some((r) => r.type === "stairs");
       if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
     }
