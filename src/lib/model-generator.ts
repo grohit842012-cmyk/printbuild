@@ -1073,6 +1073,10 @@ export function generateVariations(
     // stair rect with those same coordinates AND reflow any room on the same
     // side whose vertical span overlaps the stair, by shrinking that room to
     // the remaining vertical band (front-of-stair OR back-of-stair).
+    // For sloped roofs the topmost floor has no stair (no roof access), so
+    // limit the alignment pass to floors that actually contain a stair.
+    const lastStairFloor =
+      spec.roofStyle === "sloped" ? plates.length - 1 : plates.length;
     if (plates.length > 1) {
       const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
       if (groundStairs) {
@@ -1080,7 +1084,7 @@ export function generateVariations(
         const sy = groundStairs.y;
         const sw = groundStairs.w;
         const sh = groundStairs.h;
-        for (let f = 1; f < plates.length; f++) {
+        for (let f = 1; f < lastStairFloor; f++) {
           const rooms = plates[f].rooms;
           // Reflow rooms on the same vertical side as the stair (overlapping x)
           for (let i = 0; i < rooms.length; i++) {
