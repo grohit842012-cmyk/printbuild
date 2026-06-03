@@ -25,8 +25,20 @@ function mulberry32(seed: number) {
   };
 }
 
-// Theme-aligned accents (navy → vibrant blue family — matches design tokens)
-const ACCENTS = ["#264e8a", "#2f5a99", "#3b6db8", "#4a7fc1", "#1e3a6e", "#5b8fd1"];
+// Distinct exterior accents — one per variation so every elevation reads
+// as its own house with its own face & colour, not a recoloured clone.
+const ACCENTS = [
+  "#264e8a", // deep navy
+  "#a83e1a", // terracotta
+  "#3b6db8", // azure
+  "#4f6b3a", // olive
+  "#7a3a5a", // plum
+  "#b07a3a", // amber
+  "#2f5a99", // ocean
+  "#5b3a2a", // cocoa
+  "#3a6b6b", // teal
+  "#8a4a3a", // brick
+];
 
 const ELEVATION_STYLES: ElevationStyle[] = [
   "modern-minimal",
@@ -36,6 +48,43 @@ const ELEVATION_STYLES: ElevationStyle[] = [
   "art-deco",
   "scandi-pitched",
 ];
+
+// ---------- Plan type catalogue (Rule Book v2.0 §Non-Box Geometry) ----------
+// The system picks the best plan shape given plot size, room count and
+// lifestyle. Each shape is realised in the existing FloorPlate via
+// cornerRadius + chamfer, since the room solver already honours both.
+export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "courtyard";
+
+/** Pick the plan family that fits the user's program & plot best. */
+export function pickPlanType(spec: DesignSpec): PlanType {
+  const area = spec.plot.widthFt * spec.plot.depthFt;
+  const aspect = Math.max(spec.plot.widthFt, spec.plot.depthFt) /
+    Math.max(1, Math.min(spec.plot.widthFt, spec.plot.depthFt));
+  const wantsCourtyard = spec.rooms.some((r) => r.type === "courtyard");
+  const bedrooms = spec.rooms
+    .filter((r) => r.type === "bedroom" || r.type === "master_bedroom")
+    .reduce((a, b) => a + b.count, 0);
+  if (wantsCourtyard && area >= 1800) return "courtyard";
+  if (area >= 2800 && bedrooms >= 4) return "u-shape";
+  if (area >= 1600 && aspect <= 1.4) return "l-shape";
+  if (aspect > 1.4) return "wide-box";
+  return "compact-box";
+}
+
+/** Pick the most space-efficient staircase given the available side band. */
+export function pickStaircase(
+  spec: DesignSpec,
+  sideWidthFt: number,
+): NonNullable<DesignSpec["staircaseType"]> {
+  if (spec.staircaseType) return spec.staircaseType;
+  // U-shape is the most compact for vertical travel and reads as a real
+  // residential stair. Use it when there's room. L when band is medium.
+  // Straight for narrow bands. Spiral only as a last resort (skipped if lift).
+  if (sideWidthFt >= 9) return "u-shape";
+  if (sideWidthFt >= 7) return "l-shape";
+  if (sideWidthFt >= 4.5) return "straight";
+  return spec.lift === "home" ? "straight" : "spiral";
+}
 
 const LABEL: Record<RoomType, string> = {
   living: "Living",
