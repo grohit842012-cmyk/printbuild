@@ -540,6 +540,7 @@ function buildPlate(
   stairSide: HallSide,
   stairShape: DesignSpec["staircaseType"],
   withLift: boolean,
+  liftSize: { w: number; h: number },
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
