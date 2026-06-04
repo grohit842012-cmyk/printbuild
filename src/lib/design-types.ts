@@ -46,6 +46,7 @@ export interface DesignSpec {
     count: 0 | 1 | 2;
     vehicle: "car" | "suv";
     location: "inside" | "outside";
+    bikes?: 0 | 1 | 2 | 3 | 4;
   };
   // Open plan = only bedrooms/baths/pooja/utility/stairs/lift get walls.
   // Closed plan = every room is walled.
