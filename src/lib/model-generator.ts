@@ -909,13 +909,37 @@ function computeParking(
   parkingSpec: DesignSpec["parking"] | undefined,
   rng: () => number,
 ): ParkingArea | undefined {
+  const bikeCount = parkingSpec?.bikes ?? 0;
   const fp = parkingFootprint(parkingSpec);
-  if (!fp || parkingSpec?.location === "outside") return undefined;
+  // Allow bike-only parking when no car bay was requested.
+  if ((!fp || parkingSpec?.location === "outside") && bikeCount === 0) return undefined;
 
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
-  const bays = parkingSpec!.count;
   const covered = rng() < 0.6;
+
+  // Bike strip is 3 ft wide × (count × 3) ft long, parked perpendicular to the wall.
+  const bikeStripLong = bikeCount * 3;
+  const bikeStripShort = 6;
+
+  // Bike-only case: no car footprint — drop a small strip in the setback.
+  if (!fp) {
+    const w = wall === "N" || wall === "S" ? bikeStripLong : bikeStripShort;
+    const h = wall === "N" || wall === "S" ? bikeStripShort : bikeStripLong;
+    let x = 0, y = 0;
+    if (wall === "N") { y = Math.max(0, ground.y - h); x = ground.x; }
+    else if (wall === "S") { y = ground.y + ground.h; x = ground.x; }
+    else if (wall === "E") { x = ground.x + ground.w; y = ground.y; }
+    else { x = Math.max(0, ground.x - w); y = ground.y; }
+    x = Math.max(0, Math.min(plotW - w, x));
+    y = Math.max(0, Math.min(plotD - h, y));
+    return {
+      x, y, w, h, bays: 0, covered: false,
+      bikeBays: { x, y, w, h, count: bikeCount },
+    };
+  }
+
+  const bays = parkingSpec!.count;
 
   // Bay orientation: along N/S walls, vehicle nose points N–S (depth = h on plot).
   // On E/W walls, vehicle nose points E–W (depth runs along x).
@@ -969,7 +993,30 @@ function computeParking(
     y < ground.y + ground.h;
   if (overlaps) return undefined;
 
-  return { x, y, w, h, bays, covered };
+  // Tuck bike bays alongside the car bay, on the side away from the entrance door.
+  let bikeBays: ParkingArea["bikeBays"] | undefined;
+  if (bikeCount > 0) {
+    const alongX = wall === "N" || wall === "S";
+    const bw = alongX ? bikeStripLong : bikeStripShort;
+    const bh = alongX ? bikeStripShort : bikeStripLong;
+    // Place adjacent to the car bay, opposite side from entrance door.
+    const doorMid = door
+      ? (alongX ? (door.x1 + door.x2) / 2 : (door.y1 + door.y2) / 2)
+      : alongX ? plotW / 2 : plotD / 2;
+    const bayMid = alongX ? x + w / 2 : y + h / 2;
+    const farFromDoor = bayMid > doorMid ? 1 : -1;
+    let bx = x, by = y;
+    if (alongX) bx = x + (farFromDoor > 0 ? w + 1 : -bw - 1);
+    else by = y + (farFromDoor > 0 ? h + 1 : -bh - 1);
+    bx = Math.max(0, Math.min(plotW - bw, bx));
+    by = Math.max(0, Math.min(plotD - bh, by));
+    const bikeOverlap =
+      bx + bw > ground.x && bx < ground.x + ground.w &&
+      by + bh > ground.y && by < ground.y + ground.h;
+    if (!bikeOverlap) bikeBays = { x: bx, y: by, w: bw, h: bh, count: bikeCount };
+  }
+
+  return { x, y, w, h, bays, covered, bikeBays };
 }
 
 

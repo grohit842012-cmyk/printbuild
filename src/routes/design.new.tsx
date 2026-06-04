@@ -94,7 +94,7 @@ function NewDesignWizard() {
     lift: "none",
     stiltParking: false,
     stiltUtilityRoom: false,
-    parking: { count: 1, vehicle: "car", location: "inside" },
+    parking: { count: 1, vehicle: "car", location: "inside", bikes: 0 },
     planMode: "closed",
     kitchenOpen: false,
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
@@ -496,7 +496,7 @@ function NewDesignWizard() {
                     <RadioGroupItem value="none" /> No lift
                   </label>
                   <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
-                    <RadioGroupItem value="home" /> Add home lift (4×4 ft, beside stairs)
+                    <RadioGroupItem value="home" /> Add a lift (auto-sized to your family)
                   </label>
                 </RadioGroup>
               </div>
@@ -596,8 +596,33 @@ function NewDesignWizard() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <Select
+                    value={String(spec.parking?.bikes ?? 0)}
+                    onValueChange={(v) =>
+                      setSpec({
+                        ...spec,
+                        parking: {
+                          count: spec.parking?.count ?? 1,
+                          vehicle: spec.parking?.vehicle ?? "car",
+                          location: spec.parking?.location ?? "inside",
+                          bikes: Number(v) as 0 | 1 | 2 | 3 | 4,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger><SelectValue placeholder="Bikes" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No bikes</SelectItem>
+                      <SelectItem value="1">1 bike (3×6 ft)</SelectItem>
+                      <SelectItem value="2">2 bikes</SelectItem>
+                      <SelectItem value="3">3 bikes</SelectItem>
+                      <SelectItem value="4">4 bikes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  We check the parking bay fits in the setback band before generating. If not, you&apos;ll be asked to move it outside, reduce to 1 car, enable stilt, or enlarge the plot.
+                  We check the parking bay fits in the setback band before generating. If not, you&apos;ll be asked to move it outside, reduce to 1 car, enable stilt, or enlarge the plot. Bikes are tucked beside the car bay.
                 </p>
               </div>
 
