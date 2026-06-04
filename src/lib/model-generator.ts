@@ -568,8 +568,8 @@ function buildPlate(
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
-  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift);
-  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift);
+  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
+  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
   const localRooms = [...leftLayout.rooms, ...rightLayout.rooms];
 
   // Rotate / mirror local coords to match entranceWall.
