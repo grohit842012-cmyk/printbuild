@@ -743,27 +743,81 @@ function Plot({ variation }: { variation: Variation }) {
 function ParkingArea({ variation }: { variation: Variation }) {
   if (!variation.parking) return null;
   const p = variation.parking;
-  const cx = p.x + p.w / 2;
-  const cz = p.y + p.h / 2;
   const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
-  const [sx, sz] = toScene(cx, cz);
+
   return (
-    <group position={[sx, 0.02, sz]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[p.w * FT_TO_M, p.h * FT_TO_M]} />
-        <meshStandardMaterial color="#f7c873" roughness={0.85} />
-      </mesh>
-      {/* Bay stripes */}
-      {Array.from({ length: Math.max(1, p.bays - 1) }).map((_, i) => (
-        <mesh key={i} position={[((i + 1) / p.bays - 0.5) * p.w * FT_TO_M, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.1, p.h * FT_TO_M * 0.9]} />
-          <meshStandardMaterial color="#fff" />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.4, 0]} castShadow>
-        <boxGeometry args={[p.w * FT_TO_M * 0.45, 0.6, p.h * FT_TO_M * 0.3]} />
-        <meshStandardMaterial color="#1e3a6e" roughness={0.5} metalness={0.3} />
-      </mesh>
+    <group>
+      {p.bays > 0 && (() => {
+        const cx = p.x + p.w / 2;
+        const cz = p.y + p.h / 2;
+        const [sx, sz] = toScene(cx, cz);
+        return (
+          <group position={[sx, 0.02, sz]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[p.w * FT_TO_M, p.h * FT_TO_M]} />
+              <meshStandardMaterial color="#f7c873" roughness={0.85} />
+            </mesh>
+            {Array.from({ length: Math.max(1, p.bays - 1) }).map((_, i) => (
+              <mesh key={i} position={[((i + 1) / p.bays - 0.5) * p.w * FT_TO_M, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[0.1, p.h * FT_TO_M * 0.9]} />
+                <meshStandardMaterial color="#fff" />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.4, 0]} castShadow>
+              <boxGeometry args={[p.w * FT_TO_M * 0.45, 0.6, p.h * FT_TO_M * 0.3]} />
+              <meshStandardMaterial color="#1e3a6e" roughness={0.5} metalness={0.3} />
+            </mesh>
+          </group>
+        );
+      })()}
+      {p.bikeBays && p.bikeBays.count > 0 && (() => {
+        const b = p.bikeBays;
+        const cx = b.x + b.w / 2;
+        const cz = b.y + b.h / 2;
+        const [sx, sz] = toScene(cx, cz);
+        const alongX = b.w >= b.h;
+        return (
+          <group position={[sx, 0.02, sz]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+              <planeGeometry args={[b.w * FT_TO_M, b.h * FT_TO_M]} />
+              <meshStandardMaterial color="#d6b48a" roughness={0.9} />
+            </mesh>
+            {Array.from({ length: b.count }).map((_, i) => {
+              const t = (i + 0.5) / b.count - 0.5;
+              const ox = alongX ? t * b.w * FT_TO_M : 0;
+              const oz = alongX ? 0 : t * b.h * FT_TO_M;
+              return (
+                <group key={i} position={[ox, 0, oz]} rotation={[0, alongX ? 0 : Math.PI / 2, 0]}>
+                  {/* two wheels */}
+                  <mesh position={[0, 0.3, -0.6]} rotation={[0, 0, Math.PI / 2]} castShadow>
+                    <torusGeometry args={[0.3, 0.04, 8, 16]} />
+                    <meshStandardMaterial color="#111" roughness={0.6} />
+                  </mesh>
+                  <mesh position={[0, 0.3, 0.6]} rotation={[0, 0, Math.PI / 2]} castShadow>
+                    <torusGeometry args={[0.3, 0.04, 8, 16]} />
+                    <meshStandardMaterial color="#111" roughness={0.6} />
+                  </mesh>
+                  {/* frame */}
+                  <mesh position={[0, 0.45, 0]} castShadow>
+                    <boxGeometry args={[0.08, 0.08, 1.2]} />
+                    <meshStandardMaterial color="#b03a2e" roughness={0.45} metalness={0.4} />
+                  </mesh>
+                  {/* seat */}
+                  <mesh position={[0, 0.7, 0.35]} castShadow>
+                    <boxGeometry args={[0.1, 0.08, 0.25]} />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.7} />
+                  </mesh>
+                  {/* handlebar */}
+                  <mesh position={[0, 0.85, -0.55]} castShadow>
+                    <boxGeometry args={[0.5, 0.05, 0.05]} />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.7} />
+                  </mesh>
+                </group>
+              );
+            })}
+          </group>
+        );
+      })()}
     </group>
   );
 }
