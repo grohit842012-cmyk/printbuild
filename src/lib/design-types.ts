@@ -151,6 +151,8 @@ export interface ParkingArea {
   h: number;
   bays: number;
   covered: boolean;
+  // Optional bike bays placed alongside the car parking (or stand-alone)
+  bikeBays?: { x: number; y: number; w: number; h: number; count: number };
 }
 
 export interface Variation {
