@@ -601,6 +601,126 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   );
 }
 
+function LiftShaft({ variation }: { variation: Variation }) {
+  // Find the lift on the ground floor — it's aligned across all floors.
+  const ground = variation.plates[0];
+  const lift = ground.rooms.find((r) => r.type === "lift");
+  if (!lift) return null;
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
+  const cx = lift.x + lift.w / 2;
+  const cz = lift.y + lift.h / 2;
+  const [sx, sz] = toScene(cx, cz);
+
+  const cabW = lift.w * FT_TO_M;
+  const cabD = lift.h * FT_TO_M;
+  const floors = variation.plates.length;
+  const cabH = floors * FLOOR_HEIGHT * FT_TO_M;
+  // 1.5 ft mechanism band above the top floor housing the motor + counterweight.
+  const mechH = 1.5 * FT_TO_M;
+  const wallT = 0.08; // thin glazed wall
+
+  const doorH = 7 * FT_TO_M;
+  const doorW = Math.min(3 * FT_TO_M, Math.min(cabW, cabD) * 0.7);
+  // Door faces hallway → same side as the room's doorWall in plate coords.
+  // Plate +y is south = +z in scene; -y is north = -z; +x = +x.
+  const wall = lift.doorWall ?? "E";
+  const isNS = wall === "N" || wall === "S";
+  const doorAxisLen = isNS ? cabW : cabD;
+  const segLen = (doorAxisLen - doorW) / 2;
+
+  // Frame + glass material
+  const frame = <meshStandardMaterial color="#1f2937" roughness={0.4} metalness={0.6} />;
+  const glass = (
+    <meshPhysicalMaterial
+      color="#bcdcf2"
+      transmission={0.85}
+      opacity={0.35}
+      transparent
+      roughness={0.05}
+      thickness={0.05}
+      metalness={0.2}
+    />
+  );
+
+  // Render one shaft side: solid glass if no door on that wall, or two
+  // glass segments flanking a door opening with a frame lintel.
+  const renderSide = (side: "N" | "S" | "E" | "W") => {
+    const along = side === "N" || side === "S";
+    const fullLen = along ? cabW : cabD;
+    const pos = side === "S" ? cabD / 2 : side === "N" ? -cabD / 2
+      : side === "E" ? cabW / 2 : -cabW / 2;
+    const rotY = along ? 0 : Math.PI / 2;
+    const hasDoor = side === wall;
+    if (!hasDoor) {
+      // Solid glass pane (per-floor; we tile vertically so each floor reads as glazed)
+      return (
+        <group key={side} position={along ? [0, cabH / 2, pos] : [pos, cabH / 2, 0]} rotation={[0, rotY, 0]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[fullLen, cabH, wallT]} />
+            {glass}
+          </mesh>
+        </group>
+      );
+    }
+    // Per-floor: glass segments flanking the door + lintel above each floor's door.
+    return (
+      <group key={side} position={along ? [0, 0, pos] : [pos, 0, 0]} rotation={[0, rotY, 0]}>
+        {Array.from({ length: floors }).map((_, fi) => {
+          const baseY = fi * FLOOR_HEIGHT * FT_TO_M;
+          const lintelH = FLOOR_HEIGHT * FT_TO_M - doorH;
+          return (
+            <group key={fi} position={[0, baseY, 0]}>
+              {segLen > 0.02 && (
+                <>
+                  <mesh position={[-fullLen / 2 + segLen / 2, FLOOR_HEIGHT * FT_TO_M / 2, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[segLen, FLOOR_HEIGHT * FT_TO_M, wallT]} />
+                    {glass}
+                  </mesh>
+                  <mesh position={[fullLen / 2 - segLen / 2, FLOOR_HEIGHT * FT_TO_M / 2, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[segLen, FLOOR_HEIGHT * FT_TO_M, wallT]} />
+                    {glass}
+                  </mesh>
+                </>
+              )}
+              {/* lintel above door */}
+              <mesh position={[0, doorH + lintelH / 2, 0]} castShadow receiveShadow>
+                <boxGeometry args={[doorW, lintelH, wallT]} />
+                {frame}
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
+    );
+  };
+
+  return (
+    <group position={[sx, 0, sz]}>
+      {/* Shaft floor */}
+      <mesh position={[0, 0.02, 0]} receiveShadow>
+        <boxGeometry args={[cabW, 0.04, cabD]} />
+        <meshStandardMaterial color="#475569" roughness={0.6} />
+      </mesh>
+      {renderSide("N")}
+      {renderSide("S")}
+      {renderSide("E")}
+      {renderSide("W")}
+      {/* Corner frame posts */}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sxn, szn], i) => (
+        <mesh key={i} position={[sxn * (cabW / 2), cabH / 2, szn * (cabD / 2)]} castShadow>
+          <boxGeometry args={[0.12, cabH, 0.12]} />
+          {frame}
+        </mesh>
+      ))}
+      {/* Mechanism housing on top — solid box, slightly larger than cab. */}
+      <mesh position={[0, cabH + mechH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[cabW + 0.25, mechH, cabD + 0.25]} />
+        <meshStandardMaterial color="#3f4654" roughness={0.7} metalness={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
 function Plot({ variation }: { variation: Variation }) {
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
