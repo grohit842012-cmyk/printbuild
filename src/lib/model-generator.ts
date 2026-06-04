@@ -425,6 +425,14 @@ function planFloor(
  *   y=0 is the front of the building
  *   "depth" is along the hallway direction (front → back)
  */
+/** Lift cab sized to occupancy. 2–3 ppl → 4×4, 4–5 → 5×5, 6+ → 6×6.
+ *  Plus a 1.5 ft mechanism band rendered in 3D around/above the shaft. */
+export function liftDims(familySize: number): { w: number; h: number } {
+  if (familySize >= 6) return { w: 6, h: 6 };
+  if (familySize >= 4) return { w: 5, h: 5 };
+  return { w: 4, h: 4 };
+}
+
 function layoutSide(
   zones: PlacedZone[],
   sideWidth: number,
@@ -436,6 +444,7 @@ function layoutSide(
   stairY: number | undefined,
   stairShape: DesignSpec["staircaseType"],
   withLift: boolean,
+  liftSize: { w: number; h: number },
 ): { rooms: RoomRect[] } {
   if (zones.length === 0) return { rooms: [] };
 
