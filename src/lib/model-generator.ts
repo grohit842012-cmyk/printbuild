@@ -1090,6 +1090,7 @@ export function generateVariations(
           stairSide,
           stairShape,
           withLift && spec.floors > 1,
+          liftDims(spec.lifestyle.familySize),
         ),
       );
     }
