@@ -487,38 +487,38 @@ function layoutSide(
 
     const doorWall: "N" | "E" | "S" | "W" = startWall === "left" ? "E" : "W";
 
-    if (z.type === "stairs") {
-      // No lift: stair fills the entire side band (no outer gap).
-      // With lift: stair takes its core size and lift fills the rest of the band.
+      // Lift sits BETWEEN hallway and stair so its door opens onto the
+      // hallway directly — never blocked by the staircase shaft.
+      const liftW = withLift ? Math.min(liftSize.w, sideWidth - 1) : 0;
+      const liftGap = withLift ? 0.5 : 0;
       const stairW = withLift
-        ? Math.min(sDims.w, sideWidth - MIN_ROOM_DIMS.lift.w - 0.5)
+        ? Math.max(MIN_ROOM_DIMS.stairs.w, sideWidth - liftW - liftGap)
         : sideWidth;
-      const stairX = startWall === "left"
-        ? hallwayX - stairW
-        : hallwayX + hallwayW + (withLift ? 0 : 0);
-      rooms.push({
-        type: "stairs", x: stairX, y, w: stairW, h: depth,
-        floor: floorIndex, label: LABEL.stairs, doorWall, doorMid: depth / 2,
-      });
-      if (withLift) {
-        const liftW = MIN_ROOM_DIMS.lift.w;
-        const liftH = Math.min(MIN_ROOM_DIMS.lift.h, depth);
-        const liftX = startWall === "left" ? stairX - liftW - 0.5 : stairX + stairW + 0.5;
-        // Clamp lift inside the side band
-        const minX = startWall === "left" ? hallwayX - sideWidth : hallwayX + hallwayW;
-        const maxX = startWall === "left" ? hallwayX - liftW : hallwayX + hallwayW + sideWidth - liftW;
-        const lx = Math.max(minX, Math.min(maxX, liftX));
+
+      if (z.type === "stairs") {
+        const stairX = startWall === "left"
+          ? hallwayX - liftW - liftGap - stairW
+          : hallwayX + hallwayW + liftW + liftGap;
         rooms.push({
-          type: "lift", x: lx, y, w: liftW, h: liftH,
-          floor: floorIndex, label: LABEL.lift, doorWall, doorMid: liftH / 2,
+          type: "stairs", x: stairX, y, w: stairW, h: depth,
+          floor: floorIndex, label: LABEL.stairs, doorWall, doorMid: depth / 2,
+        });
+        if (withLift) {
+          const liftH = Math.min(liftSize.h, depth);
+          const liftX = startWall === "left"
+            ? hallwayX - liftW
+            : hallwayX + hallwayW;
+          rooms.push({
+            type: "lift", x: liftX, y, w: liftW, h: liftH,
+            floor: floorIndex, label: LABEL.lift, doorWall, doorMid: liftH / 2,
+          });
+        }
+      } else {
+        rooms.push({
+          type: z.type, x, y, w: width, h: depth,
+          floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
         });
       }
-    } else {
-      rooms.push({
-        type: z.type, x, y, w: width, h: depth,
-        floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
-      });
-    }
 
     cursorY += depth;
   }
