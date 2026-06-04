@@ -684,8 +684,49 @@ function LiftShaft({ variation }: { variation: Variation }) {
               )}
               {/* lintel above door */}
               <mesh position={[0, doorH + lintelH / 2, 0]} castShadow receiveShadow>
-                <boxGeometry args={[doorW, lintelH, wallT]} />
+                <boxGeometry args={[doorW + 0.18, lintelH, wallT]} />
                 {frame}
+              </mesh>
+              {/* polished door frame surround (slightly proud) */}
+              <mesh position={[-doorW / 2 - 0.04, doorH / 2, wallT * 0.6]} castShadow>
+                <boxGeometry args={[0.08, doorH, wallT * 1.2]} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.85} />
+              </mesh>
+              <mesh position={[doorW / 2 + 0.04, doorH / 2, wallT * 0.6]} castShadow>
+                <boxGeometry args={[0.08, doorH, wallT * 1.2]} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.85} />
+              </mesh>
+              <mesh position={[0, doorH + 0.04, wallT * 0.6]} castShadow>
+                <boxGeometry args={[doorW + 0.16, 0.08, wallT * 1.2]} />
+                <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.85} />
+              </mesh>
+              {/* two brushed-steel sliding door leaves with a thin centre seam */}
+              <mesh position={[-doorW / 4 - 0.005, doorH / 2, wallT * 0.55]} castShadow receiveShadow>
+                <boxGeometry args={[doorW / 2 - 0.01, doorH - 0.04, wallT * 0.45]} />
+                <meshStandardMaterial color="#9aa3ad" roughness={0.35} metalness={0.85} />
+              </mesh>
+              <mesh position={[doorW / 4 + 0.005, doorH / 2, wallT * 0.55]} castShadow receiveShadow>
+                <boxGeometry args={[doorW / 2 - 0.01, doorH - 0.04, wallT * 0.45]} />
+                <meshStandardMaterial color="#9aa3ad" roughness={0.35} metalness={0.85} />
+              </mesh>
+              {/* threshold strip at floor */}
+              <mesh position={[0, 0.02, wallT * 0.6]} castShadow>
+                <boxGeometry args={[doorW + 0.1, 0.04, wallT * 1.3]} />
+                <meshStandardMaterial color="#475569" roughness={0.4} metalness={0.7} />
+              </mesh>
+              {/* call panel beside the door + tiny indicator light */}
+              <mesh position={[doorW / 2 + 0.18, doorH * 0.55, wallT * 0.7]} castShadow>
+                <boxGeometry args={[0.12, 0.32, 0.02]} />
+                <meshStandardMaterial color="#1f2937" roughness={0.35} metalness={0.6} />
+              </mesh>
+              <mesh position={[doorW / 2 + 0.18, doorH * 0.7, wallT * 0.72]}>
+                <boxGeometry args={[0.05, 0.05, 0.015]} />
+                <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.8} />
+              </mesh>
+              {/* floor indicator above lintel */}
+              <mesh position={[0, doorH + lintelH * 0.6, wallT * 0.7]}>
+                <boxGeometry args={[0.45, 0.12, 0.02]} />
+                <meshStandardMaterial color="#0b1220" roughness={0.4} />
               </mesh>
             </group>
           );
