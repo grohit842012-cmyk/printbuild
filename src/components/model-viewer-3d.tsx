@@ -348,12 +348,8 @@ function RoomBlock({
           </group>
         );
       })()}
-      {room.type === "lift" && (
-        <mesh position={[0, h / 2, 0]} castShadow>
-          <boxGeometry args={[w * 0.9, h, d * 0.9]} />
-          <meshStandardMaterial color="#475569" roughness={0.4} metalness={0.4} />
-        </mesh>
-      )}
+      {/* Lift cab is rendered as a single full-height shaft by <LiftShaft/>
+          at the top level — nothing per-floor here. */}
       {room.type === "parking" && (
         <group>
           <mesh position={[0, 0.02, 0]} receiveShadow>
