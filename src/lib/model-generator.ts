@@ -909,8 +909,10 @@ function computeParking(
   parkingSpec: DesignSpec["parking"] | undefined,
   rng: () => number,
 ): ParkingArea | undefined {
+  const bikeCount = parkingSpec?.bikes ?? 0;
   const fp = parkingFootprint(parkingSpec);
-  if (!fp || parkingSpec?.location === "outside") return undefined;
+  // Allow bike-only parking when no car bay was requested.
+  if ((!fp || parkingSpec?.location === "outside") && bikeCount === 0) return undefined;
 
   const wall: "N" | "E" | "S" | "W" = pickEntranceWall(entranceDir);
   const door = ground.entranceDoor;
