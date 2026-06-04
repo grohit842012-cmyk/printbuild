@@ -94,7 +94,7 @@ function NewDesignWizard() {
     lift: "none",
     stiltParking: false,
     stiltUtilityRoom: false,
-    parking: { count: 1, vehicle: "car", location: "inside" },
+    parking: { count: 1, vehicle: "car", location: "inside", bikes: 0 },
     planMode: "closed",
     kitchenOpen: false,
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
