@@ -496,7 +496,7 @@ function NewDesignWizard() {
                     <RadioGroupItem value="none" /> No lift
                   </label>
                   <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
-                    <RadioGroupItem value="home" /> Add home lift (4×4 ft, beside stairs)
+                    <RadioGroupItem value="home" /> Add a lift (auto-sized to your family)
                   </label>
                 </RadioGroup>
               </div>
