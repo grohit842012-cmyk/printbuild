@@ -4,16 +4,14 @@ import type { Direction } from "@/lib/design-types";
 interface Props {
   widthFt: number;
   depthFt: number;
-  /** Which side faces East. Clicking an edge sets East to that side. */
   facing: Direction;
   onChange: (d: Direction) => void;
 }
 
 type Side = "N" | "E" | "S" | "W";
 
-// If East is on `eastSide`, derive the "facing" of each edge.
 const COMPASS: Record<Side, Record<Side, Direction>> = {
-  N: { N: "E", E: "S", S: "W", W: "N" }, // East = top edge
+  N: { N: "E", E: "S", S: "W", W: "N" },
   E: { N: "N", E: "E", S: "S", W: "W" },
   S: { N: "W", E: "N", S: "E", W: "S" },
   W: { N: "S", E: "W", S: "N", W: "E" },
@@ -28,71 +26,85 @@ function inferEast(facing: Direction): Side {
 
 export function PlotFacingPicker({ widthFt, depthFt, facing, onChange }: Props) {
   const eastSide: Side = useMemo(() => inferEast(facing), [facing]);
-  const W = 240;
-  const H = 240;
-  const pad = 40;
+
   const aspect = widthFt / depthFt;
-  const bw = aspect >= 1 ? W - pad * 2 : (H - pad * 2) * aspect;
-  const bh = aspect >= 1 ? (W - pad * 2) / aspect : H - pad * 2;
-  const x = (W - bw) / 2;
-  const y = (H - bh) / 2;
+  // Box sized within a 280x280 container, with 40px padding for labels
+  const containerSize = 280;
+  const pad = 44;
+  const inner = containerSize - pad * 2;
+  const bw = aspect >= 1 ? inner : inner * aspect;
+  const bh = aspect >= 1 ? inner / aspect : inner;
+  const left = (containerSize - bw) / 2;
+  const top = (containerSize - bh) / 2;
+  const hit = 36;
 
   const edgeFor = (s: Side): Direction => COMPASS[eastSide][s];
-
-  // Clicking edge `s` sets eastSide = s; stored facing is the front-edge (S) direction.
   const clickEast = (s: Side) => onChange(COMPASS[s].S);
 
-  const hit = 28; // tap target thickness in svg units
-
-  const edges: { side: Side; hit: { x: number; y: number; w: number; h: number }; line: { x1: number; y1: number; x2: number; y2: number } }[] = [
-    { side: "N", hit: { x: x - hit / 2, y: y - hit / 2, w: bw + hit, h: hit }, line: { x1: x, y1: y, x2: x + bw, y2: y } },
-    { side: "E", hit: { x: x + bw - hit / 2, y: y - hit / 2, w: hit, h: bh + hit }, line: { x1: x + bw, y1: y, x2: x + bw, y2: y + bh } },
-    { side: "S", hit: { x: x - hit / 2, y: y + bh - hit / 2, w: bw + hit, h: hit }, line: { x1: x, y1: y + bh, x2: x + bw, y2: y + bh } },
-    { side: "W", hit: { x: x - hit / 2, y: y - hit / 2, w: hit, h: bh + hit }, line: { x1: x, y1: y, x2: x, y2: y + bh } },
-  ];
+  const edgeStyle = (s: Side): React.CSSProperties => {
+    const isEast = s === eastSide;
+    const color = isEast ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)";
+    const thickness = isEast ? 6 : 3;
+    const common: React.CSSProperties = {
+      position: "absolute",
+      background: "transparent",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+      touchAction: "manipulation",
+    };
+    if (s === "N") return { ...common, left: left - hit / 2, top: top - hit / 2, width: bw + hit, height: hit, borderTop: `${thickness}px solid ${color}`, boxSizing: "border-box" };
+    if (s === "S") return { ...common, left: left - hit / 2, top: top + bh - hit / 2, width: bw + hit, height: hit, borderBottom: `${thickness}px solid ${color}`, boxSizing: "border-box" };
+    if (s === "E") return { ...common, left: left + bw - hit / 2, top: top - hit / 2, width: hit, height: bh + hit, borderRight: `${thickness}px solid ${color}`, boxSizing: "border-box" };
+    return { ...common, left: left - hit / 2, top: top - hit / 2, width: hit, height: bh + hit, borderLeft: `${thickness}px solid ${color}`, boxSizing: "border-box" };
+  };
 
   return (
     <div className="border border-border rounded-lg p-3 bg-card">
-      <p className="text-xs text-muted-foreground mb-2">
+      <p className="text-xs text-muted-foreground mb-3">
         Tap the edge of your plot that faces <strong>East</strong> (sunrise side). The other directions will be set automatically.
       </p>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="max-w-[280px] mx-auto block touch-manipulation select-none">
+      <div className="mx-auto relative" style={{ width: containerSize, height: containerSize, maxWidth: "100%" }}>
         {/* Plot fill */}
-        <rect x={x} y={y} width={bw} height={bh} fill="hsl(var(--secondary))" stroke="hsl(var(--border))" strokeWidth={1} pointerEvents="none" />
-
-        {/* Edge tap zones + visible strokes */}
-        {edges.map((e) => {
-          const isEast = e.side === eastSide;
-          return (
-            <g key={e.side} style={{ cursor: "pointer" }} onClick={() => clickEast(e.side)} onTouchStart={() => clickEast(e.side)}>
-              <rect {...e.hit} fill="transparent" />
-              <line
-                {...e.line}
-                stroke={isEast ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
-                strokeWidth={isEast ? 6 : 3}
-                strokeLinecap="round"
-              />
-            </g>
-          );
-        })}
-
-        {/* Edge labels */}
-        <text x={W / 2} y={y - 14} textAnchor="middle" fontSize="12" fontWeight="700" fill="hsl(var(--foreground))" pointerEvents="none">
+        <div
+          style={{
+            position: "absolute",
+            left,
+            top,
+            width: bw,
+            height: bh,
+            background: "hsl(var(--secondary))",
+            pointerEvents: "none",
+          }}
+        />
+        {/* Center label */}
+        <div
+          style={{ position: "absolute", left, top, width: bw, height: bh, pointerEvents: "none" }}
+          className="flex flex-col items-center justify-center text-muted-foreground"
+        >
+          <span className="text-[10px]">Your plot</span>
+          <span className="text-[10px]">{widthFt}′ × {depthFt}′</span>
+        </div>
+        {/* Edge buttons */}
+        {(["N", "E", "S", "W"] as Side[]).map((s) => (
+          <button key={s} type="button" aria-label={`Set ${s} edge as East`} style={edgeStyle(s)} onClick={() => clickEast(s)} />
+        ))}
+        {/* Edge direction labels */}
+        <div style={{ position: "absolute", left: 0, right: 0, top: top - 28, textAlign: "center", pointerEvents: "none" }} className="text-sm font-bold text-foreground">
           {edgeFor("N")}
-        </text>
-        <text x={x + bw + 16} y={H / 2 + 4} textAnchor="start" fontSize="12" fontWeight="700" fill="hsl(var(--foreground))" pointerEvents="none">
-          {edgeFor("E")}
-        </text>
-        <text x={W / 2} y={y + bh + 22} textAnchor="middle" fontSize="12" fontWeight="700" fill="hsl(var(--foreground))" pointerEvents="none">
+        </div>
+        <div style={{ position: "absolute", left: 0, right: 0, top: top + bh + 10, textAlign: "center", pointerEvents: "none" }} className="text-sm font-bold text-foreground">
           {edgeFor("S")}
-        </text>
-        <text x={x - 16} y={H / 2 + 4} textAnchor="end" fontSize="12" fontWeight="700" fill="hsl(var(--foreground))" pointerEvents="none">
+        </div>
+        <div style={{ position: "absolute", left: left + bw + 10, top: top + bh / 2 - 10, pointerEvents: "none" }} className="text-sm font-bold text-foreground">
+          {edgeFor("E")}
+        </div>
+        <div style={{ position: "absolute", right: containerSize - left + 10, top: top + bh / 2 - 10, pointerEvents: "none" }} className="text-sm font-bold text-foreground">
           {edgeFor("W")}
-        </text>
-        <text x={W / 2} y={H / 2 - 4} textAnchor="middle" fontSize="10" fill="hsl(var(--muted-foreground))" pointerEvents="none">Your plot</text>
-        <text x={W / 2} y={H / 2 + 10} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))" pointerEvents="none">{widthFt}′ × {depthFt}′</text>
-      </svg>
-      <p className="text-[11px] text-center text-muted-foreground mt-1">
+        </div>
+      </div>
+      <p className="text-[11px] text-center text-muted-foreground mt-2">
         Front faces <strong>{edgeFor("S")}</strong> · East side highlighted
       </p>
     </div>
