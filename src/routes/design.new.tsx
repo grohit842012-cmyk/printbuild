@@ -211,8 +211,10 @@ function NewDesignWizard() {
                     setVastu((vp) => ({ ...vp, entranceDirection: facing }));
                   }}
                 />
+              </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
+
                 <div>
                   <Label>Width (ft)</Label>
                   <Input
