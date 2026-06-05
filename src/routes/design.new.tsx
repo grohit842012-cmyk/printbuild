@@ -200,7 +200,21 @@ function NewDesignWizard() {
                 <Label>Design name</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
               </div>
+              <div>
+                <Label className="mb-2 block">Plot orientation</Label>
+                <PlotFacingPicker
+                  widthFt={spec.plot.widthFt}
+                  depthFt={spec.plot.depthFt}
+                  facing={spec.plot.facing}
+                  onChange={(facing) => {
+                    setSpec({ ...spec, plot: { ...spec.plot, facing } });
+                    setVastu((vp) => ({ ...vp, entranceDirection: facing }));
+                  }}
+                />
+              </div>
+
               <div className="grid sm:grid-cols-3 gap-4">
+
                 <div>
                   <Label>Width (ft)</Label>
                   <Input
