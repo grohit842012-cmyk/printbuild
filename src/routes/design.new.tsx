@@ -286,15 +286,6 @@ function NewDesignWizard() {
                   </Select>
                 </div>
               </div>
-              <PlotFacingPicker
-                widthFt={spec.plot.widthFt}
-                depthFt={spec.plot.depthFt}
-                facing={spec.plot.facing}
-                onChange={(facing) => {
-                  setSpec({ ...spec, plot: { ...spec.plot, facing } });
-                  setVastu((vp) => ({ ...vp, entranceDirection: facing }));
-                }}
-              />
             </>
           )}
 
