@@ -1078,14 +1078,16 @@ export function generateVariations(
 
   // If stilt parking, ground floor is parking + stairs (+optional utility).
   if (stiltParking) {
+    // One open parking bay (no internal partition between cars) + stairs.
+    // The bay sizes itself to fit 1 or 2 cars from spec.parking?.count.
     const stilt: FlatRoom[] = [
-      { type: "parking", sizePref: "medium" },
-      { type: "parking", sizePref: "medium" },
+      { type: "parking", sizePref: "large" },
       { type: "stairs", sizePref: "medium" },
     ];
     if (spec.stiltUtilityRoom) stilt.push({ type: "utility", sizePref: "small" });
     perFloor[0] = stilt;
   }
+
 
   // Inject stair on every floor when multi-floor — EXCEPT the top floor for
   // sloped/pitched roofs. There is no roof access on a pitched house, so no
