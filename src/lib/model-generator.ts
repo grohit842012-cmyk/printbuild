@@ -214,7 +214,7 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
   if (fw < 22 || fh < 26) {
     issues.push({
       floor: 0,
-      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Rule Book v2.0 minimums need at least 28×32 ft.`,
+      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). PrintBuild needs at least 28×32 ft to fit small-tier rooms with circulation.`,
     });
     return issues;
   }
