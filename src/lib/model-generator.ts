@@ -117,40 +117,47 @@ const LABEL: Record<RoomType, string> = {
   parking: "Parking",
 };
 
-// ---------- Architectural minimum dimensions (ft) ----------
-// Sourced from Architectural Rule Book v2.0 (mandatory minimums).
-export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
-  living: { w: 14, h: 16 },
-  master_bedroom: { w: 13, h: 14 },
-  bedroom: { w: 11, h: 12 },
-  kitchen: { w: 9, h: 11 },
-  dining: { w: 10, h: 12 },
-  bath: { w: 6, h: 7 },
-  pooja: { w: 5, h: 6 },
-  study: { w: 8, h: 8 },
-  courtyard: { w: 8, h: 8 },
-  stairs: { w: 4, h: 8 },
-  lift: { w: 4, h: 4 },
-  utility: { w: 6, h: 7 },
-  parking: { w: 9, h: 18 },
+// ---------- Room size preferences (PrintBuild Room Size Preference Rule Book) ----------
+// Users select Small / Medium / Large per room. The generator targets the
+// selected dimensions and never shrinks a room below its selected category —
+// if it doesn't fit, the user is notified instead.
+export type SizePref = "small" | "medium" | "large";
+
+export const ROOM_DIMS_BY_PREF: Record<RoomType, Record<SizePref, { w: number; h: number }>> = {
+  // Living Room / Hall
+  living:         { small: { w: 10, h: 12 }, medium: { w: 12, h: 18 }, large: { w: 15, h: 20 } },
+  master_bedroom: { small: { w: 10, h: 12 }, medium: { w: 12, h: 14 }, large: { w: 14, h: 16 } },
+  bedroom:        { small: { w: 10, h: 10 }, medium: { w: 10, h: 12 }, large: { w: 12, h: 12 } },
+  kitchen:        { small: { w: 8,  h: 10 }, medium: { w: 10, h: 10 }, large: { w: 10, h: 12 } },
+  dining:         { small: { w: 10, h: 10 }, medium: { w: 10, h: 12 }, large: { w: 12, h: 14 } },
+  // Bath covers both common and attached bathrooms.
+  bath:           { small: { w: 5,  h: 7  }, medium: { w: 6,  h: 8  }, large: { w: 8,  h: 10 } },
+  // Pooja: never oversize on constrained plots.
+  pooja:          { small: { w: 3,  h: 4  }, medium: { w: 4,  h: 5  }, large: { w: 5,  h: 7  } },
+  study:          { small: { w: 8,  h: 10 }, medium: { w: 10, h: 10 }, large: { w: 10, h: 12 } },
+  utility:        { small: { w: 4,  h: 6  }, medium: { w: 6,  h: 8  }, large: { w: 8,  h: 10 } },
+  courtyard:      { small: { w: 8,  h: 8  }, medium: { w: 10, h: 10 }, large: { w: 12, h: 12 } },
+  // Circulation — sized by staircase shape elsewhere; these are the floor.
+  stairs:         { small: { w: 4,  h: 8  }, medium: { w: 4.5,h: 9  }, large: { w: 5,  h: 10 } },
+  lift:           { small: { w: 4,  h: 4  }, medium: { w: 4,  h: 4  }, large: { w: 4,  h: 4  } },
+  // Parking: Small = single car (10×18), Medium = large single car (10×20), Large = two cars (18×20).
+  parking:        { small: { w: 10, h: 18 }, medium: { w: 10, h: 20 }, large: { w: 18, h: 20 } },
 };
 
-// Preferred dimensions (Rule Book v2.0 "Preferred" tier).
-const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
-  living: { w: 16, h: 20 },
-  master_bedroom: { w: 14, h: 16 },
-  bedroom: { w: 12, h: 13 },
-  kitchen: { w: 10, h: 12 },
-  dining: { w: 12, h: 14 },
-  bath: { w: 7, h: 8 },
-  pooja: { w: 6, h: 8 },
-  study: { w: 9, h: 10 },
-  courtyard: { w: 10, h: 10 },
-  stairs: { w: 4.5, h: 9 },
-  lift: { w: 4, h: 4 },
-  utility: { w: 7, h: 8 },
-  parking: { w: 9, h: 18 },
-};
+/** Target dims for a room given its user-selected size preference. */
+export function dimsFor(type: RoomType, pref: SizePref): { w: number; h: number } {
+  return ROOM_DIMS_BY_PREF[type][pref];
+}
+
+/**
+ * Absolute floor for a room — the smallest acceptable footprint.
+ * Per the Room Size Preference Rule Book, we never shrink below the user's
+ * selected category. This map represents the "small" tier as the global floor
+ * for callers that don't know the user's pref (legacy parking/stair sizing).
+ */
+export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = Object.fromEntries(
+  (Object.keys(ROOM_DIMS_BY_PREF) as RoomType[]).map((t) => [t, ROOM_DIMS_BY_PREF[t].small]),
+) as Record<RoomType, { w: number; h: number }>;
 
 interface FlatRoom {
   type: RoomType;
