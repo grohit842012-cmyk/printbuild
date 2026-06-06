@@ -466,7 +466,7 @@ function layoutSide(
 
   const targets = orderedZones.map((z) => {
     if (z.type === "stairs") return sDims.h;
-    const pref = PREF_ROOM_DIMS[z.type];
+    const pref = dimsFor(z.type, z.sizePref);
     return Math.max(pref.w, pref.h);
   });
   const sumTarget = targets.reduce((a, b) => a + b, 0);
