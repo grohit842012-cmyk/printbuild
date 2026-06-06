@@ -224,7 +224,7 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
     const rooms = perFloor[f] ?? [];
     let needed = 0;
     for (const r of rooms) {
-      const m = MIN_ROOM_DIMS[r.type];
+      const m = dimsFor(r.type, r.sizePref);
       needed += m.w * m.h * r.count;
     }
     // hallway area estimate
@@ -233,19 +233,19 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
     if (needed > usable) {
       issues.push({
         floor: f + 1,
-        message: `Floor ${f + 1}: rooms need ${Math.ceil(needed)} sqft but plot only fits ${Math.floor(usable)} sqft after hallway.`,
+        message: `Floor ${f + 1}: rooms at selected sizes need ${Math.ceil(needed)} sqft but plot only fits ${Math.floor(usable)} sqft after hallway. Pick a smaller size for one or more rooms, drop a room, or use a larger plot.`,
       });
     }
     // Largest single room must fit between hallway and outer wall
     const sideZone = (fw - HALLWAY_WIDTH) / 2;
     for (const r of rooms) {
       if (r.count <= 0) continue;
-      const m = MIN_ROOM_DIMS[r.type];
+      const m = dimsFor(r.type, r.sizePref);
       const minSide = Math.min(m.w, m.h);
       if (minSide > sideZone) {
         issues.push({
           floor: f + 1,
-          message: `Floor ${f + 1}: ${LABEL[r.type]} needs ${minSide} ft but only ${Math.floor(sideZone)} ft available beside hallway.`,
+          message: `Floor ${f + 1}: ${LABEL[r.type]} (${r.sizePref}) needs ${minSide} ft but only ${Math.floor(sideZone)} ft available beside hallway. Pick a smaller size or widen the plot.`,
         });
       }
     }
