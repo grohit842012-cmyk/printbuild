@@ -342,7 +342,7 @@ function planFloor(
 
   // Sort: public items first, then private. Within each, larger area first.
   const sortKey = (r: FlatRoom) => {
-    const m = PREF_ROOM_DIMS[r.type];
+    const m = dimsFor(r.type, r.sizePref);
     return -(m.w * m.h);
   };
   const varyOrder = (a: FlatRoom, b: FlatRoom) => {
