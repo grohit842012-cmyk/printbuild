@@ -117,40 +117,47 @@ const LABEL: Record<RoomType, string> = {
   parking: "Parking",
 };
 
-// ---------- Architectural minimum dimensions (ft) ----------
-// Sourced from Architectural Rule Book v2.0 (mandatory minimums).
-export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
-  living: { w: 14, h: 16 },
-  master_bedroom: { w: 13, h: 14 },
-  bedroom: { w: 11, h: 12 },
-  kitchen: { w: 9, h: 11 },
-  dining: { w: 10, h: 12 },
-  bath: { w: 6, h: 7 },
-  pooja: { w: 5, h: 6 },
-  study: { w: 8, h: 8 },
-  courtyard: { w: 8, h: 8 },
-  stairs: { w: 4, h: 8 },
-  lift: { w: 4, h: 4 },
-  utility: { w: 6, h: 7 },
-  parking: { w: 9, h: 18 },
+// ---------- Room size preferences (PrintBuild Room Size Preference Rule Book) ----------
+// Users select Small / Medium / Large per room. The generator targets the
+// selected dimensions and never shrinks a room below its selected category —
+// if it doesn't fit, the user is notified instead.
+export type SizePref = "small" | "medium" | "large";
+
+export const ROOM_DIMS_BY_PREF: Record<RoomType, Record<SizePref, { w: number; h: number }>> = {
+  // Living Room / Hall
+  living:         { small: { w: 10, h: 12 }, medium: { w: 12, h: 18 }, large: { w: 15, h: 20 } },
+  master_bedroom: { small: { w: 10, h: 12 }, medium: { w: 12, h: 14 }, large: { w: 14, h: 16 } },
+  bedroom:        { small: { w: 10, h: 10 }, medium: { w: 10, h: 12 }, large: { w: 12, h: 12 } },
+  kitchen:        { small: { w: 8,  h: 10 }, medium: { w: 10, h: 10 }, large: { w: 10, h: 12 } },
+  dining:         { small: { w: 10, h: 10 }, medium: { w: 10, h: 12 }, large: { w: 12, h: 14 } },
+  // Bath covers both common and attached bathrooms.
+  bath:           { small: { w: 5,  h: 7  }, medium: { w: 6,  h: 8  }, large: { w: 8,  h: 10 } },
+  // Pooja: never oversize on constrained plots.
+  pooja:          { small: { w: 3,  h: 4  }, medium: { w: 4,  h: 5  }, large: { w: 5,  h: 7  } },
+  study:          { small: { w: 8,  h: 10 }, medium: { w: 10, h: 10 }, large: { w: 10, h: 12 } },
+  utility:        { small: { w: 4,  h: 6  }, medium: { w: 6,  h: 8  }, large: { w: 8,  h: 10 } },
+  courtyard:      { small: { w: 8,  h: 8  }, medium: { w: 10, h: 10 }, large: { w: 12, h: 12 } },
+  // Circulation — sized by staircase shape elsewhere; these are the floor.
+  stairs:         { small: { w: 4,  h: 8  }, medium: { w: 4.5,h: 9  }, large: { w: 5,  h: 10 } },
+  lift:           { small: { w: 4,  h: 4  }, medium: { w: 4,  h: 4  }, large: { w: 4,  h: 4  } },
+  // Parking: Small = single car (10×18), Medium = large single car (10×20), Large = two cars (18×20).
+  parking:        { small: { w: 10, h: 18 }, medium: { w: 10, h: 20 }, large: { w: 18, h: 20 } },
 };
 
-// Preferred dimensions (Rule Book v2.0 "Preferred" tier).
-const PREF_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = {
-  living: { w: 16, h: 20 },
-  master_bedroom: { w: 14, h: 16 },
-  bedroom: { w: 12, h: 13 },
-  kitchen: { w: 10, h: 12 },
-  dining: { w: 12, h: 14 },
-  bath: { w: 7, h: 8 },
-  pooja: { w: 6, h: 8 },
-  study: { w: 9, h: 10 },
-  courtyard: { w: 10, h: 10 },
-  stairs: { w: 4.5, h: 9 },
-  lift: { w: 4, h: 4 },
-  utility: { w: 7, h: 8 },
-  parking: { w: 9, h: 18 },
-};
+/** Target dims for a room given its user-selected size preference. */
+export function dimsFor(type: RoomType, pref: SizePref): { w: number; h: number } {
+  return ROOM_DIMS_BY_PREF[type][pref];
+}
+
+/**
+ * Absolute floor for a room — the smallest acceptable footprint.
+ * Per the Room Size Preference Rule Book, we never shrink below the user's
+ * selected category. This map represents the "small" tier as the global floor
+ * for callers that don't know the user's pref (legacy parking/stair sizing).
+ */
+export const MIN_ROOM_DIMS: Record<RoomType, { w: number; h: number }> = Object.fromEntries(
+  (Object.keys(ROOM_DIMS_BY_PREF) as RoomType[]).map((t) => [t, ROOM_DIMS_BY_PREF[t].small]),
+) as Record<RoomType, { w: number; h: number }>;
 
 interface FlatRoom {
   type: RoomType;
@@ -207,7 +214,7 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
   if (fw < 22 || fh < 26) {
     issues.push({
       floor: 0,
-      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). Rule Book v2.0 minimums need at least 28×32 ft.`,
+      message: `Plot is too small (${spec.plot.widthFt}×${spec.plot.depthFt} ft). PrintBuild needs at least 28×32 ft to fit small-tier rooms with circulation.`,
     });
     return issues;
   }
@@ -217,7 +224,7 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
     const rooms = perFloor[f] ?? [];
     let needed = 0;
     for (const r of rooms) {
-      const m = MIN_ROOM_DIMS[r.type];
+      const m = dimsFor(r.type, r.sizePref);
       needed += m.w * m.h * r.count;
     }
     // hallway area estimate
@@ -226,19 +233,19 @@ export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
     if (needed > usable) {
       issues.push({
         floor: f + 1,
-        message: `Floor ${f + 1}: rooms need ${Math.ceil(needed)} sqft but plot only fits ${Math.floor(usable)} sqft after hallway.`,
+        message: `Floor ${f + 1}: rooms at selected sizes need ${Math.ceil(needed)} sqft but plot only fits ${Math.floor(usable)} sqft after hallway. Pick a smaller size for one or more rooms, drop a room, or use a larger plot.`,
       });
     }
     // Largest single room must fit between hallway and outer wall
     const sideZone = (fw - HALLWAY_WIDTH) / 2;
     for (const r of rooms) {
       if (r.count <= 0) continue;
-      const m = MIN_ROOM_DIMS[r.type];
+      const m = dimsFor(r.type, r.sizePref);
       const minSide = Math.min(m.w, m.h);
       if (minSide > sideZone) {
         issues.push({
           floor: f + 1,
-          message: `Floor ${f + 1}: ${LABEL[r.type]} needs ${minSide} ft but only ${Math.floor(sideZone)} ft available beside hallway.`,
+          message: `Floor ${f + 1}: ${LABEL[r.type]} (${r.sizePref}) needs ${minSide} ft but only ${Math.floor(sideZone)} ft available beside hallway. Pick a smaller size or widen the plot.`,
         });
       }
     }
@@ -335,7 +342,7 @@ function planFloor(
 
   // Sort: public items first, then private. Within each, larger area first.
   const sortKey = (r: FlatRoom) => {
-    const m = PREF_ROOM_DIMS[r.type];
+    const m = dimsFor(r.type, r.sizePref);
     return -(m.w * m.h);
   };
   const varyOrder = (a: FlatRoom, b: FlatRoom) => {
@@ -459,7 +466,7 @@ function layoutSide(
 
   const targets = orderedZones.map((z) => {
     if (z.type === "stairs") return sDims.h;
-    const pref = PREF_ROOM_DIMS[z.type];
+    const pref = dimsFor(z.type, z.sizePref);
     return Math.max(pref.w, pref.h);
   });
   const sumTarget = targets.reduce((a, b) => a + b, 0);
