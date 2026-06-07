@@ -137,7 +137,7 @@ function Index() {
               { icon: Home, title: "Tell us about your home", desc: "Plot, floors, rooms, lifestyle and Vastu preferences in a guided form." },
               { icon: Sparkles, title: "Refine with AI", desc: "Our assistant asks smart follow-ups to capture exactly what you envision." },
               { icon: Box, title: "Explore 10 designs", desc: "Walk through ten parametric variations with curved walls and 2D plans." },
-              { icon: Compass, title: "Book & receive", desc: "Confirm your favourite — we fabricate the printable STL files for you." },
+              { icon: Compass, title: "Review & receive", desc: "Review your favourite design with experts — then we fabricate the printable STL files for you." },
             ].map((step, i) => (
               <div
                 key={i}
