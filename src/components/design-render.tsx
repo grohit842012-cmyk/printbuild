@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Variation } from "@/lib/design-types";
+import type { DesignSpec, Variation } from "@/lib/design-types";
 import { dnaToRenderPrompt, fallbackDnaFromVariation } from "@/lib/design-dna";
 import { Loader2, Sparkles, RefreshCw, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,7 @@ interface Props {
   designId: string;
   index: number;
   variation: Variation;
-  spec: {
-    plot: { widthFt: number; depthFt: number; facing: string; shape: string };
-    floors: number;
-    rooms: { type: string; count: number; sizePref: string }[];
-    lifestyle: { familySize: number; workFromHome: boolean; entertaining: boolean; notes: string };
-  };
+  spec: Pick<DesignSpec, "plot" | "floors" | "rooms" | "lifestyle">;
   // If true, render is generated on mount when missing. If false, user must
   // click a button to generate (used on gallery cards to save credits).
   autoGenerate?: boolean;

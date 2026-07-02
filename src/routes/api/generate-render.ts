@@ -11,7 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 // validate the caller's Supabase session bearer token before spending
 // credits.
 
-export const Route = createFileRoute("/api/public/generate-render")({
+export const Route = createFileRoute("/api/generate-render")({
   server: {
     handlers: {
       POST: async ({ request }) => {
