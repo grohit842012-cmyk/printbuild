@@ -155,6 +155,18 @@ export interface ParkingArea {
   bikeBays?: { x: number; y: number; w: number; h: number; count: number };
 }
 
+export interface DesignDNARef {
+  massing: string;
+  facade: string;
+  roof: string;
+  windows: string;
+  signature: string;
+  landscape: string;
+  mood: string;
+  palette: { wall: string; roof: string; trim: string; accent: string };
+  name: string;
+}
+
 export interface Variation {
   id: string;
   seed: number;
@@ -173,4 +185,9 @@ export interface Variation {
   parking?: ParkingArea;
   paletteAccent: string;
   liveability: Liveability;
+  // Every variation is a one-of-a-kind elevation — DNA drives the render prompt
+  // and the display name. Optional for backwards compatibility with old rows.
+  dna?: DesignDNARef;
+  // Cached photorealistic exterior render URL (Supabase Storage).
+  renderUrl?: string;
 }
