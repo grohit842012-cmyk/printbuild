@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
+import { DesignRender } from "@/components/design-render";
 import { generateVariations } from "@/lib/model-generator";
+import { fallbackDnaFromVariation } from "@/lib/design-dna";
 import { Loader2, RefreshCw, Trash2, Sparkles } from "lucide-react";
 import type { DesignSpec, VastuPreferences, Variation } from "@/lib/design-types";
 import { recommendVariations, climateFit, climateLabel } from "@/lib/climate";
@@ -31,6 +33,7 @@ function GalleryPage() {
   const { id } = useParams({ from: "/design/$id/gallery" });
   const navigate = useNavigate();
   const [variations, setVariations] = useState<Variation[]>([]);
+  const [spec, setSpec] = useState<DesignSpec | null>(null);
   const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
   const [kitchenOpen, setKitchenOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,9 +52,10 @@ function GalleryPage() {
     setLoading(false);
     if (error || !data) { toast.error("Could not load designs"); return; }
     setVariations((data.generated_variations as unknown as Variation[]) ?? []);
-    const spec = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
-    setPlanMode(spec?.planMode ?? "closed");
-    setKitchenOpen(!!spec?.kitchenOpen);
+    const s = data.spec as unknown as DesignSpec;
+    setSpec(s);
+    setPlanMode(s?.planMode ?? "closed");
+    setKitchenOpen(!!s?.kitchenOpen);
   }
 
   async function deleteVariation(varId: string) {
@@ -113,6 +117,7 @@ function GalleryPage() {
               const t = tierLabel(v.vastuTier);
               const isRec = recommended.has(v.id);
               const fit = climateFit(v.elevationStyle);
+              const dna = v.dna ?? fallbackDnaFromVariation(v, idx);
               return (
                 <div
                   key={v.id}
@@ -132,25 +137,35 @@ function GalleryPage() {
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                  <button
+                  <div
                     onClick={() => navigate({ to: "/design/$id/view/$idx", params: { id, idx: String(idx) } })}
-                    className="text-left w-full"
+                    className="text-left w-full cursor-pointer"
                   >
-                    <div className="aspect-square bg-secondary/40 rounded-xl mb-3 overflow-hidden">
-                      <FloorPlan2D variation={v} floor={1} size={300} planMode={planMode} kitchenOpen={kitchenOpen} />
+                    {spec ? (
+                      <div className="mb-3">
+                        <DesignRender
+                          designId={id}
+                          index={idx}
+                          variation={v}
+                          spec={spec}
+                          siblings={variations}
+                          autoGenerate={false}
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-square bg-secondary/40 rounded-xl mb-3 overflow-hidden">
+                        <FloorPlan2D variation={v} floor={1} size={300} planMode={planMode} kitchenOpen={kitchenOpen} />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mb-1 gap-2">
+                      <h3 className="font-display text-lg leading-tight">{dna.name}</h3>
+                      <Badge className={t.cls + " shrink-0"}>{t.text}</Badge>
                     </div>
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-display text-lg">Design {idx + 1}</h3>
-                      <Badge className={t.cls}>{t.text}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {v.elevationStyle.replace(/-/g, " ")} ·{" "}
-                      {v.parking
-                        ? v.parking.covered ? "Carport" : "Open parking"
-                        : "Stilt parking"}
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">
+                      {dna.facade} · {dna.roof}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Curvature {Math.round(v.curvatureLevel * 100)}% · Vastu {v.vastuScore}/100
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Vastu {v.vastuScore}/100 · {v.parking ? (v.parking.covered ? "Carport" : "Open parking") : "Stilt parking"}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {fit.best.slice(0, 2).map((c) => (
@@ -159,7 +174,7 @@ function GalleryPage() {
                         </span>
                       ))}
                     </div>
-                  </button>
+                  </div>
                 </div>
               );
             })}
