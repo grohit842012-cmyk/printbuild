@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import { ModelViewer3D } from "@/components/model-viewer-3d";
 import { FloorSummary } from "@/components/floor-summary";
-import type { Variation } from "@/lib/design-types";
+import { DesignRender } from "@/components/design-render";
+import { fallbackDnaFromVariation } from "@/lib/design-dna";
+import type { DesignSpec, Variation } from "@/lib/design-types";
 import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler, Sun } from "lucide-react";
 import { computeEstimates, formatCurrency, type Currency } from "@/lib/estimates";
 import { climateFit, climateLabel } from "@/lib/climate";
@@ -36,6 +38,8 @@ function InspectorPage() {
   const { id, idx } = useParams({ from: "/design/$id/view/$idx" });
   const navigate = useNavigate();
   const [variation, setVariation] = useState<Variation | null>(null);
+  const [allVariations, setAllVariations] = useState<Variation[]>([]);
+  const [spec, setSpec] = useState<DesignSpec | null>(null);
   const [allFloors, setAllFloors] = useState<number[]>([]);
   const [activeFloor, setActiveFloor] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -57,9 +61,11 @@ function InspectorPage() {
       const v = variations[Number(idx)];
       if (!v) { toast.error("Variation not found"); return; }
       setVariation(v);
-      const spec = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
-      setPlanMode(spec?.planMode ?? "closed");
-      setKitchenOpen(!!spec?.kitchenOpen);
+      setAllVariations(variations);
+      setSpec(data.spec as unknown as DesignSpec);
+      const specJson = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
+      setPlanMode(specJson?.planMode ?? "closed");
+      setKitchenOpen(!!specJson?.kitchenOpen);
       const floors = v.plates.map((p) => p.floor);
       setAllFloors(floors);
       setActiveFloor(floors[0]);
