@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignNewRouteImport } from './routes/design.new'
+import { Route as ApiGenerateRenderRouteImport } from './routes/api/generate-render'
 import { Route as AdminReviewsRouteImport } from './routes/admin_.reviews'
 import { Route as DesignIdReviewRouteImport } from './routes/design.$id.review'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
@@ -43,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
 const DesignNewRoute = DesignNewRouteImport.update({
   id: '/design/new',
   path: '/design/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGenerateRenderRoute = ApiGenerateRenderRouteImport.update({
+  id: '/api/generate-render',
+  path: '/api/generate-render',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminReviewsRoute = AdminReviewsRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/api/generate-render': typeof ApiGenerateRenderRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/api/generate-render': typeof ApiGenerateRenderRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/designs': typeof DesignsRoute
   '/admin_/reviews': typeof AdminReviewsRoute
+  '/api/generate-render': typeof ApiGenerateRenderRoute
   '/design/new': typeof DesignNewRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/designs'
     | '/admin/reviews'
+    | '/api/generate-render'
     | '/design/new'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/designs'
     | '/admin/reviews'
+    | '/api/generate-render'
     | '/design/new'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/designs'
     | '/admin_/reviews'
+    | '/api/generate-render'
     | '/design/new'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DesignsRoute: typeof DesignsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
+  ApiGenerateRenderRoute: typeof ApiGenerateRenderRoute
   DesignNewRoute: typeof DesignNewRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/design/new'
       fullPath: '/design/new'
       preLoaderRoute: typeof DesignNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-render': {
+      id: '/api/generate-render'
+      path: '/api/generate-render'
+      fullPath: '/api/generate-render'
+      preLoaderRoute: typeof ApiGenerateRenderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/reviews': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DesignsRoute: DesignsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
+  ApiGenerateRenderRoute: ApiGenerateRenderRoute,
   DesignNewRoute: DesignNewRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
@@ -250,12 +271,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

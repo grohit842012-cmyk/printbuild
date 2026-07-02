@@ -12,6 +12,7 @@ import type {
   VastuPreferences,
 } from "./design-types";
 import { DIRECTION_ANGLES, scoreVastu } from "./vastu";
+import { generateDnaSet } from "./design-dna";
 
 // ---------- Seeded RNG ----------
 function mulberry32(seed: number) {
@@ -1293,5 +1294,16 @@ export function generateVariations(
   }
 
   variations.sort((a, b) => b.vastuScore - a.vastuScore);
+
+  // Attach a unique architectural DNA to every variation. Deterministic per
+  // batch (via baseSeed), and dedup'd on the core visual tuple across the 10
+  // so no two elevations share the same massing/facade/roof/signature combo.
+  const dnaSet = generateDnaSet(baseSeed, variations.length);
+  for (let i = 0; i < variations.length; i++) {
+    variations[i].dna = dnaSet[i];
+    variations[i].paletteAccent = dnaSet[i].palette.accent;
+  }
+
   return variations;
 }
+

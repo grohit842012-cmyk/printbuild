@@ -1,53 +1,96 @@
 
+## Goal
 
-## Improve 3D coordinates, openings, and modelling
+Every one of the 10 generated designs is a **one-of-a-kind elevation** — no two look alike, no repeating style presets. Each variation still respects the user's plot, BHK, floors, room-size preferences, and Vastu, and each gets its own photorealistic exterior render and richer illustrated 2D plan.
 
-The 3D model currently doesn't match the 2D plan because walls are drawn from a single rounded outer shell instead of from actual room rectangles. Doors and windows also float because their openings are cut from that shell, not from the wall the room actually owns. This rebuilds the 3D geometry directly from room coordinates so 3D and 2D match exactly.
+## How uniqueness is guaranteed (no fixed style list)
 
-### 1. `src/components/model-viewer-3d.tsx` — rebuild geometry from rooms
+Instead of a fixed catalog of 10 styles, each variation gets a **freshly composed design DNA** — a random-but-coherent combination sampled per variation, seeded by `designId + variationIndex` (deterministic per design, unique across variations):
 
-**a. Replace the outer rounded shell with per-room walls**
-- For each room, walk its 4 sides and classify each as:
-  - **Exterior** (touches plate boundary) → solid wall, full height, with windows cut where `Opening.kind === "window"` falls on this segment.
-  - **Hallway-facing** (touches `plate.hallway` rect) → wall with a 3 ft door cutout at the room's `doorMid` / `doorWall`.
-  - **Shared with another room** (deduped by sorted endpoint pairs so the wall is drawn once) → solid partition, no openings unless ensuite.
-- Wall thickness 0.5 ft, height = `floorHeight(plate.floor)`. Build each segment as a `BoxGeometry` placed along the edge so coordinates match `RoomRect` exactly.
+- **Massing** — cuboidal, stepped, cantilevered, L-shape, wrap-around, split-level, tower-and-wing, courtyard, floating box, gabled, monopitch, butterfly-roof…
+- **Facade material** — exposed brick, board-formed concrete, white render, charcoal render, weathered timber, teak slats, terracotta jaali, corten steel, limestone, granite, glass curtain, stone plinth + render…
+- **Roof form** — flat, mono-pitch, gable, butterfly, sawtooth, terraced with sky garden, pergola-topped, curved shell…
+- **Window rhythm** — floor-to-ceiling ribbon, punched rectangles, arched, jaali screen, corner glass, vertical slot, clerestory strip…
+- **Signature move** (exactly one per variation) — double-height entry, cantilevered balcony, rooftop terrace, brise-soleil, water-court, tree-well, jaali screen wall, spiral external stair, sunken plinth, ribbon skylight…
+- **Landscaping** — desert xeriscape, tropical dense, formal parterre, gravel + boulders, lawn + palms, kitchen garden, bamboo grove…
+- **Mood / time of day** — golden hour, blue hour, overcast morning, monsoon dusk, dry sunny noon, twilight with warm interior glow…
 
-**b. Fix opening coordinates**
-- Today `Opening` endpoints are drawn as freestanding glass planes that often miss the wall. Resolve each opening to the wall segment it belongs to (match `(x1,y1)-(x2,y2)` against room edges with 0.1 ft tolerance), then cut the hole in that wall's `BoxGeometry` via CSG-style subtraction using two flanking boxes (left jamb, right jamb, lintel, sill) instead of one plane. Window: sill at 3 ft, head at 7 ft, width from `Opening.width`. Door: sill 0, head 7 ft, width 3 ft.
-- Frames + sills now sit flush in the wall plane at the wall's actual position, not floating in front.
+A deterministic seeded RNG picks one from each axis per variation, with a **guard** that runs across the 10 variations in a single design and rejects any duplicate `(massing, facade, roof, signature)` combination — resampling until every variation has a distinct core. Additionally, each variation's render prompt includes an explicit *"do not repeat these exact combinations already used: […]"* clause to push the image model toward visible differentiation.
 
-**c. Plinth, slab, and roof from room footprint**
-- Build plinth and floor slab as a merged shape of all room rectangles for the floor (use `THREE.Shape` per room, combined into an `ExtrudeGeometry`), padded outward by 0.8 ft for the plinth.
-- Roof slab = same merged footprint inflated by 1.5 ft for the eave overhang. Straight edges, no rounded shell.
-- Drop the global rounded-rect plate shape from 3D entirely (2D keeps it for the floor-plan clip — no change there).
+The style name shown to the user is generated from the chosen DNA (e.g. *"Cantilevered Corten Court"*, *"Jaali-Screened Terrace House"*) — never a preset label.
 
-**d. Wall corner curvature (walls only)**
-- For rooms sitting on the building's outer corners, replace the corner edge of the two meeting exterior walls with a 1.5 ft quarter-cylinder. All other walls stay straight. Roofs and slabs stay straight-edged.
+## What each variation gets
 
-**e. Per-floor coordinate alignment**
-- Use `floorBaseY(plate.floor)` consistently for plinth, walls, openings, slab, and roof so each floor stacks exactly on the one below — no half-floor gaps.
-- Stair landing slab on each non-top floor sits at `floorBaseY(plate.floor + 1)` over the stair cell.
+1. **A unique design DNA** (as above), stored on the variation.
+2. **A photorealistic exterior render** generated per variation via Lovable AI Gateway (`openai/gpt-image-2`, `quality: "low"`, streamed). Prompt is built from the DNA plus plot size, BHK, floors, orientation, and an exclusion list of previously-used DNAs from the same design.
+3. **The existing interactive 3D model**, with materials tinted from the DNA (walls, roof, trim) — no geometry rebuild in this pass (that's tracked separately in `.lovable/plan.md`).
+4. **A richer illustrated 2D plan** — room labels with sq ft, dimension ticks on outer walls, north arrow, scale bar, furniture symbols (bed / sofa / dining / WC / kitchen counter / car), hatched walls, door swing arcs, window mullions, accent tint from the DNA.
 
-**f. Entrance porch**
-- Porch slab + 2 columns + door panel + arch keyed off `groundPlate.entranceDoor` endpoints (already correct), but anchor the door panel and arch into the actual exterior wall segment now drawn there, so the porch reads as cut into the facade instead of stuck on top of it.
+## User-visible flow
 
-### 2. `src/lib/model-generator.ts` — make openings resolvable
+- **Gallery**: 10 cards, each showing its unique render + generated style name + BHK/sqft. Renders stream in progressively (blur → sharp) on first view; then cached.
+- **Variation view**: hero render on top, interactive 3D + illustrated 2D plan below, a short caption listing the DNA (materials, roof, signature move).
+- **Fallback**: if a render fails (moderation / credits / rate limit), show a Three.js still with a "Retry render" button — never blocks the page.
 
-- When pushing each `Opening`, snap its endpoints to the owning room's wall coordinates exactly (same floats, no rounding drift) so the 3D resolver in step 1b finds the wall on the first pass.
-- For each window, also store `wall: "N" | "E" | "S" | "W"` and `room: roomIndex` to make resolution O(1) instead of geometric matching. Add these two optional fields to `Opening` in `src/lib/design-types.ts`.
-- Ensure every habitable room emits exactly one window opening on its longest exterior wall (already intended — verify and fix if missing).
+## Technical changes
 
-### 3. `src/lib/design-types.ts`
-- Extend `Opening` with optional `wall?: "N" | "E" | "S" | "W"` and `roomIndex?: number` for fast 3D lookup. Existing data without these fields still works (3D falls back to geometric match).
+### Data model (`src/lib/design-types.ts`)
+Extend `Variation`:
+```ts
+dna: {
+  massing: string;
+  facade: string;
+  roof: string;
+  windows: string;
+  signature: string;
+  landscape: string;
+  mood: string;
+  palette: { wall: string; roof: string; trim: string; accent: string };
+  name: string;               // generated, e.g. "Cantilevered Corten Court"
+}
+renderUrl?: string;
+```
 
-### Out of scope
-- 2D plan rendering (no change).
-- Wizard, routes, liveability panel (no change).
-- Furniture, drag-edit, terraces, payments.
+### DNA generator (`src/lib/design-dna.ts`, new)
+- Axis vocabularies + weighted samplers.
+- `seededRng(designId, index)` for deterministic-per-variation randomness.
+- `generateDnaSet(designId, n)` returns `n` unique DNAs (dedup by core tuple).
+- `dnaToPrompt(dna, spec)` builds the image prompt including the exclusion list.
+- `dnaToName(dna)` composes the display name.
 
-### Files changed
-- `src/components/model-viewer-3d.tsx` — full geometry rebuild from rooms.
-- `src/lib/model-generator.ts` — snap opening coordinates, tag wall + roomIndex.
-- `src/lib/design-types.ts` — add optional `wall` and `roomIndex` to `Opening`.
+### Variation generation (`src/lib/model-generator.ts`)
+- After building the 10 variations, attach one DNA to each via `generateDnaSet`.
+- Feed `dna.palette` into materials used by the 3D viewer.
 
+### Render pipeline
+- **New**: server route `src/routes/api/generate-render.ts` — raw HTTP handler that streams SSE from AI Gateway (`createServerFn` can't stream). Body pass-through, no buffering.
+- **New**: `src/lib/streamImage.ts` — client helper using `eventsource-parser` + `flushSync` (per `ai-image-generation` knowledge).
+- **New**: Supabase Storage bucket `design-renders` (public read). On `image_generation.completed`, upload the PNG and PATCH `renderUrl` into the design's `generated_variations` JSON.
+- Renders are **lazy**: only generated the first time a variation card/view is opened. Never auto-regenerated on spec edits — user clicks "Regenerate".
+
+### 2D plan (`src/components/floor-plan-2d.tsx`)
+- Add SVG `<pattern>` hatched wall fill.
+- Furniture symbols per room type.
+- Dimension lines with ticks on the outer envelope.
+- North arrow + scale bar.
+- Door swing arcs, window mullion lines.
+- Accent color from `variation.dna.palette.accent`.
+
+### 3D (`src/components/model-viewer-3d.tsx`)
+- Read `variation.dna.palette` for wall / roof / trim materials only. No geometry changes.
+
+### Routes
+- `src/routes/design.$id.gallery.tsx`: card shows `renderUrl` or streams it in. Style name + BHK/sqft caption.
+- `src/routes/design.$id.view.$idx.tsx`: hero render on top; 3D + illustrated 2D below; DNA caption block.
+
+## Out of scope
+- Interior renders (exterior only for this pass).
+- Furnishing the 3D model.
+- Rebuilding 3D geometry from room rectangles (already tracked in `.lovable/plan.md`).
+- Auto-regenerating renders on spec edits.
+
+## Files touched
+- **new**: `src/lib/design-dna.ts`, `src/lib/streamImage.ts`, `src/routes/api/generate-render.ts`, Supabase migration for `design-renders` bucket
+- **edited**: `src/lib/design-types.ts`, `src/lib/model-generator.ts`, `src/components/floor-plan-2d.tsx`, `src/components/model-viewer-3d.tsx`, `src/routes/design.$id.gallery.tsx`, `src/routes/design.$id.view.$idx.tsx`
+
+Approve and I'll build it end-to-end.
