@@ -478,6 +478,128 @@ function RoomWalls({ w, d, h, room }: { w: number; d: number; h: number; room: R
   );
 }
 
+function entranceWall(variation: Variation): "N" | "E" | "S" | "W" {
+  const dir = variation.entranceDirection;
+  if (dir === "N" || dir === "NE" || dir === "NW") return "N";
+  if (dir === "S" || dir === "SE" || dir === "SW") return "S";
+  return dir === "W" ? "W" : "E";
+}
+
+function sidePosition(
+  variation: Variation,
+  plate: FloorPlate,
+  side: "N" | "E" | "S" | "W",
+  offsetFt: number,
+  widthFt: number,
+  depthFt: number,
+): { pos: [number, number, number]; size: [number, number, number] } {
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
+  const cx = side === "E" ? plate.x + plate.w + offsetFt : side === "W" ? plate.x - offsetFt : plate.x + plate.w / 2;
+  const cy = side === "S" ? plate.y + plate.h + offsetFt : side === "N" ? plate.y - offsetFt : plate.y + plate.h / 2;
+  const [sx, sz] = toScene(cx, cy);
+  const isNS = side === "N" || side === "S";
+  return {
+    pos: [sx, 0, sz],
+    size: [
+      (isNS ? widthFt : depthFt) * FT_TO_M,
+      1,
+      (isNS ? depthFt : widthFt) * FT_TO_M,
+    ],
+  };
+}
+
+function ElevationFeatures({ variation, topY }: { variation: Variation; topY: number }) {
+  const ground = variation.plates[0];
+  const top = variation.plates[variation.plates.length - 1];
+  const palette = paletteFor(variation);
+  const massing = variation.massingStyle ?? "pergola-terrace";
+  const front = entranceWall(variation);
+  const frontSpan = front === "N" || front === "S" ? ground.w : ground.h;
+  const frontFeature = sidePosition(variation, ground, front, 1.2, Math.min(frontSpan * 0.7, 22), 5.5);
+  const railMat = <meshPhysicalMaterial color="#bcdcf2" transmission={0.6} opacity={0.45} transparent roughness={0.08} metalness={0.2} />;
+  const trimMat = <meshStandardMaterial color={palette.trim} roughness={0.7} />;
+  const accentMat = <meshStandardMaterial color={palette.accent} roughness={0.72} metalness={palette.material === "corten" ? 0.35 : 0.03} />;
+  const timberMat = <meshStandardMaterial color={palette.material === "timber" ? palette.wall : "#7a5a3a"} roughness={0.65} />;
+  const y1 = FLOOR_HEIGHT * FT_TO_M;
+  const roofCenter = makeToScene(variation.plotWidthFt, variation.plotDepthFt)(top.x + top.w / 2, top.y + top.h / 2);
+
+  const balcony = (wide = 1) => (
+    <group position={[frontFeature.pos[0], y1 + 0.05, frontFeature.pos[2]]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[frontFeature.size[0] * wide, 0.16, frontFeature.size[2]]} />
+        {trimMat}
+      </mesh>
+      <mesh position={[0, 0.6, front === "N" ? -frontFeature.size[2] / 2 : front === "S" ? frontFeature.size[2] / 2 : 0]} castShadow>
+        <boxGeometry args={[frontFeature.size[0] * wide, 0.9, 0.08]} />
+        {railMat}
+      </mesh>
+      {(front === "E" || front === "W") && (
+        <mesh position={[front === "W" ? -frontFeature.size[0] / 2 : frontFeature.size[0] / 2, 0.6, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.9, frontFeature.size[2]]} />
+          {railMat}
+        </mesh>
+      )}
+    </group>
+  );
+
+  const screen = (count: number, fullHeight = false) => {
+    const isNS = front === "N" || front === "S";
+    const sign = front === "N" || front === "W" ? -1 : 1;
+    const height = (fullHeight ? variation.plates.length * FLOOR_HEIGHT : 9) * FT_TO_M;
+    return (
+      <group position={[frontFeature.pos[0], height / 2, frontFeature.pos[2]]}>
+        {Array.from({ length: count }).map((_, k) => {
+          const t = count === 1 ? 0 : k / (count - 1) - 0.5;
+          return (
+            <mesh key={k} position={isNS ? [t * frontFeature.size[0], 0, sign * 0.08] : [sign * 0.08, 0, t * frontFeature.size[2]]} castShadow>
+              <boxGeometry args={isNS ? [0.09, height, 0.16] : [0.16, height, 0.09]} />
+              {accentMat}
+            </mesh>
+          );
+        })}
+      </group>
+    );
+  };
+
+  const pergola = (level = topY + 0.55) => (
+    <group position={[roofCenter[0], level, roofCenter[1]]}>
+      {Array.from({ length: 6 }).map((_, k) => (
+        <mesh key={k} position={[(-0.5 + k / 5) * top.w * FT_TO_M * 0.62, 0, 0]} castShadow>
+          <boxGeometry args={[0.12, 0.16, top.h * FT_TO_M * 0.68]} />
+          {timberMat}
+        </mesh>
+      ))}
+      {[-1, 1].map((sx) => [-1, 1].map((sz) => (
+        <mesh key={`${sx}-${sz}`} position={[sx * top.w * FT_TO_M * 0.32, -0.65, sz * top.h * FT_TO_M * 0.32]} castShadow>
+          <boxGeometry args={[0.18, 1.3, 0.18]} />
+          {timberMat}
+        </mesh>
+      )))}
+    </group>
+  );
+
+  switch (massing) {
+    case "cantilever-front":
+      return <>{balcony(1.15)}{screen(5)}</>;
+    case "side-veranda":
+      return <>{balcony(0.9)}{pergola(FLOOR_HEIGHT * FT_TO_M + 0.5)}</>;
+    case "stepped-terrace":
+      return <>{pergola()}{balcony(0.75)}</>;
+    case "tower-wing":
+      return <>{screen(3, true)}{balcony(0.65)}</>;
+    case "jaali-court":
+      return <>{screen(12, true)}</>;
+    case "split-block":
+      return <>{screen(7, true)}{balcony(0.55)}</>;
+    case "pergola-terrace":
+      return <>{pergola()}{balcony(0.9)}</>;
+    case "courtyard-cut":
+      return <>{screen(6)}{pergola()}</>;
+    default:
+      return <>{balcony(0.8)}</>;
+  }
+}
+
 function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const top = variation.plates[variation.plates.length - 1];
   const cx = top.x + top.w / 2;
@@ -487,7 +609,45 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
   const [sx, sz] = toScene(cx, cz);
   const center: [number, number, number] = [sx, topY, sz];
-  const TRIM = "#fbfaf6";
+  const palette = paletteFor(variation);
+  const TRIM = palette.trim;
+  const massing = variation.massingStyle ?? "pergola-terrace";
+
+  if (massing === "gabled-house") {
+    const ridgeH = Math.min(w, d) * 0.32;
+    return (
+      <group position={center}>
+        <mesh position={[0, 0.08 + ridgeH / 2, -d * 0.18]} rotation={[0.38, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.75, 0.16, d * 0.62]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.65} />
+        </mesh>
+        <mesh position={[0, 0.08 + ridgeH / 2, d * 0.18]} rotation={[-0.38, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.75, 0.16, d * 0.62]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.65} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (massing === "butterfly-pavilion") {
+    const lift = Math.min(w, d) * 0.22;
+    return (
+      <group position={center}>
+        <mesh position={[-w * 0.24, lift / 2, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+        </mesh>
+        <mesh position={[w * 0.24, lift / 2, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+        </mesh>
+        <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.22, 0.18, d + 0.9]} />
+          <meshStandardMaterial color={TRIM} roughness={0.55} />
+        </mesh>
+      </group>
+    );
+  }
 
   // Domed roof option removed — only flat/sloped remain.
   if (variation.roofType === "sloped") {
@@ -503,7 +663,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         {/* terracotta hipped roof */}
         <mesh position={[0, 0.1 + ridgeH / 2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
           <coneGeometry args={[Math.max(w, d) * 0.62, ridgeH, 4]} />
-          <meshStandardMaterial color="#a83e1a" roughness={0.65} />
+          <meshStandardMaterial color={palette.roof} roughness={0.65} />
         </mesh>
       </group>
     );
@@ -515,7 +675,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     <group position={center}>
       <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
         <boxGeometry args={[w + 0.4, 0.2, d + 0.4]} />
-        <meshStandardMaterial color="#cdb89a" roughness={0.8} />
+        <meshStandardMaterial color={palette.roof} roughness={0.8} />
       </mesh>
       <mesh position={[0, 0.5, -d / 2 - 0.1]} castShadow>
         <boxGeometry args={[w + 0.6, 0.7, 0.25]} />
