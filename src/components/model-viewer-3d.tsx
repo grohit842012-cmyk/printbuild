@@ -250,6 +250,34 @@ function FloorMesh({
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
   const [sx, sz] = toScene(cx, cz);
+  const slabShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    const w = plate.w * FT_TO_M;
+    const d = plate.h * FT_TO_M;
+    const x0 = -w / 2;
+    const z0 = -d / 2;
+    const c = Math.min((plate.chamfer || 0) * FT_TO_M, w * 0.35, d * 0.35);
+    if (c > 0.05) {
+      const corner = plate.chamferCorner ?? "NE";
+      const pts: [number, number][] = corner === "NE"
+        ? [[x0, z0], [x0 + w - c, z0], [x0 + w, z0 + c], [x0 + w, z0 + d], [x0, z0 + d]]
+        : corner === "NW"
+          ? [[x0 + c, z0], [x0 + w, z0], [x0 + w, z0 + d], [x0, z0 + d], [x0, z0 + c]]
+          : corner === "SE"
+            ? [[x0, z0], [x0 + w, z0], [x0 + w, z0 + d - c], [x0 + w - c, z0 + d], [x0, z0 + d]]
+            : [[x0, z0], [x0 + w, z0], [x0 + w, z0 + d], [x0 + c, z0 + d], [x0, z0 + d - c]];
+      shape.moveTo(pts[0][0], pts[0][1]);
+      pts.slice(1).forEach(([x, z]) => shape.lineTo(x, z));
+      shape.closePath();
+    } else {
+      shape.moveTo(x0, z0);
+      shape.lineTo(x0 + w, z0);
+      shape.lineTo(x0 + w, z0 + d);
+      shape.lineTo(x0, z0 + d);
+      shape.closePath();
+    }
+    return shape;
+  }, [plate.chamfer, plate.chamferCorner, plate.h, plate.w]);
   return (
     <group position={[sx, baseY, sz]}>
       {/* plinth/foundation extending down to ground */}
@@ -260,7 +288,7 @@ function FloorMesh({
         </mesh>
       )}
       <mesh position={[0, -0.05, 0]} receiveShadow>
-        <boxGeometry args={[plate.w * FT_TO_M, 0.1, plate.h * FT_TO_M]} />
+        <extrudeGeometry args={[slabShape, { depth: 0.1, bevelEnabled: false }]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
       <PerimeterWalls plate={plate} variation={variation} />
