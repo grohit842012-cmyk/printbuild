@@ -118,6 +118,9 @@ export interface FloorPlate {
   cornerRadius: number;
   // Optional chamfer cut size at NE corner in feet (for L-shape feel) — 0 = none
   chamfer: number;
+  // Which corner is cut for the current variation's footprint. This makes
+  // each generated plan/elevation read as a different massing, not the same box.
+  chamferCorner?: "NE" | "NW" | "SE" | "SW";
   rooms: RoomRect[];
   openings: Opening[];
   // The hallway corridor for this floor (light-gray spine in 2D).
@@ -182,6 +185,17 @@ export interface Variation {
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "sloped";
   elevationStyle: ElevationStyle;
+  massingStyle?:
+    | "courtyard-cut"
+    | "cantilever-front"
+    | "stepped-terrace"
+    | "side-veranda"
+    | "tower-wing"
+    | "butterfly-pavilion"
+    | "gabled-house"
+    | "jaali-court"
+    | "split-block"
+    | "pergola-terrace";
   parking?: ParkingArea;
   paletteAccent: string;
   liveability: Liveability;
