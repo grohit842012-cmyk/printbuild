@@ -73,6 +73,50 @@ const MASSING_STYLES: MassingStyle[] = [
 
 const CHAMFER_CORNERS: NonNullable<FloorPlate["chamferCorner"]>[] = ["NE", "NW", "SE", "SW"];
 
+interface FootprintInset {
+  west: number;
+  east: number;
+  north: number;
+  south: number;
+}
+
+const ZERO_INSET: FootprintInset = { west: 0, east: 0, north: 0, south: 0 };
+
+function footprintForMassing(
+  massing: MassingStyle,
+  floorIndex: number,
+  totalFloors: number,
+  maxInset: number,
+  rng: () => number,
+): FootprintInset {
+  if (maxInset <= 0.25) return ZERO_INSET;
+  const topBias = totalFloors <= 1 ? 0 : floorIndex / Math.max(1, totalFloors - 1);
+  const a = maxInset * (0.65 + rng() * 0.35);
+  const b = maxInset * (0.35 + rng() * 0.3);
+  switch (massing) {
+    case "cantilever-front":
+      return topBias > 0 ? { west: b, east: 0, north: 0, south: b } : { west: 0, east: b, north: a, south: 0 };
+    case "stepped-terrace":
+      return { west: b * topBias, east: a * topBias, north: b * topBias, south: a * topBias };
+    case "side-veranda":
+      return { west: a, east: 0, north: b, south: 0 };
+    case "tower-wing":
+      return topBias > 0.4 ? { west: a, east: b, north: 0, south: b } : { west: 0, east: b, north: 0, south: 0 };
+    case "split-block":
+      return floorIndex % 2 === 0 ? { west: a, east: 0, north: b, south: 0 } : { west: 0, east: a, north: 0, south: b };
+    case "pergola-terrace":
+      return topBias > 0 ? { west: b, east: b, north: 0, south: a * topBias } : ZERO_INSET;
+    case "courtyard-cut":
+    case "jaali-court":
+      return { west: b, east: b, north: b, south: b };
+    case "butterfly-pavilion":
+      return { west: b, east: b, north: 0, south: 0 };
+    case "gabled-house":
+    default:
+      return { west: 0, east: 0, north: b, south: b };
+  }
+}
+
 /** Pick the plan family that fits the user's program & plot best.
  *
  * Non-box shapes (L, U, courtyard) carve a notch out of the NE corner of the
@@ -566,12 +610,13 @@ function buildPlate(
   stairShape: DesignSpec["staircaseType"],
   withLift: boolean,
   liftSize: { w: number; h: number },
+  footprintInset: FootprintInset,
   layoutShift: number,
 ): FloorPlate {
-  const fx = SETBACK;
-  const fy = SETBACK;
-  const fw = plotW - SETBACK * 2;
-  const fh = plotD - SETBACK * 2;
+  const fx = SETBACK + footprintInset.west;
+  const fy = SETBACK + footprintInset.north;
+  const fw = plotW - SETBACK * 2 - footprintInset.west - footprintInset.east;
+  const fh = plotD - SETBACK * 2 - footprintInset.north - footprintInset.south;
 
   const entranceWall = pickEntranceWall(entranceDir);
 
