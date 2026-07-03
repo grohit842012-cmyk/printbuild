@@ -9,9 +9,7 @@ import { toast } from "sonner";
 import { FloorPlan2D } from "@/components/floor-plan-2d";
 import { ModelViewer3D } from "@/components/model-viewer-3d";
 import { FloorSummary } from "@/components/floor-summary";
-import { DesignRender } from "@/components/design-render";
-import { fallbackDnaFromVariation } from "@/lib/design-dna";
-import type { DesignSpec, Variation } from "@/lib/design-types";
+import type { Variation } from "@/lib/design-types";
 import { Check, X, AlertTriangle, Star, Clock, Hammer, Ruler, Sun } from "lucide-react";
 import { computeEstimates, formatCurrency, type Currency } from "@/lib/estimates";
 import { climateFit, climateLabel } from "@/lib/climate";
@@ -38,8 +36,6 @@ function InspectorPage() {
   const { id, idx } = useParams({ from: "/design/$id/view/$idx" });
   const navigate = useNavigate();
   const [variation, setVariation] = useState<Variation | null>(null);
-  const [allVariations, setAllVariations] = useState<Variation[]>([]);
-  const [spec, setSpec] = useState<DesignSpec | null>(null);
   const [allFloors, setAllFloors] = useState<number[]>([]);
   const [activeFloor, setActiveFloor] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -61,8 +57,6 @@ function InspectorPage() {
       const v = variations[Number(idx)];
       if (!v) { toast.error("Variation not found"); return; }
       setVariation(v);
-      setAllVariations(variations);
-      setSpec(data.spec as unknown as DesignSpec);
       const specJson = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
       setPlanMode(specJson?.planMode ?? "closed");
       setKitchenOpen(!!specJson?.kitchenOpen);
@@ -118,39 +112,18 @@ function InspectorPage() {
           <Badge>{variation.vastuTier === "strict" ? "Strict Vastu" : variation.vastuTier === "mostly" ? "Mostly Vastu" : "Partial Vastu"}</Badge>
         </div>
 
-        {/* Photorealistic exterior render — unique per variation */}
-        {spec && (() => {
-          const dna = variation.dna ?? fallbackDnaFromVariation(variation, Number(idx));
-          return (
-            <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-              <div className="flex items-start justify-between mb-3 gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wider text-accent">One-of-a-kind elevation</p>
-                  <h2 className="font-display text-2xl">{dna.name}</h2>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-                    {dna.massing} · {dna.facade} · {dna.roof}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Signature: {dna.signature}. Windows: {dna.windows}. Setting: {dna.landscape}, {dna.mood}.
-                  </p>
-                </div>
-              </div>
-              <DesignRender
-                designId={id}
-                index={Number(idx)}
-                variation={variation}
-                spec={spec}
-                siblings={allVariations}
-                autoGenerate
-              />
-            </div>
-          );
-        })()}
-
         {/* 3D model viewer — full width */}
         <div className="bg-card border border-border rounded-2xl p-5 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display text-xl">Interactive 3D model</h2>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-accent">One-of-a-kind elevation</p>
+              <h2 className="font-display text-xl">Interactive 3D model</h2>
+              {variation.dna && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {variation.dna.name} · {variation.dna.massing} · {variation.dna.facade} · {variation.dna.roof}
+                </p>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground">Drag to orbit · scroll to zoom</span>
           </div>
           <ModelViewer3D variation={variation} planMode={planMode} kitchenOpen={kitchenOpen} />
