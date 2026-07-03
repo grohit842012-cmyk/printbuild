@@ -56,6 +56,23 @@ const ELEVATION_STYLES: ElevationStyle[] = [
 // cornerRadius + chamfer, since the room solver already honours both.
 export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "courtyard";
 
+type MassingStyle = NonNullable<Variation["massingStyle"]>;
+
+const MASSING_STYLES: MassingStyle[] = [
+  "courtyard-cut",
+  "cantilever-front",
+  "stepped-terrace",
+  "side-veranda",
+  "tower-wing",
+  "butterfly-pavilion",
+  "gabled-house",
+  "jaali-court",
+  "split-block",
+  "pergola-terrace",
+];
+
+const CHAMFER_CORNERS: NonNullable<FloorPlate["chamferCorner"]>[] = ["NE", "NW", "SE", "SW"];
+
 /** Pick the plan family that fits the user's program & plot best.
  *
  * Non-box shapes (L, U, courtyard) carve a notch out of the NE corner of the
@@ -549,6 +566,7 @@ function buildPlate(
   stairShape: DesignSpec["staircaseType"],
   withLift: boolean,
   liftSize: { w: number; h: number },
+  layoutShift: number,
 ): FloorPlate {
   const fx = SETBACK;
   const fy = SETBACK;
@@ -569,15 +587,18 @@ function buildPlate(
   const workWidth = hallwayAlongY ? fw : fh;
 
   const hallwayW = HALLWAY_WIDTH;
-  const sideWidth = (workWidth - hallwayW) / 2;
-  const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
+  const maxOffset = Math.max(0, (workWidth - hallwayW) / 2 - 8);
+  const hallwayOffset = Math.max(-maxOffset, Math.min(maxOffset, layoutShift));
+  const hallwayLocalX = (workWidth - hallwayW) / 2 + hallwayOffset;
+  const leftSideWidth = hallwayLocalX;
+  const rightSideWidth = workWidth - hallwayLocalX - hallwayW;
 
   const zones = planFloor(rooms, entranceWall, rng, stairSide);
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
-  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
-  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
+  const leftLayout = layoutSide(leftZones, leftSideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
+  const rightLayout = layoutSide(rightZones, rightSideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
   const localRooms = [...leftLayout.rooms, ...rightLayout.rooms];
 
   // Rotate / mirror local coords to match entranceWall.
