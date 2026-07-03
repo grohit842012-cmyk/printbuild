@@ -287,7 +287,7 @@ function FloorMesh({
           <meshStandardMaterial color="#bdb3a4" roughness={0.95} />
         </mesh>
       )}
-      <mesh position={[0, -0.05, 0]} receiveShadow>
+      <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <extrudeGeometry args={[slabShape, { depth: 0.1, bevelEnabled: false }]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
