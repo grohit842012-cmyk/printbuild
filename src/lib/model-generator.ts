@@ -1188,11 +1188,14 @@ export function generateVariations(
   for (let i = 0; i < count; i++) {
     const seed = baseSeed + i * 1009;
     const rng = mulberry32(seed);
+    const massingStyle = MASSING_STYLES[i % MASSING_STYLES.length];
 
     const baseCurv =
       spec.curvature === "gentle" ? 0.25 : spec.curvature === "bold" ? 0.8 : 0.5;
     const curvatureLevel = Math.max(0.1, Math.min(1, baseCurv + (rng() - 0.5) * 0.25));
     const stairSide: HallSide = rng() < 0.5 ? "left" : "right";
+    const sideBandInset = Math.max(0, Math.min(6, (Math.min(usableW, usableD) - HALLWAY_WIDTH - 18) / 2));
+    const layoutShift = ((i % 5) - 2) * Math.min(2.4, Math.max(0.5, sideBandInset * 0.45));
 
     const plates: FloorPlate[] = [];
     for (let f = 0; f < spec.floors; f++) {
@@ -1214,6 +1217,8 @@ export function generateVariations(
           stairShape,
           withLift && spec.floors > 1,
           liftDims(spec.lifestyle.familySize),
+          footprintForMassing(massingStyle, f, spec.floors, sideBandInset, rng),
+          layoutShift,
         ),
       );
     }
@@ -1332,7 +1337,11 @@ export function generateVariations(
       "courtyard": Math.min(5, sideAspect * 0.15),
     };
     const chamfer = chamferFor[planType] * (0.75 + rng() * 0.5);
-    for (const p of plates) p.chamfer = chamfer;
+    const chamferCorner = CHAMFER_CORNERS[i % CHAMFER_CORNERS.length];
+    for (const p of plates) {
+      p.chamfer = chamfer || (massingStyle === "split-block" || massingStyle === "jaali-court" ? Math.min(5, sideAspect * 0.12) : 0);
+      p.chamferCorner = chamferCorner;
+    }
 
     // Parking lives inside the plot. When stilt-parking is enabled, parking
     // is a room on the ground floor instead of a separate strip.
@@ -1353,6 +1362,7 @@ export function generateVariations(
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
       elevationStyle,
+      massingStyle,
       parking,
       paletteAccent: accent,
       liveability,
