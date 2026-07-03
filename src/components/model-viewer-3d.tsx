@@ -962,7 +962,7 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
                 key={plate.floor}
                 plate={plate}
                 baseY={baseYs[i]}
-                accent={variation.paletteAccent}
+                variation={variation}
                 planMode={planMode}
                 kitchenOpen={kitchenOpen}
                 plotW={variation.plotWidthFt}
