@@ -32,7 +32,6 @@ function GalleryPage() {
   const { id } = useParams({ from: "/design/$id/gallery" });
   const navigate = useNavigate();
   const [variations, setVariations] = useState<Variation[]>([]);
-  const [spec, setSpec] = useState<DesignSpec | null>(null);
   const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
   const [kitchenOpen, setKitchenOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -52,7 +51,6 @@ function GalleryPage() {
     if (error || !data) { toast.error("Could not load designs"); return; }
     setVariations((data.generated_variations as unknown as Variation[]) ?? []);
     const s = data.spec as unknown as DesignSpec;
-    setSpec(s);
     setPlanMode(s?.planMode ?? "closed");
     setKitchenOpen(!!s?.kitchenOpen);
   }
