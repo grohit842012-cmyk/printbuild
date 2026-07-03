@@ -32,6 +32,29 @@ interface Props {
   kitchenOpen?: boolean;
 }
 
+function paletteFor(variation: Variation) {
+  const dna = variation.dna;
+  const facade = dna?.facade.toLowerCase() ?? "";
+  const wall = dna?.palette.wall ?? variation.paletteAccent ?? "#c98a4b";
+  const trim = dna?.palette.trim ?? "#fbf6ec";
+  const accent = dna?.palette.accent ?? variation.paletteAccent ?? "#c98a4b";
+  const roof = dna?.palette.roof ?? (variation.roofType === "sloped" ? "#a83e1a" : "#3a3a38");
+  const material = facade.includes("brick")
+    ? "brick"
+    : facade.includes("timber") || facade.includes("teak")
+      ? "timber"
+      : facade.includes("jaali") || facade.includes("terracotta")
+        ? "jaali"
+        : facade.includes("glass")
+          ? "glass"
+          : facade.includes("stone") || facade.includes("granite") || facade.includes("limestone")
+            ? "stone"
+            : facade.includes("corten")
+              ? "corten"
+              : "render";
+  return { wall, trim, accent, roof, material };
+}
+
 function isOpen(type: string, planMode: string, kitchenOpen: boolean) {
   if (planMode !== "open") return false;
   if (type === "kitchen") return kitchenOpen;
@@ -67,21 +90,19 @@ function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[
 }
 
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
-function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }) {
+function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Variation }) {
   const t = WALL_THICKNESS * FT_TO_M;
   const h = FLOOR_HEIGHT * FT_TO_M;
   const winTop = 7 * FT_TO_M;
   const winBot = 3 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
 
-  // Each variation must read as its own house — blend the warm stucco base
-  // strongly toward the variation accent so the 10 elevations are visibly
-  // different colours, not the same beige box recoloured.
-  const base = new THREE.Color("#e6cfa8");
-  const tint = new THREE.Color(accent || "#c98a4b");
-  const wall = base.clone().lerp(tint, 0.45);
+  const palette = paletteFor(variation);
+  const base = new THREE.Color(palette.wall);
+  const tint = new THREE.Color(palette.accent);
+  const wall = base.clone().lerp(tint, palette.material === "render" ? 0.18 : 0.05);
   const WALL_COLOR = `#${wall.getHexString()}`;
-  const TRIM_COLOR = "#fbf6ec";   // warm white
+  const TRIM_COLOR = palette.trim;
   const DOOR_COLOR = "#5a3a22";   // walnut
 
   const tol = 0.6;
@@ -130,7 +151,7 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
       segments.push(
         <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
           <boxGeometry args={args} />
-          <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+          <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
         </mesh>,
       );
     }
@@ -145,7 +166,7 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
         segments.push(
           <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // door frame trim
@@ -170,7 +191,7 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
         segments.push(
           <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={sillArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // sill band (trim)
@@ -185,7 +206,7 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
         segments.push(
           <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // top trim under lintel
@@ -223,8 +244,8 @@ function PerimeterWalls({ plate, accent }: { plate: FloorPlate; accent: string }
 }
 
 function FloorMesh({
-  plate, baseY, accent, planMode, kitchenOpen, plotW, plotD,
-}: { plate: FloorPlate; baseY: number; accent: string; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number }) {
   const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
@@ -242,7 +263,7 @@ function FloorMesh({
         <boxGeometry args={[plate.w * FT_TO_M, 0.1, plate.h * FT_TO_M]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
-      <PerimeterWalls plate={plate} accent={accent} />
+      <PerimeterWalls plate={plate} variation={variation} />
       {plate.rooms.map((r, i) => (
         <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} />
       ))}
