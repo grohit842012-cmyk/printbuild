@@ -30,24 +30,26 @@ const ROOM_COLOR: Record<string, string> = {
   parking: "#f7c873",
 };
 
-/** Build an SVG path for a rectangle with rounded corners + optional NE chamfer. */
+/** Build an SVG path for a rectangle with rounded corners + optional chamfered corner. */
 function platePath(p: FloorPlate, scale: number, ox: number, oy: number): string {
   const x = ox + p.x * scale;
   const y = oy + p.y * scale;
   const w = p.w * scale;
   const h = p.h * scale;
   const r = Math.min(p.cornerRadius * scale, w / 2, h / 2);
+  const c = Math.min((p.chamfer || 0) * scale, w * 0.35, h * 0.35);
+  const corner = p.chamferCorner ?? "NE";
+  if (c > 0.5) {
+    if (corner === "NE") return [`M ${x} ${y}`, `L ${x + w - c} ${y}`, `L ${x + w} ${y + c}`, `L ${x + w} ${y + h}`, `L ${x} ${y + h}`, "Z"].join(" ");
+    if (corner === "NW") return [`M ${x + c} ${y}`, `L ${x + w} ${y}`, `L ${x + w} ${y + h}`, `L ${x} ${y + h}`, `L ${x} ${y + c}`, "Z"].join(" ");
+    if (corner === "SE") return [`M ${x} ${y}`, `L ${x + w} ${y}`, `L ${x + w} ${y + h - c}`, `L ${x + w - c} ${y + h}`, `L ${x} ${y + h}`, "Z"].join(" ");
+    return [`M ${x} ${y}`, `L ${x + w} ${y}`, `L ${x + w} ${y + h}`, `L ${x + c} ${y + h}`, `L ${x} ${y + h - c}`, "Z"].join(" ");
+  }
   return [
-    `M ${x + r} ${y}`,
-    `L ${x + w - r} ${y}`,
-    `Q ${x + w} ${y} ${x + w} ${y + r}`,
-    `L ${x + w} ${y + h - r}`,
-    `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
-    `L ${x + r} ${y + h}`,
-    `Q ${x} ${y + h} ${x} ${y + h - r}`,
-    `L ${x} ${y + r}`,
-    `Q ${x} ${y} ${x + r} ${y}`,
-    "Z",
+    `M ${x + r} ${y}`, `L ${x + w - r} ${y}`, `Q ${x + w} ${y} ${x + w} ${y + r}`,
+    `L ${x + w} ${y + h - r}`, `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
+    `L ${x + r} ${y + h}`, `Q ${x} ${y + h} ${x} ${y + h - r}`,
+    `L ${x} ${y + r}`, `Q ${x} ${y} ${x + r} ${y}`, "Z",
   ].join(" ");
 }
 
