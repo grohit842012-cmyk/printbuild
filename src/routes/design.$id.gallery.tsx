@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FloorPlan2D } from "@/components/floor-plan-2d";
-import { DesignRender } from "@/components/design-render";
+import { ModelViewer3D } from "@/components/model-viewer-3d";
 import { generateVariations } from "@/lib/model-generator";
 import { fallbackDnaFromVariation } from "@/lib/design-dna";
 import { Loader2, RefreshCw, Trash2, Sparkles } from "lucide-react";
@@ -141,22 +140,9 @@ function GalleryPage() {
                     onClick={() => navigate({ to: "/design/$id/view/$idx", params: { id, idx: String(idx) } })}
                     className="text-left w-full cursor-pointer"
                   >
-                    {spec ? (
-                      <div className="mb-3">
-                        <DesignRender
-                          designId={id}
-                          index={idx}
-                          variation={v}
-                          spec={spec}
-                          siblings={variations}
-                          autoGenerate={false}
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-square bg-secondary/40 rounded-xl mb-3 overflow-hidden">
-                        <FloorPlan2D variation={v} floor={1} size={300} planMode={planMode} kitchenOpen={kitchenOpen} />
-                      </div>
-                    )}
+                    <div className="mb-3 pointer-events-none">
+                      <ModelViewer3D variation={v} planMode={planMode} kitchenOpen={kitchenOpen} />
+                    </div>
                     <div className="flex items-center justify-between mb-1 gap-2">
                       <h3 className="font-display text-lg leading-tight">{dna.name}</h3>
                       <Badge className={t.cls + " shrink-0"}>{t.text}</Badge>
