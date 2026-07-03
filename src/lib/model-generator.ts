@@ -56,6 +56,67 @@ const ELEVATION_STYLES: ElevationStyle[] = [
 // cornerRadius + chamfer, since the room solver already honours both.
 export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "courtyard";
 
+type MassingStyle = NonNullable<Variation["massingStyle"]>;
+
+const MASSING_STYLES: MassingStyle[] = [
+  "courtyard-cut",
+  "cantilever-front",
+  "stepped-terrace",
+  "side-veranda",
+  "tower-wing",
+  "butterfly-pavilion",
+  "gabled-house",
+  "jaali-court",
+  "split-block",
+  "pergola-terrace",
+];
+
+const CHAMFER_CORNERS: NonNullable<FloorPlate["chamferCorner"]>[] = ["NE", "NW", "SE", "SW"];
+
+interface FootprintInset {
+  west: number;
+  east: number;
+  north: number;
+  south: number;
+}
+
+const ZERO_INSET: FootprintInset = { west: 0, east: 0, north: 0, south: 0 };
+
+function footprintForMassing(
+  massing: MassingStyle,
+  floorIndex: number,
+  totalFloors: number,
+  maxInset: number,
+  rng: () => number,
+): FootprintInset {
+  if (maxInset <= 0.25) return ZERO_INSET;
+  const topBias = totalFloors <= 1 ? 0 : floorIndex / Math.max(1, totalFloors - 1);
+  const a = maxInset * (0.65 + rng() * 0.35);
+  const b = maxInset * (0.35 + rng() * 0.3);
+  switch (massing) {
+    case "cantilever-front":
+      return topBias > 0 ? { west: b, east: 0, north: 0, south: b } : { west: 0, east: b, north: a, south: 0 };
+    case "stepped-terrace":
+      return { west: b * topBias, east: a * topBias, north: b * topBias, south: a * topBias };
+    case "side-veranda":
+      return { west: a, east: 0, north: b, south: 0 };
+    case "tower-wing":
+      return topBias > 0.4 ? { west: a, east: b, north: 0, south: b } : { west: 0, east: b, north: 0, south: 0 };
+    case "split-block":
+      return floorIndex % 2 === 0 ? { west: a, east: 0, north: b, south: 0 } : { west: 0, east: a, north: 0, south: b };
+    case "pergola-terrace":
+      return topBias > 0 ? { west: b, east: b, north: 0, south: a * topBias } : ZERO_INSET;
+    case "courtyard-cut":
+    case "jaali-court":
+      return { west: b, east: b, north: b, south: b };
+    case "butterfly-pavilion":
+      return { west: b, east: b, north: 0, south: 0 };
+    case "gabled-house":
+    default:
+      return { west: 0, east: 0, north: b, south: b };
+  }
+}
+
 /** Pick the plan family that fits the user's program & plot best.
  *
  * Non-box shapes (L, U, courtyard) carve a notch out of the NE corner of the
@@ -549,11 +610,13 @@ function buildPlate(
   stairShape: DesignSpec["staircaseType"],
   withLift: boolean,
   liftSize: { w: number; h: number },
+  footprintInset: FootprintInset,
+  layoutShift: number,
 ): FloorPlate {
-  const fx = SETBACK;
-  const fy = SETBACK;
-  const fw = plotW - SETBACK * 2;
-  const fh = plotD - SETBACK * 2;
+  const fx = SETBACK + footprintInset.west;
+  const fy = SETBACK + footprintInset.north;
+  const fw = plotW - SETBACK * 2 - footprintInset.west - footprintInset.east;
+  const fh = plotD - SETBACK * 2 - footprintInset.north - footprintInset.south;
 
   const entranceWall = pickEntranceWall(entranceDir);
 
@@ -569,15 +632,18 @@ function buildPlate(
   const workWidth = hallwayAlongY ? fw : fh;
 
   const hallwayW = HALLWAY_WIDTH;
-  const sideWidth = (workWidth - hallwayW) / 2;
-  const hallwayLocalX = sideWidth; // hallway starts here (in local coords)
+  const maxOffset = Math.max(0, (workWidth - hallwayW) / 2 - 8);
+  const hallwayOffset = Math.max(-maxOffset, Math.min(maxOffset, layoutShift));
+  const hallwayLocalX = (workWidth - hallwayW) / 2 + hallwayOffset;
+  const leftSideWidth = hallwayLocalX;
+  const rightSideWidth = workWidth - hallwayLocalX - hallwayW;
 
   const zones = planFloor(rooms, entranceWall, rng, stairSide);
   const leftZones = zones.filter((z) => z.side === "left");
   const rightZones = zones.filter((z) => z.side === "right");
 
-  const leftLayout = layoutSide(leftZones, sideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
-  const rightLayout = layoutSide(rightZones, sideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
+  const leftLayout = layoutSide(leftZones, leftSideWidth, workDepth, "left", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
+  const rightLayout = layoutSide(rightZones, rightSideWidth, workDepth, "right", floorIndex, hallwayLocalX, hallwayW, undefined, stairShape, withLift, liftSize);
   const localRooms = [...leftLayout.rooms, ...rightLayout.rooms];
 
   // Rotate / mirror local coords to match entranceWall.
@@ -1122,11 +1188,14 @@ export function generateVariations(
   for (let i = 0; i < count; i++) {
     const seed = baseSeed + i * 1009;
     const rng = mulberry32(seed);
+    const massingStyle = MASSING_STYLES[i % MASSING_STYLES.length];
 
     const baseCurv =
       spec.curvature === "gentle" ? 0.25 : spec.curvature === "bold" ? 0.8 : 0.5;
     const curvatureLevel = Math.max(0.1, Math.min(1, baseCurv + (rng() - 0.5) * 0.25));
     const stairSide: HallSide = rng() < 0.5 ? "left" : "right";
+    const sideBandInset = Math.max(0, Math.min(6, (Math.min(usableW, usableD) - HALLWAY_WIDTH - 18) / 2));
+    const layoutShift = ((i % 5) - 2) * Math.min(2.4, Math.max(0.5, sideBandInset * 0.45));
 
     const plates: FloorPlate[] = [];
     for (let f = 0; f < spec.floors; f++) {
@@ -1148,6 +1217,8 @@ export function generateVariations(
           stairShape,
           withLift && spec.floors > 1,
           liftDims(spec.lifestyle.familySize),
+          footprintForMassing(massingStyle, f, spec.floors, sideBandInset, rng),
+          layoutShift,
         ),
       );
     }
@@ -1266,7 +1337,11 @@ export function generateVariations(
       "courtyard": Math.min(5, sideAspect * 0.15),
     };
     const chamfer = chamferFor[planType] * (0.75 + rng() * 0.5);
-    for (const p of plates) p.chamfer = chamfer;
+    const chamferCorner = CHAMFER_CORNERS[i % CHAMFER_CORNERS.length];
+    for (const p of plates) {
+      p.chamfer = chamfer || (massingStyle === "split-block" || massingStyle === "jaali-court" ? Math.min(5, sideAspect * 0.12) : 0);
+      p.chamferCorner = chamferCorner;
+    }
 
     // Parking lives inside the plot. When stilt-parking is enabled, parking
     // is a room on the ground floor instead of a separate strip.
@@ -1287,6 +1362,7 @@ export function generateVariations(
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
       elevationStyle,
+      massingStyle,
       parking,
       paletteAccent: accent,
       liveability,
