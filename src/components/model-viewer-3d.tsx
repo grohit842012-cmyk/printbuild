@@ -678,15 +678,21 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     const lift = Math.min(w, d) * 0.22;
     return (
       <group position={center}>
-        <mesh position={[-w * 0.24, lift / 2, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
+        {/* Clerestory glass fill along the ridge — closes the V so the
+            interior isn't exposed to sky, but reads as a light monitor. */}
+        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.75, d + 0.6]} />
+          <meshPhysicalMaterial color="#dfeaf2" transmission={0.35} opacity={0.85} transparent roughness={0.15} metalness={0.1} />
+        </mesh>
+        <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
-        <mesh position={[w * 0.24, lift / 2, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
+        <mesh position={[w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
-        <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+        <mesh position={[0, lift * 0.35 + 0.05, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 0.18, d + 0.9]} />
           <meshStandardMaterial color={TRIM} roughness={0.55} />
         </mesh>
