@@ -618,23 +618,28 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     </group>
   );
 
+  // Decorations must NEVER cover the front entrance on the ground floor.
+  // We only allow front-side balconies (upper level) and side-wall screens.
+  // Full-height screens on the entrance side are disallowed — they were
+  // burying doors and windows.
   switch (massing) {
     case "cantilever-front":
-      return <>{balcony(1.15)}{screen(5)}</>;
+      return <>{balcony(1.15)}</>;
     case "side-veranda":
-      return <>{balcony(0.9)}{pergola(FLOOR_HEIGHT * FT_TO_M + 0.5)}</>;
+      return <>{balcony(0.9)}</>;
     case "stepped-terrace":
-      return <>{pergola()}{balcony(0.75)}</>;
+      return <>{balcony(0.75)}</>;
     case "tower-wing":
-      return <>{screen(3, true)}{balcony(0.65)}</>;
+      return <>{balcony(0.65)}</>;
     case "jaali-court":
-      return <>{screen(12, true)}</>;
+      // Screens only if the front feature can sit as an upper balcony, not full-height.
+      return <>{balcony(0.9)}{variation.plates.length > 1 ? screen(6) : null}</>;
     case "split-block":
-      return <>{screen(7, true)}{balcony(0.55)}</>;
+      return <>{balcony(0.75)}</>;
     case "pergola-terrace":
-      return <>{pergola()}{balcony(0.9)}</>;
+      return <>{balcony(0.9)}</>;
     case "courtyard-cut":
-      return <>{screen(6)}{pergola()}</>;
+      return <>{balcony(0.8)}</>;
     default:
       return <>{balcony(0.8)}</>;
   }
