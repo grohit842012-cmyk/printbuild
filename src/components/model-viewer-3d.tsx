@@ -225,14 +225,22 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
           <mesh key={`g${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={glassArgs} />
             <meshPhysicalMaterial
-              color="#bcdcf2"
-              transmission={0.7}
-              opacity={0.55}
+              color={`#${GLASS_TINT}`}
+              transmission={0.55}
+              opacity={0.65}
               transparent
-              roughness={0.05}
+              roughness={0.08}
               thickness={0.05}
-              metalness={0.2}
+              metalness={0.15}
             />
+          </mesh>,
+        );
+        // muntin — a subtle horizontal divider for character
+        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.06, t * 0.35] : [t * 0.35, 0.06, segLen * 0.9];
+        segments.push(
+          <mesh key={`m${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
+            <boxGeometry args={muntinArgs} />
+            <meshStandardMaterial color={palette.trim} roughness={0.6} />
           </mesh>,
         );
       }
