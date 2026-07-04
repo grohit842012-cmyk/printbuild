@@ -10,6 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Compass } from "lucide-react";
 
+function safeNext(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  // Same-origin relative paths only (avoid open-redirect via absolute or protocol URLs).
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "";
+  return raw;
+}
+
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -17,19 +24,23 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Create an account to design and save your custom home." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>) => ({ next: safeNext(s.next) }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { next } = Route.useSearch();
   const [loading, setLoading] = useState(false);
+  const destination = next || "/designs";
 
   useEffect(() => {
     if (!authLoading && user) {
-      void navigate({ to: "/designs" });
+      if (next) window.location.href = next;
+      else void navigate({ to: "/designs" });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, next]);
 
   async function onSignIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,7 +56,8 @@ function AuthPage() {
       return;
     }
     toast.success("Welcome back");
-    void navigate({ to: "/designs" });
+    if (next) window.location.href = next;
+    else void navigate({ to: "/designs" });
   }
 
   async function onSignUp(e: FormEvent<HTMLFormElement>) {
@@ -59,7 +71,7 @@ function AuthPage() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.origin + destination,
         data: { display_name: displayName },
       },
     });
@@ -69,7 +81,8 @@ function AuthPage() {
       return;
     }
     toast.success("Account created — you're signed in");
-    void navigate({ to: "/designs" });
+    if (next) window.location.href = next;
+    else void navigate({ to: "/designs" });
   }
 
   return (
@@ -92,7 +105,7 @@ function AuthPage() {
             className="w-full mb-4"
             onClick={async () => {
               const result = await lovable.auth.signInWithOAuth("google", {
-                redirect_uri: window.location.origin + "/designs",
+                redirect_uri: window.location.origin + destination,
               });
               if (result.error) toast.error(result.error.message);
             }}
