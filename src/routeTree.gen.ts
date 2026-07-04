@@ -22,6 +22,7 @@ import { Route as DesignIdReviewRouteImport } from './routes/design.$id.review'
 import { Route as DesignIdRefineRouteImport } from './routes/design.$id.refine'
 import { Route as DesignIdGalleryRouteImport } from './routes/design.$id.gallery'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as DesignIdViewIdxRouteImport } from './routes/design.$id.view.$idx'
 
 const McpRoute = McpRouteImport.update({
@@ -92,6 +93,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignIdViewIdxRoute = DesignIdViewIdxRouteImport.update({
   id: '/design/$id/view/$idx',
   path: '/design/$id/view/$idx',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin_/reviews': typeof AdminReviewsRoute
   '/design/new': typeof DesignNewRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/design/$id/gallery': typeof DesignIdGalleryRoute
   '/design/$id/refine': typeof DesignIdRefineRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/admin/reviews'
     | '/design/new'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/admin/reviews'
     | '/design/new'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/admin_/reviews'
     | '/design/new'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/design/$id/gallery'
     | '/design/$id/refine'
@@ -208,6 +220,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   DesignNewRoute: typeof DesignNewRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   DesignIdGalleryRoute: typeof DesignIdGalleryRoute
   DesignIdRefineRoute: typeof DesignIdRefineRoute
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design/$id/view/$idx': {
       id: '/design/$id/view/$idx'
       path: '/design/$id/view/$idx'
@@ -329,6 +349,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   DesignNewRoute: DesignNewRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   DesignIdGalleryRoute: DesignIdGalleryRoute,
   DesignIdRefineRoute: DesignIdRefineRoute,
