@@ -99,11 +99,15 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
 
   const palette = paletteFor(variation);
   const base = new THREE.Color(palette.wall);
-  const tint = new THREE.Color(palette.accent);
-  const wall = base.clone().lerp(tint, palette.material === "render" ? 0.18 : 0.05);
+  const cream = new THREE.Color("#f6efe2");
+  // Whitewash: pull every facade toward warm off-white so the row of designs
+  // reads as light+wooden, per user preference.
+  const wall = base.clone().lerp(cream, palette.material === "timber" || palette.material === "brick" ? 0.35 : 0.55);
   const WALL_COLOR = `#${wall.getHexString()}`;
-  const TRIM_COLOR = palette.trim;
+  const TRIM_COLOR = "#f4ecdd";
   const DOOR_COLOR = "#5a3a22";   // walnut
+  // Window tint — varies per variation so windows aren't always white.
+  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#bcdcf2"), 0.55).getHexString();
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
