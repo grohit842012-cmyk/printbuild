@@ -1168,28 +1168,28 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.05;
+          gl.toneMappingExposure = 1.15;
         }}
       >
         <Suspense fallback={null}>
-          {/* Sunset sky */}
+          {/* Bright daylight sky */}
           <Sky
             distance={450000}
-            sunPosition={[-1, 0.18, 0.6]}
-            inclination={0.49}
+            sunPosition={[-0.6, 0.9, 0.4]}
+            inclination={0.15}
             azimuth={0.25}
-            turbidity={8}
-            rayleigh={3}
-            mieCoefficient={0.012}
-            mieDirectionalG={0.85}
+            turbidity={4}
+            rayleigh={1.5}
+            mieCoefficient={0.006}
+            mieDirectionalG={0.8}
           />
-          <fog attach="fog" args={["#f6c79a", camDist * 2, camDist * 6]} />
-          <ambientLight intensity={0.45} color="#ffd9b3" />
-          {/* Warm sunset key light */}
+          <fog attach="fog" args={["#dfe8ee", camDist * 3, camDist * 8]} />
+          <ambientLight intensity={0.7} color="#ffffff" />
+          {/* Sun */}
           <directionalLight
-            position={[-camDist * 1.2, camDist * 0.6, camDist * 0.8]}
-            intensity={1.6}
-            color="#ffb070"
+            position={[-camDist * 0.8, camDist * 1.4, camDist * 0.6]}
+            intensity={1.4}
+            color="#fff5e0"
             castShadow
             shadow-mapSize={[2048, 2048]}
             shadow-camera-left={-camDist}
