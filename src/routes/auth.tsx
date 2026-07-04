@@ -10,6 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Compass } from "lucide-react";
 
+function safeNext(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  // Same-origin relative paths only (avoid open-redirect via absolute or protocol URLs).
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "";
+  return raw;
+}
+
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -17,6 +24,7 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Create an account to design and save your custom home." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>) => ({ next: safeNext(s.next) }),
   component: AuthPage,
 });
 
