@@ -99,11 +99,15 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
 
   const palette = paletteFor(variation);
   const base = new THREE.Color(palette.wall);
-  const tint = new THREE.Color(palette.accent);
-  const wall = base.clone().lerp(tint, palette.material === "render" ? 0.18 : 0.05);
+  const cream = new THREE.Color("#f6efe2");
+  // Whitewash: pull every facade toward warm off-white so the row of designs
+  // reads as light+wooden, per user preference.
+  const wall = base.clone().lerp(cream, palette.material === "timber" || palette.material === "brick" ? 0.35 : 0.55);
   const WALL_COLOR = `#${wall.getHexString()}`;
-  const TRIM_COLOR = palette.trim;
+  const TRIM_COLOR = "#f4ecdd";
   const DOOR_COLOR = "#5a3a22";   // walnut
+  // Window tint — varies per variation so windows aren't always white.
+  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#bcdcf2"), 0.55).getHexString();
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
@@ -221,14 +225,22 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
           <mesh key={`g${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={glassArgs} />
             <meshPhysicalMaterial
-              color="#bcdcf2"
-              transmission={0.7}
-              opacity={0.55}
+              color={`#${GLASS_TINT}`}
+              transmission={0.55}
+              opacity={0.65}
               transparent
-              roughness={0.05}
+              roughness={0.08}
               thickness={0.05}
-              metalness={0.2}
+              metalness={0.15}
             />
+          </mesh>,
+        );
+        // muntin — a subtle horizontal divider for character
+        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.06, t * 0.35] : [t * 0.35, 0.06, segLen * 0.9];
+        segments.push(
+          <mesh key={`m${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
+            <boxGeometry args={muntinArgs} />
+            <meshStandardMaterial color={palette.trim} roughness={0.6} />
           </mesh>,
         );
       }
@@ -606,23 +618,28 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     </group>
   );
 
+  // Decorations must NEVER cover the front entrance on the ground floor.
+  // We only allow front-side balconies (upper level) and side-wall screens.
+  // Full-height screens on the entrance side are disallowed — they were
+  // burying doors and windows.
   switch (massing) {
     case "cantilever-front":
-      return <>{balcony(1.15)}{screen(5)}</>;
+      return <>{balcony(1.15)}</>;
     case "side-veranda":
-      return <>{balcony(0.9)}{pergola(FLOOR_HEIGHT * FT_TO_M + 0.5)}</>;
+      return <>{balcony(0.9)}</>;
     case "stepped-terrace":
-      return <>{pergola()}{balcony(0.75)}</>;
+      return <>{balcony(0.75)}</>;
     case "tower-wing":
-      return <>{screen(3, true)}{balcony(0.65)}</>;
+      return <>{balcony(0.65)}</>;
     case "jaali-court":
-      return <>{screen(12, true)}</>;
+      // Screens only if the front feature can sit as an upper balcony, not full-height.
+      return <>{balcony(0.9)}{variation.plates.length > 1 ? screen(6) : null}</>;
     case "split-block":
-      return <>{screen(7, true)}{balcony(0.55)}</>;
+      return <>{balcony(0.75)}</>;
     case "pergola-terrace":
-      return <>{pergola()}{balcony(0.9)}</>;
+      return <>{balcony(0.9)}</>;
     case "courtyard-cut":
-      return <>{screen(6)}{pergola()}</>;
+      return <>{balcony(0.8)}</>;
     default:
       return <>{balcony(0.8)}</>;
   }
@@ -661,15 +678,21 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     const lift = Math.min(w, d) * 0.22;
     return (
       <group position={center}>
-        <mesh position={[-w * 0.24, lift / 2, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
+        {/* Clerestory glass fill along the ridge — closes the V so the
+            interior isn't exposed to sky, but reads as a light monitor. */}
+        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.75, d + 0.6]} />
+          <meshPhysicalMaterial color="#dfeaf2" transmission={0.35} opacity={0.85} transparent roughness={0.15} metalness={0.1} />
+        </mesh>
+        <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
-        <mesh position={[w * 0.24, lift / 2, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
+        <mesh position={[w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
-        <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
+        <mesh position={[0, lift * 0.35 + 0.05, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 0.18, d + 0.9]} />
           <meshStandardMaterial color={TRIM} roughness={0.55} />
         </mesh>
@@ -974,18 +997,55 @@ function LiftShaft({ variation }: { variation: Variation }) {
 function Plot({ variation }: { variation: Variation }) {
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
+  // Deterministic tree placement around the plot edge
+  const trees: { x: number; z: number; scale: number; kind: number }[] = [];
+  const seed = variation.seed || 1;
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 9301 + i * 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  const half = { w: w / 2 + 1.2, d: d / 2 + 1.2 };
+  const outer = { w: w / 2 + 5, d: d / 2 + 5 };
+  for (let i = 0; i < 14; i++) {
+    const side = i % 4;
+    const t = rand(i * 3 + 1);
+    const jitter = rand(i * 3 + 2) * 1.6;
+    let x = 0, z = 0;
+    if (side === 0) { x = -outer.w + jitter; z = -half.d + t * d; }
+    else if (side === 1) { x = outer.w - jitter; z = -half.d + t * d; }
+    else if (side === 2) { z = -outer.d + jitter; x = -half.w + t * w; }
+    else { z = outer.d - jitter; x = -half.w + t * w; }
+    trees.push({ x, z, scale: 0.9 + rand(i * 3 + 3) * 0.8, kind: Math.floor(rand(i) * 3) });
+  }
   return (
     <group>
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w + 6, d + 6]} />
-        <meshStandardMaterial color="#3f6b3a" roughness={0.95} />
+        <planeGeometry args={[w + 14, d + 14]} />
+        <meshStandardMaterial color="#7ca25a" roughness={0.95} />
       </mesh>
       {/* Driveway hint */}
       <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#52525b" roughness={0.85} />
+        <meshStandardMaterial color="#8b8478" roughness={0.85} />
       </mesh>
+      {/* Perimeter trees for landscape context */}
+      {trees.map((t, i) => (
+        <group key={i} position={[t.x, 0, t.z]} scale={t.scale}>
+          <mesh position={[0, 0.8, 0]} castShadow>
+            <cylinderGeometry args={[0.12, 0.16, 1.6, 6]} />
+            <meshStandardMaterial color="#6b4a2a" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 2.2, 0]} castShadow>
+            {t.kind === 0
+              ? <sphereGeometry args={[1.1, 10, 8]} />
+              : t.kind === 1
+                ? <coneGeometry args={[0.9, 2.4, 8]} />
+                : <sphereGeometry args={[0.9, 8, 6]} />}
+            <meshStandardMaterial color={t.kind === 1 ? "#3f6b3a" : "#587a3f"} roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
@@ -1108,28 +1168,28 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.05;
+          gl.toneMappingExposure = 1.15;
         }}
       >
         <Suspense fallback={null}>
-          {/* Sunset sky */}
+          {/* Bright daylight sky */}
           <Sky
             distance={450000}
-            sunPosition={[-1, 0.18, 0.6]}
-            inclination={0.49}
+            sunPosition={[-0.6, 0.9, 0.4]}
+            inclination={0.15}
             azimuth={0.25}
-            turbidity={8}
-            rayleigh={3}
-            mieCoefficient={0.012}
-            mieDirectionalG={0.85}
+            turbidity={4}
+            rayleigh={1.5}
+            mieCoefficient={0.006}
+            mieDirectionalG={0.8}
           />
-          <fog attach="fog" args={["#f6c79a", camDist * 2, camDist * 6]} />
-          <ambientLight intensity={0.45} color="#ffd9b3" />
-          {/* Warm sunset key light */}
+          <fog attach="fog" args={["#dfe8ee", camDist * 3, camDist * 8]} />
+          <ambientLight intensity={0.7} color="#ffffff" />
+          {/* Sun */}
           <directionalLight
-            position={[-camDist * 1.2, camDist * 0.6, camDist * 0.8]}
-            intensity={1.6}
-            color="#ffb070"
+            position={[-camDist * 0.8, camDist * 1.4, camDist * 0.6]}
+            intensity={1.4}
+            color="#fff5e0"
             castShadow
             shadow-mapSize={[2048, 2048]}
             shadow-camera-left={-camDist}
@@ -1138,8 +1198,9 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
             shadow-camera-bottom={-camDist}
           />
           {/* Cool fill from opposite side */}
-          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.4} color="#9ec9ff" />
-          <Environment preset="sunset" />
+          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.55} color="#e8f0ff" />
+          <Environment preset="park" />
+
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
           {variation.plates
