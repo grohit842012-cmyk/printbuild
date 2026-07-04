@@ -1198,8 +1198,9 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
             shadow-camera-bottom={-camDist}
           />
           {/* Cool fill from opposite side */}
-          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.4} color="#9ec9ff" />
-          <Environment preset="sunset" />
+          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.55} color="#e8f0ff" />
+          <Environment preset="park" />
+
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
           {variation.plates
