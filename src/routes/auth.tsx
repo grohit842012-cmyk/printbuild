@@ -105,7 +105,7 @@ function AuthPage() {
             className="w-full mb-4"
             onClick={async () => {
               const result = await lovable.auth.signInWithOAuth("google", {
-                redirect_uri: window.location.origin + "/designs",
+                redirect_uri: window.location.origin + destination,
               });
               if (result.error) toast.error(result.error.message);
             }}
