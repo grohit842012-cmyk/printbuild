@@ -997,18 +997,55 @@ function LiftShaft({ variation }: { variation: Variation }) {
 function Plot({ variation }: { variation: Variation }) {
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
+  // Deterministic tree placement around the plot edge
+  const trees: { x: number; z: number; scale: number; kind: number }[] = [];
+  const seed = variation.seed || 1;
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 9301 + i * 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  const half = { w: w / 2 + 1.2, d: d / 2 + 1.2 };
+  const outer = { w: w / 2 + 5, d: d / 2 + 5 };
+  for (let i = 0; i < 14; i++) {
+    const side = i % 4;
+    const t = rand(i * 3 + 1);
+    const jitter = rand(i * 3 + 2) * 1.6;
+    let x = 0, z = 0;
+    if (side === 0) { x = -outer.w + jitter; z = -half.d + t * d; }
+    else if (side === 1) { x = outer.w - jitter; z = -half.d + t * d; }
+    else if (side === 2) { z = -outer.d + jitter; x = -half.w + t * w; }
+    else { z = outer.d - jitter; x = -half.w + t * w; }
+    trees.push({ x, z, scale: 0.9 + rand(i * 3 + 3) * 0.8, kind: Math.floor(rand(i) * 3) });
+  }
   return (
     <group>
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w + 6, d + 6]} />
-        <meshStandardMaterial color="#3f6b3a" roughness={0.95} />
+        <planeGeometry args={[w + 14, d + 14]} />
+        <meshStandardMaterial color="#7ca25a" roughness={0.95} />
       </mesh>
       {/* Driveway hint */}
       <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#52525b" roughness={0.85} />
+        <meshStandardMaterial color="#8b8478" roughness={0.85} />
       </mesh>
+      {/* Perimeter trees for landscape context */}
+      {trees.map((t, i) => (
+        <group key={i} position={[t.x, 0, t.z]} scale={t.scale}>
+          <mesh position={[0, 0.8, 0]} castShadow>
+            <cylinderGeometry args={[0.12, 0.16, 1.6, 6]} />
+            <meshStandardMaterial color="#6b4a2a" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 2.2, 0]} castShadow>
+            {t.kind === 0
+              ? <sphereGeometry args={[1.1, 10, 8]} />
+              : t.kind === 1
+                ? <coneGeometry args={[0.9, 2.4, 8]} />
+                : <sphereGeometry args={[0.9, 8, 6]} />}
+            <meshStandardMaterial color={t.kind === 1 ? "#3f6b3a" : "#587a3f"} roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
