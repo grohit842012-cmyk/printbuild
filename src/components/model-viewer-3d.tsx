@@ -678,14 +678,32 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
 
   if (massing === "butterfly-pavilion") {
     const lift = Math.min(w, d) * 0.22;
+    // Solid parapet wall closes the gap between the top floor and the V so
+    // you never see interior from outside. Gable-end walls seal the ±X sides.
     return (
       <group position={center}>
-        {/* Clerestory glass fill along the ridge — closes the V so the
-            interior isn't exposed to sky, but reads as a light monitor. */}
-        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
-          <boxGeometry args={[w + 0.6, lift * 0.75, d + 0.6]} />
-          <meshPhysicalMaterial color="#dfeaf2" transmission={0.35} opacity={0.85} transparent roughness={0.15} metalness={0.1} />
+        {/* Parapet band that fully wraps the top-floor perimeter */}
+        <mesh position={[0, lift * 0.42, -d / 2 - 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.85, 0.3]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.75} />
         </mesh>
+        <mesh position={[0, lift * 0.42, d / 2 + 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.85, 0.3]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.75} />
+        </mesh>
+        {/* Gable end walls on the low sides of the V — solid, closes the sky gap */}
+        {[-1, 1].map((s) => (
+          <mesh key={s} position={[s * (w / 2 + 0.1), lift * 0.55, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.3, lift * 1.05, d + 0.6]} />
+            <meshStandardMaterial color={palette.trim} roughness={0.75} />
+          </mesh>
+        ))}
+        {/* Clerestory glass strip along the ridge for a soft light monitor */}
+        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.55, d + 0.6]} />
+          <meshPhysicalMaterial color="#dfeaf2" transmission={0.4} opacity={0.82} transparent roughness={0.15} metalness={0.1} />
+        </mesh>
+        {/* The two roof slabs of the butterfly V */}
         <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
@@ -694,6 +712,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
+        {/* Central ridge trim */}
         <mesh position={[0, lift * 0.35 + 0.05, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 0.18, d + 0.9]} />
           <meshStandardMaterial color={TRIM} roughness={0.55} />
