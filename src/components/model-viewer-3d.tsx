@@ -647,6 +647,73 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   }
 }
 
+function RoofPots({ w, d, seed }: { w: number; d: number; seed: number }) {
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 9301 + i * 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  const pots: { x: number; z: number; kind: 0 | 1 | 2; s: number }[] = [];
+  const count = 6;
+  for (let i = 0; i < count; i++) {
+    const edge = i % 4;
+    const t = 0.15 + rand(i * 5 + 1) * 0.7;
+    let x = 0, z = 0;
+    const inset = 0.6;
+    if (edge === 0) { x = -w / 2 + inset; z = -d / 2 + t * d; }
+    else if (edge === 1) { x = w / 2 - inset; z = -d / 2 + t * d; }
+    else if (edge === 2) { z = -d / 2 + inset; x = -w / 2 + t * w; }
+    else { z = d / 2 - inset; x = -w / 2 + t * w; }
+    pots.push({ x, z, kind: Math.floor(rand(i * 7) * 3) as 0 | 1 | 2, s: 0.8 + rand(i * 3) * 0.5 });
+  }
+  return (
+    <group position={[0, 0.2, 0]}>
+      {pots.map((p, i) => (
+        <group key={i} position={[p.x, 0, p.z]} scale={p.s}>
+          {/* terracotta pot */}
+          <mesh position={[0, 0.18, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.22, 0.16, 0.36, 12]} />
+            <meshStandardMaterial color="#a05a3a" roughness={0.85} />
+          </mesh>
+          {/* soil */}
+          <mesh position={[0, 0.36, 0]} receiveShadow>
+            <cylinderGeometry args={[0.2, 0.2, 0.02, 12]} />
+            <meshStandardMaterial color="#3a2a1a" roughness={1} />
+          </mesh>
+          {/* foliage — layered irregular blobs */}
+          {p.kind === 0 ? (
+            <>
+              <mesh position={[0, 0.62, 0]} castShadow>
+                <sphereGeometry args={[0.28, 10, 8]} />
+                <meshStandardMaterial color="#4a7a3a" roughness={0.9} />
+              </mesh>
+              <mesh position={[0.14, 0.58, 0.06]} castShadow>
+                <sphereGeometry args={[0.18, 8, 6]} />
+                <meshStandardMaterial color="#578a45" roughness={0.9} />
+              </mesh>
+            </>
+          ) : p.kind === 1 ? (
+            <>
+              <mesh position={[0, 0.75, 0]} castShadow>
+                <coneGeometry args={[0.22, 0.9, 8]} />
+                <meshStandardMaterial color="#3f6b3a" roughness={0.9} />
+              </mesh>
+            </>
+          ) : (
+            <>
+              {[[-0.1, 0.55, 0], [0.12, 0.62, 0.05], [0, 0.5, -0.1]].map(([x, y, z], k) => (
+                <mesh key={k} position={[x, y, z]} castShadow>
+                  <sphereGeometry args={[0.16, 8, 6]} />
+                  <meshStandardMaterial color="#688a4a" roughness={0.9} />
+                </mesh>
+              ))}
+            </>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const top = variation.plates[variation.plates.length - 1];
   const cx = top.x + top.w / 2;
