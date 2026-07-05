@@ -38,7 +38,9 @@ function paletteFor(variation: Variation) {
   const wall = dna?.palette.wall ?? variation.paletteAccent ?? "#c98a4b";
   const trim = dna?.palette.trim ?? "#fbf6ec";
   const accent = dna?.palette.accent ?? variation.paletteAccent ?? "#c98a4b";
-  const roof = dna?.palette.roof ?? (variation.roofType === "sloped" ? "#a83e1a" : "#3a3a38");
+  // Force a dark roof palette — user asked for dark roofs on every design.
+  const DARK_ROOFS = ["#2a2622", "#1f1d1c", "#3a2a20", "#242a2e", "#1c1c1c", "#2f241a"];
+  const roof = DARK_ROOFS[(variation.seed || 0) % DARK_ROOFS.length];
   const material = facade.includes("brick")
     ? "brick"
     : facade.includes("timber") || facade.includes("teak")
@@ -582,16 +584,24 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     </group>
   );
 
-  const screen = (count: number, fullHeight = false) => {
-    const isNS = front === "N" || front === "S";
-    const sign = front === "N" || front === "W" ? -1 : 1;
-    const height = (fullHeight ? variation.plates.length * FLOOR_HEIGHT : 9) * FT_TO_M;
+  // Vertical fins / jaali placed on a SIDE wall of the UPPER floor only —
+  // never the entrance side, never full-height (was blocking the door).
+  const screen = (count: number) => {
+    if (variation.plates.length < 2) return null;
+    // pick a side wall perpendicular to entrance
+    const side = (front === "N" || front === "S" ? "E" : "S") as "N" | "E" | "S" | "W";
+    const upper = variation.plates[variation.plates.length - 1];
+    const span = side === "N" || side === "S" ? upper.w : upper.h;
+    const feat = sidePosition(variation, upper, side, 0.4, Math.min(span * 0.55, 14), 4);
+    const height = 8.5 * FT_TO_M;
+    const isNS = side === "N" || side === "S";
+    const sign = side === "N" || side === "W" ? -1 : 1;
     return (
-      <group position={[frontFeature.pos[0], height / 2, frontFeature.pos[2]]}>
+      <group position={[feat.pos[0], y1 + height / 2, feat.pos[2]]}>
         {Array.from({ length: count }).map((_, k) => {
           const t = count === 1 ? 0 : k / (count - 1) - 0.5;
           return (
-            <mesh key={k} position={isNS ? [t * frontFeature.size[0], 0, sign * 0.08] : [sign * 0.08, 0, t * frontFeature.size[2]]} castShadow>
+            <mesh key={k} position={isNS ? [t * feat.size[0], 0, sign * 0.08] : [sign * 0.08, 0, t * feat.size[2]]} castShadow>
               <boxGeometry args={isNS ? [0.09, height, 0.16] : [0.16, height, 0.09]} />
               {accentMat}
             </mesh>
@@ -645,6 +655,73 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   }
 }
 
+function RoofPots({ w, d, seed }: { w: number; d: number; seed: number }) {
+  const rand = (i: number) => {
+    const x = Math.sin(seed * 9301 + i * 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  const pots: { x: number; z: number; kind: 0 | 1 | 2; s: number }[] = [];
+  const count = 6;
+  for (let i = 0; i < count; i++) {
+    const edge = i % 4;
+    const t = 0.15 + rand(i * 5 + 1) * 0.7;
+    let x = 0, z = 0;
+    const inset = 0.6;
+    if (edge === 0) { x = -w / 2 + inset; z = -d / 2 + t * d; }
+    else if (edge === 1) { x = w / 2 - inset; z = -d / 2 + t * d; }
+    else if (edge === 2) { z = -d / 2 + inset; x = -w / 2 + t * w; }
+    else { z = d / 2 - inset; x = -w / 2 + t * w; }
+    pots.push({ x, z, kind: Math.floor(rand(i * 7) * 3) as 0 | 1 | 2, s: 0.8 + rand(i * 3) * 0.5 });
+  }
+  return (
+    <group position={[0, 0.2, 0]}>
+      {pots.map((p, i) => (
+        <group key={i} position={[p.x, 0, p.z]} scale={p.s}>
+          {/* terracotta pot */}
+          <mesh position={[0, 0.18, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.22, 0.16, 0.36, 12]} />
+            <meshStandardMaterial color="#a05a3a" roughness={0.85} />
+          </mesh>
+          {/* soil */}
+          <mesh position={[0, 0.36, 0]} receiveShadow>
+            <cylinderGeometry args={[0.2, 0.2, 0.02, 12]} />
+            <meshStandardMaterial color="#3a2a1a" roughness={1} />
+          </mesh>
+          {/* foliage — layered irregular blobs */}
+          {p.kind === 0 ? (
+            <>
+              <mesh position={[0, 0.62, 0]} castShadow>
+                <sphereGeometry args={[0.28, 10, 8]} />
+                <meshStandardMaterial color="#4a7a3a" roughness={0.9} />
+              </mesh>
+              <mesh position={[0.14, 0.58, 0.06]} castShadow>
+                <sphereGeometry args={[0.18, 8, 6]} />
+                <meshStandardMaterial color="#578a45" roughness={0.9} />
+              </mesh>
+            </>
+          ) : p.kind === 1 ? (
+            <>
+              <mesh position={[0, 0.75, 0]} castShadow>
+                <coneGeometry args={[0.22, 0.9, 8]} />
+                <meshStandardMaterial color="#3f6b3a" roughness={0.9} />
+              </mesh>
+            </>
+          ) : (
+            <>
+              {[[-0.1, 0.55, 0], [0.12, 0.62, 0.05], [0, 0.5, -0.1]].map(([x, y, z], k) => (
+                <mesh key={k} position={[x, y, z]} castShadow>
+                  <sphereGeometry args={[0.16, 8, 6]} />
+                  <meshStandardMaterial color="#688a4a" roughness={0.9} />
+                </mesh>
+              ))}
+            </>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const top = variation.plates[variation.plates.length - 1];
   const cx = top.x + top.w / 2;
@@ -676,14 +753,32 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
 
   if (massing === "butterfly-pavilion") {
     const lift = Math.min(w, d) * 0.22;
+    // Solid parapet wall closes the gap between the top floor and the V so
+    // you never see interior from outside. Gable-end walls seal the ±X sides.
     return (
       <group position={center}>
-        {/* Clerestory glass fill along the ridge — closes the V so the
-            interior isn't exposed to sky, but reads as a light monitor. */}
-        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
-          <boxGeometry args={[w + 0.6, lift * 0.75, d + 0.6]} />
-          <meshPhysicalMaterial color="#dfeaf2" transmission={0.35} opacity={0.85} transparent roughness={0.15} metalness={0.1} />
+        {/* Parapet band that fully wraps the top-floor perimeter */}
+        <mesh position={[0, lift * 0.42, -d / 2 - 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.85, 0.3]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.75} />
         </mesh>
+        <mesh position={[0, lift * 0.42, d / 2 + 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.85, 0.3]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.75} />
+        </mesh>
+        {/* Gable end walls on the low sides of the V — solid, closes the sky gap */}
+        {[-1, 1].map((s) => (
+          <mesh key={s} position={[s * (w / 2 + 0.1), lift * 0.55, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.3, lift * 1.05, d + 0.6]} />
+            <meshStandardMaterial color={palette.trim} roughness={0.75} />
+          </mesh>
+        ))}
+        {/* Clerestory glass strip along the ridge for a soft light monitor */}
+        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.6, lift * 0.55, d + 0.6]} />
+          <meshPhysicalMaterial color="#dfeaf2" transmission={0.4} opacity={0.82} transparent roughness={0.15} metalness={0.1} />
+        </mesh>
+        {/* The two roof slabs of the butterfly V */}
         <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
@@ -692,6 +787,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
           <meshStandardMaterial color={palette.roof} roughness={0.68} />
         </mesh>
+        {/* Central ridge trim */}
         <mesh position={[0, lift * 0.35 + 0.05, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.22, 0.18, d + 0.9]} />
           <meshStandardMaterial color={TRIM} roughness={0.55} />
@@ -744,6 +840,9 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         <boxGeometry args={[0.25, 0.7, d + 0.6]} />
         <meshStandardMaterial color={TRIM} roughness={0.7} />
       </mesh>
+      {/* Potted greenery on the flat roof terrace */}
+      <RoofPots w={w} d={d} seed={variation.seed || 1} />
+
       {hasMumty && topStair && (() => {
         // Small "stair room" sitting on top of the flat roof, directly above the stair shaft.
         // Door faces the side with the most open terrace (largest clearance to the plate edge).
@@ -754,8 +853,13 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         const stairCz = topStair.y + topStair.h / 2;
         const topCx = top.x + top.w / 2;
         const topCz = top.y + top.h / 2;
-        const mx = (stairCx - topCx) * FT_TO_M;
-        const mz = (stairCz - topCz) * FT_TO_M;
+        // Clamp mumty inside the top-plate perimeter so it never pokes out.
+        const rawMx = (stairCx - topCx) * FT_TO_M;
+        const rawMz = (stairCz - topCz) * FT_TO_M;
+        const maxMx = Math.max(0, (top.w * FT_TO_M - mw) / 2 - 0.2);
+        const maxMz = Math.max(0, (top.h * FT_TO_M - md) / 2 - 0.2);
+        const mx = Math.min(maxMx, Math.max(-maxMx, rawMx));
+        const mz = Math.min(maxMz, Math.max(-maxMz, rawMz));
         const wallT = WALL_THICKNESS * FT_TO_M;
         const doorW = 3 * FT_TO_M;
         const doorH = 6.5 * FT_TO_M;
@@ -1029,23 +1133,60 @@ function Plot({ variation }: { variation: Variation }) {
         <planeGeometry args={[w * 0.6, 2]} />
         <meshStandardMaterial color="#8b8478" roughness={0.85} />
       </mesh>
-      {/* Perimeter trees for landscape context */}
-      {trees.map((t, i) => (
-        <group key={i} position={[t.x, 0, t.z]} scale={t.scale}>
-          <mesh position={[0, 0.8, 0]} castShadow>
-            <cylinderGeometry args={[0.12, 0.16, 1.6, 6]} />
-            <meshStandardMaterial color="#6b4a2a" roughness={0.9} />
+      {/* Ground shrubs / hedge dabs for realism */}
+      {Array.from({ length: 22 }).map((_, i) => {
+        const a = rand(i * 11 + 100) * Math.PI * 2;
+        const r = (Math.max(w, d) / 2) + 0.6 + rand(i * 13) * 3.5;
+        const x = Math.cos(a) * r;
+        const z = Math.sin(a) * r;
+        const s = 0.4 + rand(i * 17) * 0.5;
+        const green = ["#4a6b32", "#5d7a3f", "#3f5e2c", "#6b8a48"][i % 4];
+        return (
+          <mesh key={`sh${i}`} position={[x, 0.18 * s, z]} scale={[s, s * 0.7, s]} castShadow receiveShadow>
+            <sphereGeometry args={[0.55, 8, 6]} />
+            <meshStandardMaterial color={green} roughness={1} />
           </mesh>
-          <mesh position={[0, 2.2, 0]} castShadow>
-            {t.kind === 0
-              ? <sphereGeometry args={[1.1, 10, 8]} />
-              : t.kind === 1
-                ? <coneGeometry args={[0.9, 2.4, 8]} />
-                : <sphereGeometry args={[0.9, 8, 6]} />}
-            <meshStandardMaterial color={t.kind === 1 ? "#3f6b3a" : "#587a3f"} roughness={0.9} />
-          </mesh>
-        </group>
-      ))}
+        );
+      })}
+      {/* Perimeter trees — irregular multi-blob canopies, trunk slightly tapered */}
+      {trees.map((t, i) => {
+        const canopyColors = ["#3f6238", "#4a7a3a", "#587a3f", "#3a5f30", "#6b8a48"];
+        const cc = canopyColors[t.kind % canopyColors.length];
+        const cc2 = canopyColors[(t.kind + 2) % canopyColors.length];
+        const blobs = 4 + Math.floor(rand(i * 19) * 3);
+        return (
+          <group key={i} position={[t.x, 0, t.z]} scale={t.scale} rotation={[0, rand(i * 23) * Math.PI, 0]}>
+            {/* Trunk */}
+            <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
+              <meshStandardMaterial color="#4a3220" roughness={0.95} />
+            </mesh>
+            {/* Sub-branches */}
+            <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
+              <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
+              <meshStandardMaterial color="#4a3220" roughness={0.95} />
+            </mesh>
+            {/* Layered irregular foliage blobs */}
+            {Array.from({ length: blobs }).map((_, k) => {
+              const ang = (k / blobs) * Math.PI * 2 + rand(i * 31 + k) * 0.6;
+              const rad = 0.35 + rand(i * 37 + k) * 0.55;
+              const yj = 2.0 + rand(i * 41 + k) * 0.9;
+              const rr = 0.5 + rand(i * 43 + k) * 0.5;
+              return (
+                <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
+                  <sphereGeometry args={[rr, 10, 8]} />
+                  <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
+                </mesh>
+              );
+            })}
+            {/* Crown cap */}
+            <mesh position={[0, 2.9, 0]} castShadow>
+              <sphereGeometry args={[0.55, 10, 8]} />
+              <meshStandardMaterial color={cc} roughness={0.95} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
