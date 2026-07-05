@@ -38,7 +38,9 @@ function paletteFor(variation: Variation) {
   const wall = dna?.palette.wall ?? variation.paletteAccent ?? "#c98a4b";
   const trim = dna?.palette.trim ?? "#fbf6ec";
   const accent = dna?.palette.accent ?? variation.paletteAccent ?? "#c98a4b";
-  const roof = dna?.palette.roof ?? (variation.roofType === "sloped" ? "#a83e1a" : "#3a3a38");
+  // Force a dark roof palette — user asked for dark roofs on every design.
+  const DARK_ROOFS = ["#2a2622", "#1f1d1c", "#3a2a20", "#242a2e", "#1c1c1c", "#2f241a"];
+  const roof = DARK_ROOFS[(variation.seed || 0) % DARK_ROOFS.length];
   const material = facade.includes("brick")
     ? "brick"
     : facade.includes("timber") || facade.includes("teak")
