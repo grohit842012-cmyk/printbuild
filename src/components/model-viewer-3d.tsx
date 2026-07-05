@@ -1125,23 +1125,60 @@ function Plot({ variation }: { variation: Variation }) {
         <planeGeometry args={[w * 0.6, 2]} />
         <meshStandardMaterial color="#8b8478" roughness={0.85} />
       </mesh>
-      {/* Perimeter trees for landscape context */}
-      {trees.map((t, i) => (
-        <group key={i} position={[t.x, 0, t.z]} scale={t.scale}>
-          <mesh position={[0, 0.8, 0]} castShadow>
-            <cylinderGeometry args={[0.12, 0.16, 1.6, 6]} />
-            <meshStandardMaterial color="#6b4a2a" roughness={0.9} />
+      {/* Ground shrubs / hedge dabs for realism */}
+      {Array.from({ length: 22 }).map((_, i) => {
+        const a = rand(i * 11 + 100) * Math.PI * 2;
+        const r = (Math.max(w, d) / 2) + 0.6 + rand(i * 13) * 3.5;
+        const x = Math.cos(a) * r;
+        const z = Math.sin(a) * r;
+        const s = 0.4 + rand(i * 17) * 0.5;
+        const green = ["#4a6b32", "#5d7a3f", "#3f5e2c", "#6b8a48"][i % 4];
+        return (
+          <mesh key={`sh${i}`} position={[x, 0.18 * s, z]} scale={[s, s * 0.7, s]} castShadow receiveShadow>
+            <sphereGeometry args={[0.55, 8, 6]} />
+            <meshStandardMaterial color={green} roughness={1} />
           </mesh>
-          <mesh position={[0, 2.2, 0]} castShadow>
-            {t.kind === 0
-              ? <sphereGeometry args={[1.1, 10, 8]} />
-              : t.kind === 1
-                ? <coneGeometry args={[0.9, 2.4, 8]} />
-                : <sphereGeometry args={[0.9, 8, 6]} />}
-            <meshStandardMaterial color={t.kind === 1 ? "#3f6b3a" : "#587a3f"} roughness={0.9} />
-          </mesh>
-        </group>
-      ))}
+        );
+      })}
+      {/* Perimeter trees — irregular multi-blob canopies, trunk slightly tapered */}
+      {trees.map((t, i) => {
+        const canopyColors = ["#3f6238", "#4a7a3a", "#587a3f", "#3a5f30", "#6b8a48"];
+        const cc = canopyColors[t.kind % canopyColors.length];
+        const cc2 = canopyColors[(t.kind + 2) % canopyColors.length];
+        const blobs = 4 + Math.floor(rand(i * 19) * 3);
+        return (
+          <group key={i} position={[t.x, 0, t.z]} scale={t.scale} rotation={[0, rand(i * 23) * Math.PI, 0]}>
+            {/* Trunk */}
+            <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
+              <meshStandardMaterial color="#4a3220" roughness={0.95} />
+            </mesh>
+            {/* Sub-branches */}
+            <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
+              <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
+              <meshStandardMaterial color="#4a3220" roughness={0.95} />
+            </mesh>
+            {/* Layered irregular foliage blobs */}
+            {Array.from({ length: blobs }).map((_, k) => {
+              const ang = (k / blobs) * Math.PI * 2 + rand(i * 31 + k) * 0.6;
+              const rad = 0.35 + rand(i * 37 + k) * 0.55;
+              const yj = 2.0 + rand(i * 41 + k) * 0.9;
+              const rr = 0.5 + rand(i * 43 + k) * 0.5;
+              return (
+                <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
+                  <sphereGeometry args={[rr, 10, 8]} />
+                  <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
+                </mesh>
+              );
+            })}
+            {/* Crown cap */}
+            <mesh position={[0, 2.9, 0]} castShadow>
+              <sphereGeometry args={[0.55, 10, 8]} />
+              <meshStandardMaterial color={cc} roughness={0.95} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
