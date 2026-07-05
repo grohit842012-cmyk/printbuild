@@ -845,8 +845,13 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         const stairCz = topStair.y + topStair.h / 2;
         const topCx = top.x + top.w / 2;
         const topCz = top.y + top.h / 2;
-        const mx = (stairCx - topCx) * FT_TO_M;
-        const mz = (stairCz - topCz) * FT_TO_M;
+        // Clamp mumty inside the top-plate perimeter so it never pokes out.
+        const rawMx = (stairCx - topCx) * FT_TO_M;
+        const rawMz = (stairCz - topCz) * FT_TO_M;
+        const maxMx = Math.max(0, (top.w * FT_TO_M - mw) / 2 - 0.2);
+        const maxMz = Math.max(0, (top.h * FT_TO_M - md) / 2 - 0.2);
+        const mx = Math.min(maxMx, Math.max(-maxMx, rawMx));
+        const mz = Math.min(maxMz, Math.max(-maxMz, rawMz));
         const wallT = WALL_THICKNESS * FT_TO_M;
         const doorW = 3 * FT_TO_M;
         const doorH = 6.5 * FT_TO_M;
