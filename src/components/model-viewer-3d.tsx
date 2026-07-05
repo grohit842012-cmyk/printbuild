@@ -589,7 +589,7 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   const screen = (count: number) => {
     if (variation.plates.length < 2) return null;
     // pick a side wall perpendicular to entrance
-    const side: "N" | "E" | "S" | "W" = front === "N" || front === "S" ? "E" : "S";
+    const side = (front === "N" || front === "S" ? "E" : "S") as "N" | "E" | "S" | "W";
     const upper = variation.plates[variation.plates.length - 1];
     const span = side === "N" || side === "S" ? upper.w : upper.h;
     const feat = sidePosition(variation, upper, side, 0.4, Math.min(span * 0.55, 14), 4);
