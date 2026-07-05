@@ -765,6 +765,9 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         <boxGeometry args={[0.25, 0.7, d + 0.6]} />
         <meshStandardMaterial color={TRIM} roughness={0.7} />
       </mesh>
+      {/* Potted greenery on the flat roof terrace */}
+      <RoofPots w={w} d={d} seed={variation.seed || 1} />
+
       {hasMumty && topStair && (() => {
         // Small "stair room" sitting on top of the flat roof, directly above the stair shaft.
         // Door faces the side with the most open terrace (largest clearance to the plate edge).
