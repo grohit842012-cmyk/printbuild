@@ -584,16 +584,24 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     </group>
   );
 
-  const screen = (count: number, fullHeight = false) => {
-    const isNS = front === "N" || front === "S";
-    const sign = front === "N" || front === "W" ? -1 : 1;
-    const height = (fullHeight ? variation.plates.length * FLOOR_HEIGHT : 9) * FT_TO_M;
+  // Vertical fins / jaali placed on a SIDE wall of the UPPER floor only —
+  // never the entrance side, never full-height (was blocking the door).
+  const screen = (count: number) => {
+    if (variation.plates.length < 2) return null;
+    // pick a side wall perpendicular to entrance
+    const side: "N" | "E" | "S" | "W" = front === "N" || front === "S" ? "E" : "S";
+    const upper = variation.plates[variation.plates.length - 1];
+    const span = side === "N" || side === "S" ? upper.w : upper.h;
+    const feat = sidePosition(variation, upper, side, 0.4, Math.min(span * 0.55, 14), 4);
+    const height = 8.5 * FT_TO_M;
+    const isNS = side === "N" || side === "S";
+    const sign = side === "N" || side === "W" ? -1 : 1;
     return (
-      <group position={[frontFeature.pos[0], height / 2, frontFeature.pos[2]]}>
+      <group position={[feat.pos[0], y1 + height / 2, feat.pos[2]]}>
         {Array.from({ length: count }).map((_, k) => {
           const t = count === 1 ? 0 : k / (count - 1) - 0.5;
           return (
-            <mesh key={k} position={isNS ? [t * frontFeature.size[0], 0, sign * 0.08] : [sign * 0.08, 0, t * frontFeature.size[2]]} castShadow>
+            <mesh key={k} position={isNS ? [t * feat.size[0], 0, sign * 0.08] : [sign * 0.08, 0, t * feat.size[2]]} castShadow>
               <boxGeometry args={isNS ? [0.09, height, 0.16] : [0.16, height, 0.09]} />
               {accentMat}
             </mesh>
