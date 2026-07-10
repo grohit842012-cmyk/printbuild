@@ -59,16 +59,17 @@ export type PlanType = "compact-box" | "wide-box" | "l-shape" | "u-shape" | "cou
 type MassingStyle = NonNullable<Variation["massingStyle"]>;
 
 const MASSING_STYLES: MassingStyle[] = [
+  "butterfly-pavilion",
+  "folded-butterfly",
+  "terrace-pavilion",
   "courtyard-cut",
   "cantilever-front",
   "stepped-terrace",
   "side-veranda",
-  "tower-wing",
-  "butterfly-pavilion",
+  "mono-slope-courtyard",
   "gabled-house",
   "jaali-court",
   "split-block",
-  "pergola-terrace",
 ];
 
 const CHAMFER_CORNERS: NonNullable<FloorPlate["chamferCorner"]>[] = ["NE", "NW", "SE", "SW"];
@@ -110,11 +111,56 @@ function footprintForMassing(
     case "jaali-court":
       return { west: b, east: b, north: b, south: b };
     case "butterfly-pavilion":
+    case "folded-butterfly":
+    case "mono-slope-courtyard":
+    case "terrace-pavilion":
       return { west: b, east: b, north: 0, south: 0 };
     case "gabled-house":
     default:
       return { west: 0, east: 0, north: b, south: b };
   }
+}
+
+function ensureVerticalCoreInsideUpperPlates(
+  plates: FloorPlate[],
+  plotW: number,
+  plotD: number,
+): FloorPlate[] {
+  if (plates.length <= 1) return plates;
+  const coreRooms = plates[0].rooms.filter((r) => r.type === "stairs" || r.type === "lift");
+  if (coreRooms.length === 0) return plates;
+
+  for (let i = 1; i < plates.length; i++) {
+    let p = plates[i];
+    let minX = p.x;
+    let minY = p.y;
+    let maxX = p.x + p.w;
+    let maxY = p.y + p.h;
+    let changed = false;
+
+    for (const r of coreRooms) {
+      const pad = 1;
+      const rx1 = r.x - pad;
+      const ry1 = r.y - pad;
+      const rx2 = r.x + r.w + pad;
+      const ry2 = r.y + r.h + pad;
+      if (rx1 < minX || ry1 < minY || rx2 > maxX || ry2 > maxY) changed = true;
+      minX = Math.min(minX, rx1);
+      minY = Math.min(minY, ry1);
+      maxX = Math.max(maxX, rx2);
+      maxY = Math.max(maxY, ry2);
+    }
+
+    if (changed) {
+      minX = Math.max(SETBACK, minX);
+      minY = Math.max(SETBACK, minY);
+      maxX = Math.min(plotW - SETBACK, maxX);
+      maxY = Math.min(plotD - SETBACK, maxY);
+      p = { ...p, x: minX, y: minY, w: Math.max(8, maxX - minX), h: Math.max(8, maxY - minY) };
+      plates[i] = rebuildInteriorOpenings(p);
+    }
+  }
+  return plates;
 }
 
 /** Pick the plan family that fits the user's program & plot best.
@@ -1163,13 +1209,11 @@ export function generateVariations(
   }
 
 
-  // Inject stair on every floor when multi-floor — EXCEPT the top floor for
-  // sloped/pitched roofs. There is no roof access on a pitched house, so no
-  // landing/mumty should appear up there.
+  // Inject stair on every habitable floor when multi-floor. Sloped/butterfly
+  // roofs only suppress the roof mumty in the 3D roof renderer — the top floor
+  // still needs a real stair landing so people can reach it.
   if (spec.floors > 1) {
-    const topFloor = spec.floors - 1;
     for (let f = 0; f < spec.floors; f++) {
-      if (spec.roofStyle === "sloped" && f === topFloor) continue;
       const has = perFloor[f].some((r) => r.type === "stairs");
       if (!has) perFloor[f].push({ type: "stairs", sizePref: "medium" });
     }
@@ -1228,10 +1272,6 @@ export function generateVariations(
     // stair rect with those same coordinates AND reflow any room on the same
     // side whose vertical span overlaps the stair, by shrinking that room to
     // the remaining vertical band (front-of-stair OR back-of-stair).
-    // For sloped roofs the topmost floor has no stair (no roof access), so
-    // limit the alignment pass to floors that actually contain a stair.
-    const lastStairFloor =
-      spec.roofStyle === "sloped" ? plates.length - 1 : plates.length;
     if (plates.length > 1) {
       const groundStairs = plates[0].rooms.find((r) => r.type === "stairs");
       if (groundStairs) {
@@ -1239,7 +1279,7 @@ export function generateVariations(
         const sy = groundStairs.y;
         const sw = groundStairs.w;
         const sh = groundStairs.h;
-        for (let f = 1; f < lastStairFloor; f++) {
+        for (let f = 1; f < plates.length; f++) {
           const rooms = plates[f].rooms;
           // Reflow rooms on the same vertical side as the stair (overlapping x)
           for (let i = 0; i < rooms.length; i++) {
@@ -1310,6 +1350,8 @@ export function generateVariations(
         }
       }
     }
+
+    ensureVerticalCoreInsideUpperPlates(plates, spec.plot.widthFt, spec.plot.depthFt);
 
     const allRooms = plates.flatMap((p) => p.rooms);
     const center = {
