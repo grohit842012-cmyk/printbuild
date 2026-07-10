@@ -30,6 +30,10 @@ interface Props {
   variation: Variation;
   planMode?: "open" | "closed";
   kitchenOpen?: boolean;
+  variant?: "default" | "tour";
+  timeOfDay?: "day" | "night";
+  autoRotate?: boolean;
+  showFurniture?: boolean;
 }
 
 function paletteFor(variation: Variation) {
@@ -92,7 +96,7 @@ function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[
 }
 
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
-function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Variation }) {
+function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorPlate; variation: Variation; timeOfDay?: "day" | "night" }) {
   const t = WALL_THICKNESS * FT_TO_M;
   const h = FLOOR_HEIGHT * FT_TO_M;
   const winTop = 7 * FT_TO_M;
@@ -227,9 +231,11 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
           <mesh key={`g${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={glassArgs} />
             <meshPhysicalMaterial
-              color={`#${GLASS_TINT}`}
+              color={timeOfDay === "night" ? "#f6c46b" : `#${GLASS_TINT}`}
+              emissive={timeOfDay === "night" ? "#f6a93a" : "#000000"}
+              emissiveIntensity={timeOfDay === "night" ? 0.55 : 0}
               transmission={0.55}
-              opacity={0.65}
+              opacity={timeOfDay === "night" ? 0.85 : 0.65}
               transparent
               roughness={0.08}
               thickness={0.05}
@@ -258,8 +264,8 @@ function PerimeterWalls({ plate, variation }: { plate: FloorPlate; variation: Va
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean }) {
   const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
@@ -284,14 +290,40 @@ function FloorMesh({
       pts.slice(1).forEach(([x, z]) => shape.lineTo(x, z));
       shape.closePath();
     } else {
-      shape.moveTo(x0, z0);
-      shape.lineTo(x0 + w, z0);
-      shape.lineTo(x0 + w, z0 + d);
-      shape.lineTo(x0, z0 + d);
-      shape.closePath();
+      const r = Math.min((plate.cornerRadius || 0) * FT_TO_M, w * 0.18, d * 0.18);
+      if (r > 0.08) {
+        shape.moveTo(x0 + r, z0);
+        shape.lineTo(x0 + w - r, z0);
+        shape.quadraticCurveTo(x0 + w, z0, x0 + w, z0 + r);
+        shape.lineTo(x0 + w, z0 + d - r);
+        shape.quadraticCurveTo(x0 + w, z0 + d, x0 + w - r, z0 + d);
+        shape.lineTo(x0 + r, z0 + d);
+        shape.quadraticCurveTo(x0, z0 + d, x0, z0 + d - r);
+        shape.lineTo(x0, z0 + r);
+        shape.quadraticCurveTo(x0, z0, x0 + r, z0);
+        shape.closePath();
+      } else {
+        shape.moveTo(x0, z0);
+        shape.lineTo(x0 + w, z0);
+        shape.lineTo(x0 + w, z0 + d);
+        shape.lineTo(x0, z0 + d);
+        shape.closePath();
+      }
     }
     return shape;
-  }, [plate.chamfer, plate.chamferCorner, plate.h, plate.w]);
+  }, [plate.chamfer, plate.chamferCorner, plate.cornerRadius, plate.h, plate.w]);
+  const curvedCorners = useMemo(() => {
+    const r = Math.min((plate.cornerRadius || 0) * FT_TO_M, plate.w * FT_TO_M * 0.18, plate.h * FT_TO_M * 0.18);
+    if (r <= 0.08 || plate.chamfer > 0.05) return [];
+    const w = plate.w * FT_TO_M;
+    const d = plate.h * FT_TO_M;
+    return [
+      { x: -w / 2 + r, z: -d / 2 + r, q: 0 },
+      { x: w / 2 - r, z: -d / 2 + r, q: 1 },
+      { x: w / 2 - r, z: d / 2 - r, q: 2 },
+      { x: -w / 2 + r, z: d / 2 - r, q: 3 },
+    ];
+  }, [plate.chamfer, plate.cornerRadius, plate.h, plate.w]);
   return (
     <group position={[sx, baseY, sz]}>
       {/* plinth/foundation extending down to ground */}
@@ -305,17 +337,77 @@ function FloorMesh({
         <extrudeGeometry args={[slabShape, { depth: 0.1, bevelEnabled: false }]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
-      <PerimeterWalls plate={plate} variation={variation} />
+      <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} />
+      {curvedCorners.map((c, i) => (
+        <group key={`curve-${i}`} position={[c.x, (FLOOR_HEIGHT * FT_TO_M) / 2, c.z]}>
+          <mesh castShadow receiveShadow>
+            <cylinderGeometry args={[Math.max(0.12, plate.cornerRadius * FT_TO_M * 0.82), Math.max(0.12, plate.cornerRadius * FT_TO_M * 0.82), FLOOR_HEIGHT * FT_TO_M, 24, 1, false, c.q * Math.PI / 2, Math.PI / 2]} />
+            <meshStandardMaterial color="#f6efe2" roughness={0.86} />
+          </mesh>
+        </group>
+      ))}
       {plate.rooms.map((r, i) => (
-        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} />
+        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} />
       ))}
     </group>
   );
 }
 
+function TerraceBridges({ lower, upper, baseY, variation }: { lower: FloorPlate; upper: FloorPlate; baseY: number; variation: Variation }) {
+  const palette = paletteFor(variation);
+  const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
+  const areas: { x: number; y: number; w: number; h: number; rail?: "N" | "S" | "E" | "W" }[] = [];
+  const lx1 = lower.x;
+  const ly1 = lower.y;
+  const lx2 = lower.x + lower.w;
+  const ly2 = lower.y + lower.h;
+  const ux1 = upper.x;
+  const uy1 = upper.y;
+  const ux2 = upper.x + upper.w;
+  const uy2 = upper.y + upper.h;
+  const overlapX = Math.max(0, Math.min(lx2, ux2) - Math.max(lx1, ux1));
+  const overlapY = Math.max(0, Math.min(ly2, uy2) - Math.max(ly1, uy1));
+  if (uy1 > ly1 + 1 && overlapX > 4) areas.push({ x: Math.max(lx1, ux1), y: ly1, w: overlapX, h: uy1 - ly1, rail: "N" });
+  if (uy2 < ly2 - 1 && overlapX > 4) areas.push({ x: Math.max(lx1, ux1), y: uy2, w: overlapX, h: ly2 - uy2, rail: "S" });
+  if (ux1 > lx1 + 1 && overlapY > 4) areas.push({ x: lx1, y: Math.max(ly1, uy1), w: ux1 - lx1, h: overlapY, rail: "W" });
+  if (ux2 < lx2 - 1 && overlapY > 4) areas.push({ x: ux2, y: Math.max(ly1, uy1), w: lx2 - ux2, h: overlapY, rail: "E" });
+  return (
+    <group>
+      {areas.filter((a) => a.w > 2 && a.h > 2).map((a, i) => {
+        const [sx, sz] = toScene(a.x + a.w / 2, a.y + a.h / 2);
+        const w = a.w * FT_TO_M;
+        const d = a.h * FT_TO_M;
+        const railZ = a.rail === "N" ? -d / 2 : a.rail === "S" ? d / 2 : 0;
+        const railX = a.rail === "W" ? -w / 2 : a.rail === "E" ? w / 2 : 0;
+        const isNS = a.rail === "N" || a.rail === "S";
+        return (
+          <group key={i} position={[sx, baseY + 0.08, sz]}>
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[w, 0.16, d]} />
+              <meshStandardMaterial color="#eee5d7" roughness={0.82} />
+            </mesh>
+            {a.rail && (
+              <mesh position={[railX, 0.58, railZ]} castShadow receiveShadow>
+                <boxGeometry args={isNS ? [w * 0.92, 0.82, 0.07] : [0.07, 0.82, d * 0.92]} />
+                <meshPhysicalMaterial color={palette.accent} transmission={0.45} opacity={0.48} transparent roughness={0.18} metalness={0.18} />
+              </mesh>
+            )}
+            {i % 2 === 0 && Math.min(w, d) > 1.2 && (
+              <group position={[-w * 0.25, 0.22, d * 0.18]} scale={0.72}>
+                <mesh position={[0, 0.18, 0]} castShadow><cylinderGeometry args={[0.18, 0.13, 0.32, 12]} /><meshStandardMaterial color="#9a5638" roughness={0.85} /></mesh>
+                <mesh position={[0, 0.46, 0]} castShadow><sphereGeometry args={[0.28, 9, 7]} /><meshStandardMaterial color="#4e7b3f" roughness={0.95} /></mesh>
+              </group>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 function RoomBlock({
-  room, plate, planMode, kitchenOpen,
-}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean }) {
+  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture,
+}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean }) {
   const localX = (room.x + room.w / 2) - (plate.x + plate.w / 2);
   const localZ = (room.y + room.h / 2) - (plate.y + plate.h / 2);
   const w = room.w * FT_TO_M;
@@ -332,6 +424,16 @@ function RoomBlock({
       </mesh>
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
         <RoomWalls w={w} d={d} h={h} room={room} />
+      )}
+      {showFurniture && <Furniture room={room} w={w} d={d} />}
+      {timeOfDay === "night" && !["stairs", "lift", "parking", "bath"].includes(room.type) && (
+        <>
+          <pointLight position={[0, 2.25, 0]} intensity={0.55} color="#ffd08a" distance={4.5} />
+          <mesh position={[0, 2.7, 0]}>
+            <sphereGeometry args={[0.08, 10, 8]} />
+            <meshStandardMaterial color="#ffd08a" emissive="#ffd08a" emissiveIntensity={1.3} />
+          </mesh>
+        </>
       )}
       {room.type === "stairs" && (() => {
         // Switchback (U-shape) staircase: two flights running in OPPOSITE directions
@@ -427,6 +529,75 @@ function RoomBlock({
       )}
     </group>
   );
+}
+
+function Furniture({ room, w, d }: { room: RoomRect; w: number; d: number }) {
+  if (["stairs", "lift", "parking", "courtyard", "utility"].includes(room.type)) return null;
+  const wood = <meshStandardMaterial color="#7b5637" roughness={0.72} />;
+  const fabric = <meshStandardMaterial color={room.type === "bedroom" || room.type === "master_bedroom" ? "#e9dfcf" : "#b7c0a5"} roughness={0.85} />;
+  const stone = <meshStandardMaterial color="#eee7dc" roughness={0.75} />;
+  const metal = <meshStandardMaterial color="#94a3b8" roughness={0.4} metalness={0.55} />;
+  const safeW = Math.max(1.2, w * 0.82);
+  const safeD = Math.max(1.2, d * 0.82);
+
+  if (room.type === "living") {
+    return (
+      <group>
+        <mesh position={[-safeW * 0.22, 0.22, safeD * 0.12]} castShadow receiveShadow><boxGeometry args={[safeW * 0.42, 0.38, safeD * 0.14]} />{fabric}</mesh>
+        <mesh position={[-safeW * 0.22, 0.55, safeD * 0.22]} castShadow><boxGeometry args={[safeW * 0.42, 0.58, 0.08]} />{fabric}</mesh>
+        <mesh position={[safeW * 0.12, 0.18, -safeD * 0.08]} castShadow receiveShadow><boxGeometry args={[safeW * 0.28, 0.12, safeD * 0.18]} />{wood}</mesh>
+        <mesh position={[safeW * 0.36, 0.42, -safeD * 0.3]} castShadow><boxGeometry args={[safeW * 0.22, 0.35, 0.06]} />{metal}</mesh>
+      </group>
+    );
+  }
+  if (room.type === "bedroom" || room.type === "master_bedroom") {
+    return (
+      <group>
+        <mesh position={[0, 0.2, safeD * 0.1]} castShadow receiveShadow><boxGeometry args={[safeW * 0.52, 0.25, safeD * 0.48]} />{wood}</mesh>
+        <mesh position={[0, 0.38, safeD * 0.1]} castShadow><boxGeometry args={[safeW * 0.48, 0.16, safeD * 0.42]} />{fabric}</mesh>
+        <mesh position={[0, 0.58, safeD * 0.35]} castShadow><boxGeometry args={[safeW * 0.5, 0.42, 0.08]} />{wood}</mesh>
+        {[-1, 1].map((s) => <mesh key={s} position={[s * safeW * 0.36, 0.22, safeD * 0.22]} castShadow><boxGeometry args={[0.28, 0.28, 0.28]} />{wood}</mesh>)}
+      </group>
+    );
+  }
+  if (room.type === "kitchen") {
+    return (
+      <group>
+        <mesh position={[-safeW * 0.3, 0.42, -safeD * 0.33]} castShadow receiveShadow><boxGeometry args={[safeW * 0.58, 0.8, 0.36]} />{wood}</mesh>
+        <mesh position={[safeW * 0.34, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[0.36, 0.8, safeD * 0.62]} />{wood}</mesh>
+        <mesh position={[-safeW * 0.05, 0.86, -safeD * 0.33]} castShadow><boxGeometry args={[safeW * 0.18, 0.06, 0.28]} />{metal}</mesh>
+      </group>
+    );
+  }
+  if (room.type === "dining") {
+    return (
+      <group>
+        <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.46, 0.1, safeD * 0.32]} />{wood}</mesh>
+        {[[0, 1], [0, -1], [1, 0], [-1, 0]].map(([x, z], i) => <mesh key={i} position={[x * safeW * 0.32, 0.24, z * safeD * 0.24]} castShadow><boxGeometry args={[0.28, 0.3, 0.28]} />{fabric}</mesh>)}
+      </group>
+    );
+  }
+  if (room.type === "study") {
+    return (
+      <group>
+        <mesh position={[0, 0.42, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[safeW * 0.5, 0.1, safeD * 0.18]} />{wood}</mesh>
+        <mesh position={[0, 0.25, -safeD * 0.05]} castShadow><boxGeometry args={[0.32, 0.36, 0.32]} />{fabric}</mesh>
+        <mesh position={[safeW * 0.28, 0.55, safeD * 0.2]} castShadow><boxGeometry args={[0.12, 0.9, safeD * 0.36]} />{wood}</mesh>
+      </group>
+    );
+  }
+  if (room.type === "pooja") {
+    return <mesh position={[0, 0.45, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[safeW * 0.52, 0.8, 0.2]} />{wood}</mesh>;
+  }
+  if (room.type === "bath") {
+    return (
+      <group>
+        <mesh position={[-safeW * 0.25, 0.25, -safeD * 0.2]} castShadow receiveShadow><boxGeometry args={[0.42, 0.28, 0.55]} />{stone}</mesh>
+        <mesh position={[safeW * 0.22, 0.38, safeD * 0.2]} castShadow><cylinderGeometry args={[0.18, 0.18, 0.5, 16]} />{stone}</mesh>
+      </group>
+    );
+  }
+  return null;
 }
 
 function RoomWalls({ w, d, h, room }: { w: number; d: number; h: number; room: RoomRect }) {
@@ -628,13 +799,37 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     </group>
   );
 
+  const woodBand = () => {
+    const side = (front === "N" || front === "S" ? "E" : "N") as "N" | "E" | "S" | "W";
+    const plate = variation.plates[Math.min(variation.plates.length - 1, 1)];
+    const span = side === "N" || side === "S" ? plate.w : plate.h;
+    const feat = sidePosition(variation, plate, side, 0.28, Math.min(span * 0.72, 20), 0.35);
+    const isNS = side === "N" || side === "S";
+    const sign = side === "N" || side === "W" ? -1 : 1;
+    return (
+      <group position={[feat.pos[0], (plate.floor - 1) * FLOOR_HEIGHT * FT_TO_M + 1.65, feat.pos[2]]}>
+        {Array.from({ length: 5 }).map((_, k) => (
+          <mesh
+            key={k}
+            position={isNS ? [0, k * 0.28, sign * 0.08] : [sign * 0.08, k * 0.28, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={isNS ? [feat.size[0], 0.09, 0.12] : [0.12, 0.09, feat.size[2]]} />
+            <meshStandardMaterial color={k % 2 ? "#8a633f" : "#6f4d32"} roughness={0.62} />
+          </mesh>
+        ))}
+      </group>
+    );
+  };
+
   // Decorations must NEVER cover the front entrance on the ground floor.
   // We only allow front-side balconies (upper level) and side-wall screens.
   // Full-height screens on the entrance side are disallowed — they were
   // burying doors and windows.
   switch (massing) {
     case "cantilever-front":
-      return <>{balcony(1.15)}</>;
+      return <>{balcony(1.15)}{woodBand()}</>;
     case "side-veranda":
       return <>{balcony(0.9)}</>;
     case "stepped-terrace":
@@ -648,8 +843,13 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
       return <>{balcony(0.75)}</>;
     case "pergola-terrace":
       return <>{balcony(0.9)}</>;
+    case "butterfly-pavilion":
+    case "folded-butterfly":
+    case "mono-slope-courtyard":
+    case "terrace-pavilion":
+      return <>{balcony(0.85)}{woodBand()}</>;
     case "courtyard-cut":
-      return <>{balcony(0.8)}</>;
+      return <>{balcony(0.8)}{woodBand()}</>;
     default:
       return <>{balcony(0.8)}</>;
   }
@@ -751,6 +951,70 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     );
   }
 
+  if (massing === "folded-butterfly") {
+    const lift = Math.min(w, d) * 0.24;
+    return (
+      <group position={center}>
+        <mesh position={[0, lift * 0.38, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.5, lift * 0.76, d + 0.5]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.76} />
+        </mesh>
+        <mesh position={[0, lift * 0.74, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.22, lift * 0.28, d + 0.7]} />
+          <meshPhysicalMaterial color="#d7e5ea" transmission={0.35} opacity={0.78} transparent roughness={0.18} metalness={0.08} />
+        </mesh>
+        <mesh position={[-w * 0.28, lift * 0.92, 0]} rotation={[0, 0, -0.3]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.62, 0.18, d + 0.85]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+        </mesh>
+        <mesh position={[w * 0.28, lift * 0.92, 0]} rotation={[0, 0, 0.3]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.62, 0.18, d + 0.85]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+        </mesh>
+        <mesh position={[0, lift * 0.62, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.24, 0.2, d + 0.95]} />
+          <meshStandardMaterial color={TRIM} roughness={0.55} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (massing === "mono-slope-courtyard") {
+    const lift = Math.min(w, d) * 0.26;
+    return (
+      <group position={center}>
+        <mesh position={[0, lift * 0.32, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.5, lift * 0.62, d + 0.5]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, lift * 0.72, 0]} rotation={[0, 0, 0.2]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.9, 0.2, d + 0.8]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+        </mesh>
+        <mesh position={[-w * 0.42, lift * 0.52, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.24, lift * 0.7, d + 0.55]} />
+          <meshStandardMaterial color={TRIM} roughness={0.7} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (massing === "terrace-pavilion") {
+    return (
+      <group position={center}>
+        <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.45, 0.2, d + 0.45]} />
+          <meshStandardMaterial color={palette.roof} roughness={0.8} />
+        </mesh>
+        <mesh position={[0, 0.55, -d / 2 - 0.1]} castShadow><boxGeometry args={[w + 0.65, 0.78, 0.25]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
+        <mesh position={[0, 0.55, d / 2 + 0.1]} castShadow><boxGeometry args={[w + 0.65, 0.78, 0.25]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
+        <mesh position={[-w / 2 - 0.1, 0.55, 0]} castShadow><boxGeometry args={[0.25, 0.78, d + 0.65]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
+        <mesh position={[w / 2 + 0.1, 0.55, 0]} castShadow><boxGeometry args={[0.25, 0.78, d + 0.65]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
+        <RoofPots w={w} d={d} seed={variation.seed || 1} />
+      </group>
+    );
+  }
+
   if (massing === "butterfly-pavilion") {
     const lift = Math.min(w, d) * 0.22;
     // Solid parapet wall closes the gap between the top floor and the V so
@@ -773,10 +1037,14 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
             <meshStandardMaterial color={palette.trim} roughness={0.75} />
           </mesh>
         ))}
-        {/* Clerestory glass strip along the ridge for a soft light monitor */}
-        <mesh position={[0, lift * 0.35, 0]} castShadow receiveShadow>
-          <boxGeometry args={[w + 0.6, lift * 0.55, d + 0.6]} />
-          <meshPhysicalMaterial color="#dfeaf2" transmission={0.4} opacity={0.82} transparent roughness={0.15} metalness={0.1} />
+        {/* Solid raised wall mass below the butterfly V; only a slim light strip remains glass. */}
+        <mesh position={[0, lift * 0.48, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w + 0.62, lift * 0.7, d + 0.62]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, lift * 0.86, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.22, lift * 0.16, d + 0.68]} />
+          <meshPhysicalMaterial color="#dfeaf2" transmission={0.35} opacity={0.76} transparent roughness={0.18} metalness={0.08} />
         </mesh>
         {/* The two roof slabs of the butterfly V */}
         <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
@@ -1273,7 +1541,14 @@ function ParkingArea({ variation }: { variation: Variation }) {
   );
 }
 
-export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = false }: Props) {
+export function ModelViewer3D({
+  variation,
+  planMode = "closed",
+  kitchenOpen = false,
+  timeOfDay = "day",
+  autoRotate = false,
+  showFurniture = true,
+}: Props) {
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
   useEffect(() => setMounted(true), []);
@@ -1344,6 +1619,15 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
 
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
+          {visibleFloor === "all" && variation.plates.slice(1).map((upper, idx) => (
+            <TerraceBridges
+              key={`terrace-${upper.floor}`}
+              lower={variation.plates[idx]}
+              upper={upper}
+              baseY={baseYs[idx + 1] - 0.08}
+              variation={variation}
+            />
+          ))}
           {variation.plates
             .map((plate, i) => ({ plate, i }))
             .filter(({ plate }) => visibleFloor === "all" || plate.floor === visibleFloor)
@@ -1357,6 +1641,8 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
                 kitchenOpen={kitchenOpen}
                 plotW={variation.plotWidthFt}
                 plotD={variation.plotDepthFt}
+                timeOfDay={timeOfDay}
+                showFurniture={showFurniture}
               />
             ))}
           {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
@@ -1365,6 +1651,8 @@ export function ModelViewer3D({ variation, planMode = "closed", kitchenOpen = fa
           <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls
             enablePan={false}
+            autoRotate={autoRotate}
+            autoRotateSpeed={0.45}
             minDistance={camDist * 0.6}
             maxDistance={camDist * 2.8}
             maxPolarAngle={Math.PI / 2.05}
