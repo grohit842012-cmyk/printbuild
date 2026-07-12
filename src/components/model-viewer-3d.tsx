@@ -211,7 +211,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
         segments.push(
           <mesh key={`st${key++}`} position={[lx, sillH + 0.02, lz]}>
             <boxGeometry args={sillTrimArgs} />
-            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.55} metalness={0.08} />
           </mesh>,
         );
         const lintelArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
@@ -225,7 +225,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
         segments.push(
           <mesh key={`lt${key++}`} position={[lx, winTop - 0.02, lz]}>
             <boxGeometry args={sillTrimArgs} />
-            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.55} metalness={0.08} />
           </mesh>,
         );
         const glassArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, (winTop - winBot) * 0.95, t * 0.2] : [t * 0.2, (winTop - winBot) * 0.95, segLen * 0.9];
@@ -236,8 +236,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
               color={timeOfDay === "night" ? "#f6c46b" : `#${GLASS_TINT}`}
               emissive={timeOfDay === "night" ? "#f6a93a" : "#000000"}
               emissiveIntensity={timeOfDay === "night" ? 0.55 : 0}
-              transmission={0.55}
-              opacity={timeOfDay === "night" ? 0.85 : 0.65}
+              transmission={0.45}
+              opacity={timeOfDay === "night" ? 0.85 : 0.7}
               transparent
               roughness={0.08}
               thickness={0.05}
@@ -245,12 +245,20 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
             />
           </mesh>,
         );
-        // muntin — a subtle horizontal divider for character
-        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.06, t * 0.35] : [t * 0.35, 0.06, segLen * 0.9];
+        // muntin — colored horizontal + vertical dividers so windows read as framed panels
+        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.08, t * 0.4] : [t * 0.4, 0.08, segLen * 0.9];
         segments.push(
           <mesh key={`m${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={muntinArgs} />
-            <meshStandardMaterial color={palette.trim} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.5} metalness={0.15} />
+          </mesh>,
+        );
+        // vertical muntin
+        const vArgs: [number, number, number] = side === "N" || side === "S" ? [0.08, (winTop - winBot) * 0.95, t * 0.4] : [t * 0.4, (winTop - winBot) * 0.95, 0.08];
+        segments.push(
+          <mesh key={`mv${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
+            <boxGeometry args={vArgs} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.5} metalness={0.15} />
           </mesh>,
         );
       }
