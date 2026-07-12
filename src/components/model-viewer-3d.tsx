@@ -1,6 +1,6 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/drei";
-import { useEffect, useMemo, useState, Suspense, type ReactElement } from "react";
+import { useEffect, useMemo, useState, useRef, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
 import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
 
@@ -111,9 +111,11 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
   const wall = base.clone().lerp(cream, palette.material === "timber" || palette.material === "brick" ? 0.35 : 0.55);
   const WALL_COLOR = `#${wall.getHexString()}`;
   const TRIM_COLOR = "#f4ecdd";
+  // Window frame/muntin picks up the variation's accent so windows read as colored, not white.
+  const FRAME_COLOR = new THREE.Color(palette.accent).lerp(new THREE.Color(palette.trim), 0.25).getStyle();
   const DOOR_COLOR = "#5a3a22";   // walnut
-  // Window tint — varies per variation so windows aren't always white.
-  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#bcdcf2"), 0.55).getHexString();
+  // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
+  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
@@ -209,7 +211,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
         segments.push(
           <mesh key={`st${key++}`} position={[lx, sillH + 0.02, lz]}>
             <boxGeometry args={sillTrimArgs} />
-            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.55} metalness={0.08} />
           </mesh>,
         );
         const lintelArgs: [number, number, number] = side === "N" || side === "S" ? [segLen, lintelH, t] : [t, lintelH, segLen];
@@ -223,7 +225,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
         segments.push(
           <mesh key={`lt${key++}`} position={[lx, winTop - 0.02, lz]}>
             <boxGeometry args={sillTrimArgs} />
-            <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.55} metalness={0.08} />
           </mesh>,
         );
         const glassArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, (winTop - winBot) * 0.95, t * 0.2] : [t * 0.2, (winTop - winBot) * 0.95, segLen * 0.9];
@@ -234,8 +236,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
               color={timeOfDay === "night" ? "#f6c46b" : `#${GLASS_TINT}`}
               emissive={timeOfDay === "night" ? "#f6a93a" : "#000000"}
               emissiveIntensity={timeOfDay === "night" ? 0.55 : 0}
-              transmission={0.55}
-              opacity={timeOfDay === "night" ? 0.85 : 0.65}
+              transmission={0.45}
+              opacity={timeOfDay === "night" ? 0.85 : 0.7}
               transparent
               roughness={0.08}
               thickness={0.05}
@@ -243,12 +245,20 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
             />
           </mesh>,
         );
-        // muntin — a subtle horizontal divider for character
-        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.06, t * 0.35] : [t * 0.35, 0.06, segLen * 0.9];
+        // muntin — colored horizontal + vertical dividers so windows read as framed panels
+        const muntinArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.9, 0.08, t * 0.4] : [t * 0.4, 0.08, segLen * 0.9];
         segments.push(
           <mesh key={`m${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
             <boxGeometry args={muntinArgs} />
-            <meshStandardMaterial color={palette.trim} roughness={0.6} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.5} metalness={0.15} />
+          </mesh>,
+        );
+        // vertical muntin
+        const vArgs: [number, number, number] = side === "N" || side === "S" ? [0.08, (winTop - winBot) * 0.95, t * 0.4] : [t * 0.4, (winTop - winBot) * 0.95, 0.08];
+        segments.push(
+          <mesh key={`mv${key++}`} position={[lx, (winTop + winBot) / 2, lz]}>
+            <boxGeometry args={vArgs} />
+            <meshStandardMaterial color={FRAME_COLOR} roughness={0.5} metalness={0.15} />
           </mesh>,
         );
       }
@@ -736,24 +746,61 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   const y1 = FLOOR_HEIGHT * FT_TO_M;
   const roofCenter = makeToScene(variation.plotWidthFt, variation.plotDepthFt)(top.x + top.w / 2, top.y + top.h / 2);
 
-  const balcony = (wide = 1) => (
-    <group position={[frontFeature.pos[0], y1 + 0.05, frontFeature.pos[2]]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[frontFeature.size[0] * wide, 0.16, frontFeature.size[2]]} />
-        {trimMat}
-      </mesh>
-      <mesh position={[0, 0.6, front === "N" ? -frontFeature.size[2] / 2 : front === "S" ? frontFeature.size[2] / 2 : 0]} castShadow>
-        <boxGeometry args={[frontFeature.size[0] * wide, 0.9, 0.08]} />
-        {railMat}
-      </mesh>
-      {(front === "E" || front === "W") && (
-        <mesh position={[front === "W" ? -frontFeature.size[0] / 2 : frontFeature.size[0] / 2, 0.6, 0]} castShadow>
-          <boxGeometry args={[0.08, 0.9, frontFeature.size[2]]} />
+  const balcony = (wide = 1) => {
+    const isNS = front === "N" || front === "S";
+    const towardHouseZ = front === "N" ? 1 : front === "S" ? -1 : 0;
+    const towardHouseX = front === "W" ? 1 : front === "E" ? -1 : 0;
+    const doorSpan = frontFeature.size[0] * wide * 0.85;
+    const doorH = 7 * FT_TO_M;
+    // Slider sits on the house wall face behind the balcony
+    const wallOffset: [number, number, number] = [
+      towardHouseX * (frontFeature.size[0] / 2),
+      0,
+      towardHouseZ * (frontFeature.size[2] / 2),
+    ];
+    return (
+      <group position={[frontFeature.pos[0], y1 + 0.05, frontFeature.pos[2]]}>
+        {/* Slab */}
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[frontFeature.size[0] * wide, 0.16, frontFeature.size[2]]} />
+          {trimMat}
+        </mesh>
+        {/* Outer railing */}
+        <mesh position={[0, 0.6, front === "N" ? -frontFeature.size[2] / 2 : front === "S" ? frontFeature.size[2] / 2 : 0]} castShadow>
+          <boxGeometry args={[frontFeature.size[0] * wide, 0.9, 0.08]} />
           {railMat}
         </mesh>
-      )}
-    </group>
-  );
+        {(front === "E" || front === "W") && (
+          <mesh position={[front === "W" ? -frontFeature.size[0] / 2 : frontFeature.size[0] / 2, 0.6, 0]} castShadow>
+            <boxGeometry args={[0.08, 0.9, frontFeature.size[2]]} />
+            {railMat}
+          </mesh>
+        )}
+        {/* Sliding-glass door — two leaves in a colored frame on the wall behind the balcony */}
+        <group position={wallOffset}>
+          {/* frame */}
+          <mesh position={[0, doorH / 2, 0]}>
+            <boxGeometry args={isNS ? [doorSpan + 0.15, doorH + 0.1, 0.06] : [0.06, doorH + 0.1, doorSpan + 0.15]} />
+            <meshStandardMaterial color={palette.accent} roughness={0.5} metalness={0.15} />
+          </mesh>
+          {/* two glass leaves */}
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={isNS ? [s * doorSpan / 4, doorH / 2, 0.02 * -towardHouseZ] : [0.02 * -towardHouseX, doorH / 2, s * doorSpan / 4]}>
+              <boxGeometry args={isNS ? [doorSpan / 2 - 0.05, doorH * 0.96, 0.04] : [0.04, doorH * 0.96, doorSpan / 2 - 0.05]} />
+              <meshPhysicalMaterial color="#a8c4d8" transmission={0.7} opacity={0.55} transparent roughness={0.05} thickness={0.05} metalness={0.15} />
+            </mesh>
+          ))}
+          {/* horizontal handle bars */}
+          {[-1, 1].map((s) => (
+            <mesh key={`h${s}`} position={isNS ? [s * 0.35, doorH * 0.5, 0.04 * -towardHouseZ] : [0.04 * -towardHouseX, doorH * 0.5, s * 0.35]}>
+              <boxGeometry args={isNS ? [0.05, 0.6, 0.03] : [0.03, 0.6, 0.05]} />
+              <meshStandardMaterial color="#c9c4bb" metalness={0.7} roughness={0.3} />
+            </mesh>
+          ))}
+        </group>
+      </group>
+    );
+  };
 
   // Vertical fins / jaali placed on a SIDE wall of the UPPER floor only —
   // never the entrance side, never full-height (was blocking the door).
@@ -1416,45 +1463,84 @@ function Plot({ variation }: { variation: Variation }) {
           </mesh>
         );
       })}
-      {/* Perimeter trees — irregular multi-blob canopies, trunk slightly tapered */}
+      {/* Perimeter trees — sway gently in the breeze */}
       {trees.map((t, i) => {
         const canopyColors = ["#3f6238", "#4a7a3a", "#587a3f", "#3a5f30", "#6b8a48"];
         const cc = canopyColors[t.kind % canopyColors.length];
         const cc2 = canopyColors[(t.kind + 2) % canopyColors.length];
         const blobs = 4 + Math.floor(rand(i * 19) * 3);
+        const phase = rand(i * 29) * Math.PI * 2;
+        const yaw = rand(i * 23) * Math.PI;
         return (
-          <group key={i} position={[t.x, 0, t.z]} scale={t.scale} rotation={[0, rand(i * 23) * Math.PI, 0]}>
-            {/* Trunk */}
-            <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
-              <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
-              <meshStandardMaterial color="#4a3220" roughness={0.95} />
-            </mesh>
-            {/* Sub-branches */}
-            <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
-              <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
-              <meshStandardMaterial color="#4a3220" roughness={0.95} />
-            </mesh>
-            {/* Layered irregular foliage blobs */}
-            {Array.from({ length: blobs }).map((_, k) => {
-              const ang = (k / blobs) * Math.PI * 2 + rand(i * 31 + k) * 0.6;
-              const rad = 0.35 + rand(i * 37 + k) * 0.55;
-              const yj = 2.0 + rand(i * 41 + k) * 0.9;
-              const rr = 0.5 + rand(i * 43 + k) * 0.5;
-              return (
-                <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
-                  <sphereGeometry args={[rr, 10, 8]} />
-                  <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
-                </mesh>
-              );
-            })}
-            {/* Crown cap */}
-            <mesh position={[0, 2.9, 0]} castShadow>
-              <sphereGeometry args={[0.55, 10, 8]} />
-              <meshStandardMaterial color={cc} roughness={0.95} />
-            </mesh>
-          </group>
+          <SwayingTree
+            key={i}
+            position={[t.x, 0, t.z]}
+            scale={t.scale}
+            yaw={yaw}
+            phase={phase}
+            cc={cc}
+            cc2={cc2}
+            blobs={blobs}
+            seed={i}
+            rand={rand}
+          />
         );
       })}
+    </group>
+  );
+}
+
+function SwayingTree({
+  position, scale, yaw, phase, cc, cc2, blobs, seed, rand,
+}: {
+  position: [number, number, number];
+  scale: number;
+  yaw: number;
+  phase: number;
+  cc: string;
+  cc2: string;
+  blobs: number;
+  seed: number;
+  rand: (i: number) => number;
+}) {
+  const canopyRef = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!canopyRef.current) return;
+    const t = clock.getElapsedTime();
+    canopyRef.current.rotation.z = Math.sin(t * 1.2 + phase) * 0.06;
+    canopyRef.current.rotation.x = Math.cos(t * 0.9 + phase * 0.7) * 0.04;
+    canopyRef.current.position.y = Math.sin(t * 1.6 + phase) * 0.05;
+  });
+  return (
+    <group position={position} scale={scale} rotation={[0, yaw, 0]}>
+      {/* Trunk (static) */}
+      <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
+        <meshStandardMaterial color="#4a3220" roughness={0.95} />
+      </mesh>
+      <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
+        <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
+        <meshStandardMaterial color="#4a3220" roughness={0.95} />
+      </mesh>
+      {/* Animated canopy */}
+      <group ref={canopyRef} position={[0, 2.0, 0]}>
+        {Array.from({ length: blobs }).map((_, k) => {
+          const ang = (k / blobs) * Math.PI * 2 + rand(seed * 31 + k) * 0.6;
+          const rad = 0.35 + rand(seed * 37 + k) * 0.55;
+          const yj = rand(seed * 41 + k) * 0.9;
+          const rr = 0.5 + rand(seed * 43 + k) * 0.5;
+          return (
+            <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
+              <sphereGeometry args={[rr, 10, 8]} />
+              <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
+            </mesh>
+          );
+        })}
+        <mesh position={[0, 0.9, 0]} castShadow>
+          <sphereGeometry args={[0.55, 10, 8]} />
+          <meshStandardMaterial color={cc} roughness={0.95} />
+        </mesh>
+      </group>
     </group>
   );
 }

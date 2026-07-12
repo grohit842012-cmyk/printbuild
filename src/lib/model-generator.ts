@@ -1379,7 +1379,19 @@ export function generateVariations(
       "courtyard": Math.min(5, sideAspect * 0.15),
     };
     const chamfer = chamferFor[planType] * (0.75 + rng() * 0.5);
-    const chamferCorner = CHAMFER_CORNERS[i % CHAMFER_CORNERS.length];
+    // For courtyard/L/U-shape plans, align the notch with the entrance wall
+    // (front) or the opposite wall (back) so the courtyard sits directly in
+    // front of or behind the main door — never trapped on a side.
+    const frontBackCorners: Record<Direction, NonNullable<FloorPlate["chamferCorner"]>[]> = {
+      N: ["NE", "NW", "SE", "SW"],
+      S: ["SE", "SW", "NE", "NW"],
+      E: ["NE", "SE", "NW", "SW"],
+      W: ["NW", "SW", "NE", "SE"],
+      NE: ["NE", "SW"], NW: ["NW", "SE"], SE: ["SE", "NW"], SW: ["SW", "NE"],
+    };
+    const alignsWithEntrance = planType === "l-shape" || planType === "u-shape" || planType === "courtyard" || massingStyle === "courtyard-cut" || massingStyle === "jaali-court" || massingStyle === "mono-slope-courtyard";
+    const candidates = alignsWithEntrance ? frontBackCorners[entranceDir] : CHAMFER_CORNERS;
+    const chamferCorner = candidates[i % candidates.length];
     for (const p of plates) {
       p.chamfer = chamfer || (massingStyle === "split-block" || massingStyle === "jaali-court" ? Math.min(5, sideAspect * 0.12) : 0);
       p.chamferCorner = chamferCorner;
