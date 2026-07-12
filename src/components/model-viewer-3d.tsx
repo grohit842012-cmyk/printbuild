@@ -111,9 +111,11 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
   const wall = base.clone().lerp(cream, palette.material === "timber" || palette.material === "brick" ? 0.35 : 0.55);
   const WALL_COLOR = `#${wall.getHexString()}`;
   const TRIM_COLOR = "#f4ecdd";
+  // Window frame/muntin picks up the variation's accent so windows read as colored, not white.
+  const FRAME_COLOR = new THREE.Color(palette.accent).lerp(new THREE.Color(palette.trim), 0.25).getStyle();
   const DOOR_COLOR = "#5a3a22";   // walnut
-  // Window tint — varies per variation so windows aren't always white.
-  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#bcdcf2"), 0.55).getHexString();
+  // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
+  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
