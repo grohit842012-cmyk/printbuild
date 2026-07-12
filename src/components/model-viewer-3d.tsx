@@ -1544,9 +1544,6 @@ function SwayingTree({
     </group>
   );
 }
-    </group>
-  );
-}
 
 function ParkingArea({ variation }: { variation: Variation }) {
   if (!variation.parking) return null;
