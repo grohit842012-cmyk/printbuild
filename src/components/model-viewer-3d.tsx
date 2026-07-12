@@ -1463,45 +1463,87 @@ function Plot({ variation }: { variation: Variation }) {
           </mesh>
         );
       })}
-      {/* Perimeter trees — irregular multi-blob canopies, trunk slightly tapered */}
+      {/* Perimeter trees — sway gently in the breeze */}
       {trees.map((t, i) => {
         const canopyColors = ["#3f6238", "#4a7a3a", "#587a3f", "#3a5f30", "#6b8a48"];
         const cc = canopyColors[t.kind % canopyColors.length];
         const cc2 = canopyColors[(t.kind + 2) % canopyColors.length];
         const blobs = 4 + Math.floor(rand(i * 19) * 3);
+        const phase = rand(i * 29) * Math.PI * 2;
+        const yaw = rand(i * 23) * Math.PI;
         return (
-          <group key={i} position={[t.x, 0, t.z]} scale={t.scale} rotation={[0, rand(i * 23) * Math.PI, 0]}>
-            {/* Trunk */}
-            <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
-              <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
-              <meshStandardMaterial color="#4a3220" roughness={0.95} />
-            </mesh>
-            {/* Sub-branches */}
-            <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
-              <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
-              <meshStandardMaterial color="#4a3220" roughness={0.95} />
-            </mesh>
-            {/* Layered irregular foliage blobs */}
-            {Array.from({ length: blobs }).map((_, k) => {
-              const ang = (k / blobs) * Math.PI * 2 + rand(i * 31 + k) * 0.6;
-              const rad = 0.35 + rand(i * 37 + k) * 0.55;
-              const yj = 2.0 + rand(i * 41 + k) * 0.9;
-              const rr = 0.5 + rand(i * 43 + k) * 0.5;
-              return (
-                <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
-                  <sphereGeometry args={[rr, 10, 8]} />
-                  <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
-                </mesh>
-              );
-            })}
-            {/* Crown cap */}
-            <mesh position={[0, 2.9, 0]} castShadow>
-              <sphereGeometry args={[0.55, 10, 8]} />
-              <meshStandardMaterial color={cc} roughness={0.95} />
-            </mesh>
-          </group>
+          <SwayingTree
+            key={i}
+            position={[t.x, 0, t.z]}
+            scale={t.scale}
+            yaw={yaw}
+            phase={phase}
+            cc={cc}
+            cc2={cc2}
+            blobs={blobs}
+            seed={i}
+            rand={rand}
+          />
         );
       })}
+    </group>
+  );
+}
+
+function SwayingTree({
+  position, scale, yaw, phase, cc, cc2, blobs, seed, rand,
+}: {
+  position: [number, number, number];
+  scale: number;
+  yaw: number;
+  phase: number;
+  cc: string;
+  cc2: string;
+  blobs: number;
+  seed: number;
+  rand: (i: number) => number;
+}) {
+  const canopyRef = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!canopyRef.current) return;
+    const t = clock.getElapsedTime();
+    canopyRef.current.rotation.z = Math.sin(t * 1.2 + phase) * 0.06;
+    canopyRef.current.rotation.x = Math.cos(t * 0.9 + phase * 0.7) * 0.04;
+    canopyRef.current.position.y = Math.sin(t * 1.6 + phase) * 0.05;
+  });
+  return (
+    <group position={position} scale={scale} rotation={[0, yaw, 0]}>
+      {/* Trunk (static) */}
+      <mesh position={[0, 1.0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.09, 0.18, 2.0, 8]} />
+        <meshStandardMaterial color="#4a3220" roughness={0.95} />
+      </mesh>
+      <mesh position={[0.15, 1.8, 0.05]} rotation={[0, 0, -0.4]} castShadow>
+        <cylinderGeometry args={[0.04, 0.07, 0.9, 6]} />
+        <meshStandardMaterial color="#4a3220" roughness={0.95} />
+      </mesh>
+      {/* Animated canopy */}
+      <group ref={canopyRef} position={[0, 2.0, 0]}>
+        {Array.from({ length: blobs }).map((_, k) => {
+          const ang = (k / blobs) * Math.PI * 2 + rand(seed * 31 + k) * 0.6;
+          const rad = 0.35 + rand(seed * 37 + k) * 0.55;
+          const yj = rand(seed * 41 + k) * 0.9;
+          const rr = 0.5 + rand(seed * 43 + k) * 0.5;
+          return (
+            <mesh key={k} position={[Math.cos(ang) * rad, yj, Math.sin(ang) * rad]} castShadow receiveShadow>
+              <sphereGeometry args={[rr, 10, 8]} />
+              <meshStandardMaterial color={k % 2 === 0 ? cc : cc2} roughness={0.95} />
+            </mesh>
+          );
+        })}
+        <mesh position={[0, 0.9, 0]} castShadow>
+          <sphereGeometry args={[0.55, 10, 8]} />
+          <meshStandardMaterial color={cc} roughness={0.95} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
     </group>
   );
 }
