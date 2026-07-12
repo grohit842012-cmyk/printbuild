@@ -1,5 +1,6 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/drei";
+import { useRef } from "react";
 import { useEffect, useMemo, useState, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
 import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
