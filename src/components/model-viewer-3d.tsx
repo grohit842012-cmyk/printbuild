@@ -737,8 +737,6 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   const palette = paletteFor(variation);
   const massing = variation.massingStyle ?? "pergola-terrace";
   const front = entranceWall(variation);
-  const frontSpan = front === "N" || front === "S" ? ground.w : ground.h;
-  const frontFeature = sidePosition(variation, ground, front, 1.2, Math.min(frontSpan * 0.7, 22), 5.5);
   const railMat = <meshPhysicalMaterial color="#bcdcf2" transmission={0.6} opacity={0.45} transparent roughness={0.08} metalness={0.2} />;
   const trimMat = <meshStandardMaterial color={palette.trim} roughness={0.7} />;
   const accentMat = <meshStandardMaterial color={palette.accent} roughness={0.72} metalness={palette.material === "corten" ? 0.35 : 0.03} />;
