@@ -95,8 +95,39 @@ function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[
   return segs;
 }
 
+/** Where the (optional) balcony + its sliding door sit. Shared by walls and features
+ *  so the wall actually gets a hole where the sliding doors are. */
+const BALCONY_WIDE: Record<string, number> = {
+  "cantilever-front": 1.15,
+  "side-veranda": 0.9,
+  "stepped-terrace": 0.75,
+  "tower-wing": 0.65,
+  "jaali-court": 0.9,
+  "split-block": 0.75,
+  "pergola-terrace": 0.9,
+  "butterfly-pavilion": 0.85,
+  "folded-butterfly": 0.85,
+  "mono-slope-courtyard": 0.85,
+  "terrace-pavilion": 0.85,
+  "courtyard-cut": 0.8,
+};
+
+function balconySpec(variation: Variation) {
+  const front = entranceWall(variation);
+  const level = variation.plates.length > 1 ? 1 : 0;
+  const plate = variation.plates[level];
+  if (!plate) return null;
+  const isNS = front === "N" || front === "S";
+  const wide = BALCONY_WIDE[variation.massingStyle ?? "pergola-terrace"] ?? 0.8;
+  const wallLenFt = isNS ? plate.w : plate.h;
+  const spanFt = Math.min(wallLenFt * 0.7, 22) * wide;
+  const doorSpanFt = Math.max(6, Math.min(spanFt * 0.6, 8.8));
+  return { front, level, plate, isNS, spanFt, depthFt: 5.5, doorSpanFt, centerFt: wallLenFt / 2 };
+}
+
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
-function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorPlate; variation: Variation; timeOfDay?: "day" | "night" }) {
+function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = true }: { plate: FloorPlate; variation: Variation; timeOfDay?: "day" | "night"; showBalcony?: boolean }) {
+
   const t = WALL_THICKNESS * FT_TO_M;
   const h = FLOOR_HEIGHT * FT_TO_M;
   const winTop = 7 * FT_TO_M;
