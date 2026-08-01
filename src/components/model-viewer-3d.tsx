@@ -34,6 +34,8 @@ interface Props {
   timeOfDay?: "day" | "night";
   autoRotate?: boolean;
   showFurniture?: boolean;
+  showBalcony?: boolean;
+
 }
 
 function paletteFor(variation: Variation) {
