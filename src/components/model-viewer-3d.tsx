@@ -1747,6 +1747,8 @@ export function ModelViewer3D({
   timeOfDay = "day",
   autoRotate = false,
   showFurniture = true,
+  showBalcony = true,
+
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
