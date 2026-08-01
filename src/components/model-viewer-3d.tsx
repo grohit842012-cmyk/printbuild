@@ -984,7 +984,10 @@ function ElevationFeatures({
   // We only allow front-side balconies (upper level) and side-wall screens.
   // Full-height screens on the entrance side are disallowed — they were
   // burying doors and windows.
+  // In floor-wise view only the balcony (+ its sliding doors) is shown.
+  if (!allFloors) return <>{balcony()}</>;
   switch (massing) {
+
     case "cantilever-front":
       return <>{balcony()}{woodBand()}</>;
     case "side-veranda":
