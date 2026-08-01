@@ -34,6 +34,7 @@ function GalleryPage() {
   const [variations, setVariations] = useState<Variation[]>([]);
   const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
   const [kitchenOpen, setKitchenOpen] = useState(false);
+  const [showBalcony, setShowBalcony] = useState(true);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -53,6 +54,7 @@ function GalleryPage() {
     const s = data.spec as unknown as DesignSpec;
     setPlanMode(s?.planMode ?? "closed");
     setKitchenOpen(!!s?.kitchenOpen);
+    setShowBalcony(s?.balcony !== false);
   }
 
   async function deleteVariation(varId: string) {
@@ -139,7 +141,7 @@ function GalleryPage() {
                     className="text-left w-full cursor-pointer"
                   >
                     <div className="mb-3 pointer-events-none">
-                      <ModelViewer3D variation={v} planMode={planMode} kitchenOpen={kitchenOpen} />
+                      <ModelViewer3D variation={v} planMode={planMode} kitchenOpen={kitchenOpen} showBalcony={showBalcony} />
                     </div>
                     <div className="flex items-center justify-between mb-1 gap-2">
                       <h3 className="font-display text-lg leading-tight">{dna.name}</h3>

@@ -34,6 +34,8 @@ interface Props {
   timeOfDay?: "day" | "night";
   autoRotate?: boolean;
   showFurniture?: boolean;
+  showBalcony?: boolean;
+
 }
 
 function paletteFor(variation: Variation) {
@@ -95,8 +97,39 @@ function subtractOpenings(wallStart: number, wallEnd: number, cuts: Seg[]): Seg[
   return segs;
 }
 
+/** Where the (optional) balcony + its sliding door sit. Shared by walls and features
+ *  so the wall actually gets a hole where the sliding doors are. */
+const BALCONY_WIDE: Record<string, number> = {
+  "cantilever-front": 1.15,
+  "side-veranda": 0.9,
+  "stepped-terrace": 0.75,
+  "tower-wing": 0.65,
+  "jaali-court": 0.9,
+  "split-block": 0.75,
+  "pergola-terrace": 0.9,
+  "butterfly-pavilion": 0.85,
+  "folded-butterfly": 0.85,
+  "mono-slope-courtyard": 0.85,
+  "terrace-pavilion": 0.85,
+  "courtyard-cut": 0.8,
+};
+
+function balconySpec(variation: Variation) {
+  const front = entranceWall(variation);
+  const level = variation.plates.length > 1 ? 1 : 0;
+  const plate = variation.plates[level];
+  if (!plate) return null;
+  const isNS = front === "N" || front === "S";
+  const wide = BALCONY_WIDE[variation.massingStyle ?? "pergola-terrace"] ?? 0.8;
+  const wallLenFt = isNS ? plate.w : plate.h;
+  const spanFt = Math.min(wallLenFt * 0.7, 22) * wide;
+  const doorSpanFt = Math.max(6, Math.min(spanFt * 0.6, 8.8));
+  return { front, level, plate, isNS, spanFt, depthFt: 5.5, doorSpanFt, centerFt: wallLenFt / 2 };
+}
+
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
-function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorPlate; variation: Variation; timeOfDay?: "day" | "night" }) {
+function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = true }: { plate: FloorPlate; variation: Variation; timeOfDay?: "day" | "night"; showBalcony?: boolean }) {
+
   const t = WALL_THICKNESS * FT_TO_M;
   const h = FLOOR_HEIGHT * FT_TO_M;
   const winTop = 7 * FT_TO_M;
@@ -145,13 +178,42 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
   const segments: ReactElement[] = [];
   let key = 0;
 
+  // Balcony sliding-door opening — a real hole in the perimeter wall.
+  const bal = showBalcony ? balconySpec(variation) : null;
+  const balOnThisFloor = bal && bal.plate.floor === plate.floor ? bal : null;
+
   const buildSide = (
     side: "N" | "S" | "E" | "W",
     length: number,
     fixedCoord: number,
   ) => {
     const cuts = byWall[side].map(c => ({ a: c.a, b: c.b }));
+    const balGap =
+      balOnThisFloor && balOnThisFloor.front === side
+        ? {
+            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.doorSpanFt / 2),
+            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.doorSpanFt / 2),
+          }
+        : null;
+    if (balGap && balGap.b - balGap.a > 1) cuts.push(balGap);
     const solid = subtractOpenings(0, length, cuts);
+    if (balGap && balGap.b - balGap.a > 1) {
+      // Lintel above the sliding doors so the wall reads as continuous.
+      const gapLen = (balGap.b - balGap.a) * FT_TO_M;
+      const gapMid = ((balGap.a + balGap.b) / 2) * FT_TO_M;
+      const lintelH = h - 7 * FT_TO_M;
+      const lx = side === "N" || side === "S" ? gapMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
+      const lz = side === "E" || side === "W" ? gapMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
+      if (lintelH > 0.05) {
+        segments.push(
+          <mesh key={`bl${key++}`} position={[lx, 7 * FT_TO_M + lintelH / 2, lz]} castShadow receiveShadow>
+            <boxGeometry args={side === "N" || side === "S" ? [gapLen, lintelH, t] : [t, lintelH, gapLen]} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+          </mesh>,
+        );
+      }
+    }
+
     for (const s of solid) {
       const segLen = (s.b - s.a) * FT_TO_M;
       const segMid = ((s.a + s.b) / 2) * FT_TO_M;
@@ -274,8 +336,9 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day" }: { plate: FloorP
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean }) {
+
   const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
@@ -347,7 +410,7 @@ function FloorMesh({
         <extrudeGeometry args={[slabShape, { depth: 0.1, bevelEnabled: false }]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
-      <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} />
+      <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} showBalcony={showBalcony} />
       {curvedCorners.map((c, i) => (
         <group key={`curve-${i}`} position={[c.x, (FLOOR_HEIGHT * FT_TO_M) / 2, c.z]}>
           <mesh castShadow receiveShadow>
@@ -731,7 +794,12 @@ function sidePosition(
   };
 }
 
-function ElevationFeatures({ variation, topY }: { variation: Variation; topY: number }) {
+function ElevationFeatures({
+  variation,
+  topY,
+  visibleFloor = "all",
+  showBalcony = true,
+}: { variation: Variation; topY: number; visibleFloor?: "all" | number; showBalcony?: boolean }) {
   const top = variation.plates[variation.plates.length - 1];
   const palette = paletteFor(variation);
   const massing = variation.massingStyle ?? "pergola-terrace";
@@ -742,17 +810,16 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   const timberMat = <meshStandardMaterial color={palette.material === "timber" ? palette.wall : "#7a5a3a"} roughness={0.65} />;
   const y1 = FLOOR_HEIGHT * FT_TO_M;
   const roofCenter = makeToScene(variation.plotWidthFt, variation.plotDepthFt)(top.x + top.w / 2, top.y + top.h / 2);
+  const allFloors = visibleFloor === "all";
 
-  const balcony = (wide = 1) => {
-    const isNS = front === "N" || front === "S";
-    // Attach to the plate of the floor the balcony belongs to, so stepped /
-    // cantilevered massings line up with the actual wall instead of the ground box.
-    const level = variation.plates.length > 1 ? 1 : 0;
-    const plate = variation.plates[level];
+  const balcony = () => {
+    const spec = showBalcony ? balconySpec(variation) : null;
+    if (!spec) return null;
+    // Visible in "All" view and in the balcony floor's own floor-wise view.
+    if (!allFloors && visibleFloor !== spec.plate.floor) return null;
+    const { isNS, plate, level, spanFt, depthFt, doorSpanFt } = spec;
     const baseY = level * FLOOR_HEIGHT * FT_TO_M;
 
-    const depthFt = 5.5;
-    const spanFt = Math.min((isNS ? plate.w : plate.h) * 0.7, 22) * wide;
     // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
     const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
     const spanM = spanFt * FT_TO_M;
@@ -762,10 +829,11 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     const outX = front === "E" ? 1 : front === "W" ? -1 : 0;
     const outZ = front === "S" ? 1 : front === "N" ? -1 : 0;
 
-    const doorSpan = Math.min(spanM * 0.6, 2.7);
+    const doorSpan = doorSpanFt * FT_TO_M;
     const doorH = 7 * FT_TO_M;
-    const slabTop = 0.09;
+    const slabTop = 0;
     const railH = 1.0;
+
     // Wall plane = inner edge of the slab.
     const wallPos: [number, number, number] = [-outX * (depthM / 2), slabTop, -outZ * (depthM / 2)];
     // Lateral axis of the balcony (along the wall).
@@ -774,12 +842,13 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
       [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 
     return (
-      <group position={[feat.pos[0], baseY + 0.02, feat.pos[2]]}>
-        {/* Slab */}
-        <mesh castShadow receiveShadow position={[0, 0.02, 0]}>
+      <group position={[feat.pos[0], baseY, feat.pos[2]]}>
+        {/* Slab — top face flush with the floor level */}
+        <mesh castShadow receiveShadow position={[0, -0.08, 0]}>
           <boxGeometry args={[isNS ? spanM : depthM, 0.16, isNS ? depthM : spanM]} />
           {trimMat}
         </mesh>
+
         {/* Railing — outer edge */}
         <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
           <boxGeometry args={[isNS ? spanM : 0.08, railH, isNS ? 0.08 : spanM]} />
@@ -917,31 +986,34 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   // We only allow front-side balconies (upper level) and side-wall screens.
   // Full-height screens on the entrance side are disallowed — they were
   // burying doors and windows.
+  // In floor-wise view only the balcony (+ its sliding doors) is shown.
+  if (!allFloors) return <>{balcony()}</>;
   switch (massing) {
+
     case "cantilever-front":
-      return <>{balcony(1.15)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     case "side-veranda":
-      return <>{balcony(0.9)}</>;
+      return <>{balcony()}</>;
     case "stepped-terrace":
-      return <>{balcony(0.75)}</>;
+      return <>{balcony()}</>;
     case "tower-wing":
-      return <>{balcony(0.65)}</>;
+      return <>{balcony()}</>;
     case "jaali-court":
       // Screens only if the front feature can sit as an upper balcony, not full-height.
-      return <>{balcony(0.9)}{variation.plates.length > 1 ? screen(6) : null}</>;
+      return <>{balcony()}{variation.plates.length > 1 ? screen(6) : null}</>;
     case "split-block":
-      return <>{balcony(0.75)}</>;
+      return <>{balcony()}</>;
     case "pergola-terrace":
-      return <>{balcony(0.9)}</>;
+      return <>{balcony()}</>;
     case "butterfly-pavilion":
     case "folded-butterfly":
     case "mono-slope-courtyard":
     case "terrace-pavilion":
-      return <>{balcony(0.85)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     case "courtyard-cut":
-      return <>{balcony(0.8)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     default:
-      return <>{balcony(0.8)}</>;
+      return <>{balcony()}</>;
   }
 }
 
@@ -1677,6 +1749,8 @@ export function ModelViewer3D({
   timeOfDay = "day",
   autoRotate = false,
   showFurniture = true,
+  showBalcony = true,
+
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
@@ -1772,10 +1846,12 @@ export function ModelViewer3D({
                 plotD={variation.plotDepthFt}
                 timeOfDay={timeOfDay}
                 showFurniture={showFurniture}
+                showBalcony={showBalcony}
               />
             ))}
           {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
-          {visibleFloor === "all" && <ElevationFeatures variation={variation} topY={topY} />}
+          <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
+
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
           <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls

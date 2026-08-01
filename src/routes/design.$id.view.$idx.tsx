@@ -44,6 +44,7 @@ function InspectorPage() {
 
   const [planMode, setPlanMode] = useState<"open" | "closed">("closed");
   const [kitchenOpen, setKitchenOpen] = useState(false);
+  const [showBalcony, setShowBalcony] = useState(true);
 
   useEffect(() => {
     void (async () => {
@@ -57,9 +58,10 @@ function InspectorPage() {
       const v = variations[Number(idx)];
       if (!v) { toast.error("Variation not found"); return; }
       setVariation(v);
-      const specJson = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean } | null;
+      const specJson = data.spec as { planMode?: "open" | "closed"; kitchenOpen?: boolean; balcony?: boolean } | null;
       setPlanMode(specJson?.planMode ?? "closed");
       setKitchenOpen(!!specJson?.kitchenOpen);
+      setShowBalcony(specJson?.balcony !== false);
       const floors = v.plates.map((p) => p.floor);
       setAllFloors(floors);
       setActiveFloor(floors[0]);
@@ -126,7 +128,7 @@ function InspectorPage() {
             </div>
             <span className="text-xs text-muted-foreground">Drag to orbit · scroll to zoom</span>
           </div>
-          <ModelViewer3D variation={variation} planMode={planMode} kitchenOpen={kitchenOpen} />
+          <ModelViewer3D variation={variation} planMode={planMode} kitchenOpen={kitchenOpen} showBalcony={showBalcony} />
         </div>
 
         <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6">
