@@ -985,29 +985,29 @@ function ElevationFeatures({
   // burying doors and windows.
   switch (massing) {
     case "cantilever-front":
-      return <>{balcony(1.15)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     case "side-veranda":
-      return <>{balcony(0.9)}</>;
+      return <>{balcony()}</>;
     case "stepped-terrace":
-      return <>{balcony(0.75)}</>;
+      return <>{balcony()}</>;
     case "tower-wing":
-      return <>{balcony(0.65)}</>;
+      return <>{balcony()}</>;
     case "jaali-court":
       // Screens only if the front feature can sit as an upper balcony, not full-height.
-      return <>{balcony(0.9)}{variation.plates.length > 1 ? screen(6) : null}</>;
+      return <>{balcony()}{variation.plates.length > 1 ? screen(6) : null}</>;
     case "split-block":
-      return <>{balcony(0.75)}</>;
+      return <>{balcony()}</>;
     case "pergola-terrace":
-      return <>{balcony(0.9)}</>;
+      return <>{balcony()}</>;
     case "butterfly-pavilion":
     case "folded-butterfly":
     case "mono-slope-courtyard":
     case "terrace-pavilion":
-      return <>{balcony(0.85)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     case "courtyard-cut":
-      return <>{balcony(0.8)}{woodBand()}</>;
+      return <>{balcony()}{woodBand()}</>;
     default:
-      return <>{balcony(0.8)}</>;
+      return <>{balcony()}</>;
   }
 }
 
