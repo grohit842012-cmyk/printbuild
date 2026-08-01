@@ -840,12 +840,13 @@ function ElevationFeatures({
       [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 
     return (
-      <group position={[feat.pos[0], baseY + 0.02, feat.pos[2]]}>
-        {/* Slab */}
-        <mesh castShadow receiveShadow position={[0, 0.02, 0]}>
+      <group position={[feat.pos[0], baseY, feat.pos[2]]}>
+        {/* Slab — top face flush with the floor level */}
+        <mesh castShadow receiveShadow position={[0, -0.08, 0]}>
           <boxGeometry args={[isNS ? spanM : depthM, 0.16, isNS ? depthM : spanM]} />
           {trimMat}
         </mesh>
+
         {/* Railing — outer edge */}
         <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
           <boxGeometry args={[isNS ? spanM : 0.08, railH, isNS ? 0.08 : spanM]} />
