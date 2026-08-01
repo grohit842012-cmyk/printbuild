@@ -792,7 +792,12 @@ function sidePosition(
   };
 }
 
-function ElevationFeatures({ variation, topY }: { variation: Variation; topY: number }) {
+function ElevationFeatures({
+  variation,
+  topY,
+  visibleFloor = "all",
+  showBalcony = true,
+}: { variation: Variation; topY: number; visibleFloor?: "all" | number; showBalcony?: boolean }) {
   const top = variation.plates[variation.plates.length - 1];
   const palette = paletteFor(variation);
   const massing = variation.massingStyle ?? "pergola-terrace";
@@ -803,17 +808,16 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
   const timberMat = <meshStandardMaterial color={palette.material === "timber" ? palette.wall : "#7a5a3a"} roughness={0.65} />;
   const y1 = FLOOR_HEIGHT * FT_TO_M;
   const roofCenter = makeToScene(variation.plotWidthFt, variation.plotDepthFt)(top.x + top.w / 2, top.y + top.h / 2);
+  const allFloors = visibleFloor === "all";
 
-  const balcony = (wide = 1) => {
-    const isNS = front === "N" || front === "S";
-    // Attach to the plate of the floor the balcony belongs to, so stepped /
-    // cantilevered massings line up with the actual wall instead of the ground box.
-    const level = variation.plates.length > 1 ? 1 : 0;
-    const plate = variation.plates[level];
+  const balcony = () => {
+    const spec = showBalcony ? balconySpec(variation) : null;
+    if (!spec) return null;
+    // Visible in "All" view and in the balcony floor's own floor-wise view.
+    if (!allFloors && visibleFloor !== spec.plate.floor) return null;
+    const { isNS, plate, level, spanFt, depthFt, doorSpanFt } = spec;
     const baseY = level * FLOOR_HEIGHT * FT_TO_M;
 
-    const depthFt = 5.5;
-    const spanFt = Math.min((isNS ? plate.w : plate.h) * 0.7, 22) * wide;
     // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
     const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
     const spanM = spanFt * FT_TO_M;
@@ -823,10 +827,11 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
     const outX = front === "E" ? 1 : front === "W" ? -1 : 0;
     const outZ = front === "S" ? 1 : front === "N" ? -1 : 0;
 
-    const doorSpan = Math.min(spanM * 0.6, 2.7);
+    const doorSpan = doorSpanFt * FT_TO_M;
     const doorH = 7 * FT_TO_M;
-    const slabTop = 0.09;
+    const slabTop = 0;
     const railH = 1.0;
+
     // Wall plane = inner edge of the slab.
     const wallPos: [number, number, number] = [-outX * (depthM / 2), slabTop, -outZ * (depthM / 2)];
     // Lateral axis of the balcony (along the wall).
