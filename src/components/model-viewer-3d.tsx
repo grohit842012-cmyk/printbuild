@@ -732,7 +732,6 @@ function sidePosition(
 }
 
 function ElevationFeatures({ variation, topY }: { variation: Variation; topY: number }) {
-  const ground = variation.plates[0];
   const top = variation.plates[variation.plates.length - 1];
   const palette = paletteFor(variation);
   const massing = variation.massingStyle ?? "pergola-terrace";
