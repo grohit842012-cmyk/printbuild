@@ -176,13 +176,42 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   const segments: ReactElement[] = [];
   let key = 0;
 
+  // Balcony sliding-door opening — a real hole in the perimeter wall.
+  const bal = showBalcony ? balconySpec(variation) : null;
+  const balOnThisFloor = bal && bal.plate.floor === plate.floor ? bal : null;
+
   const buildSide = (
     side: "N" | "S" | "E" | "W",
     length: number,
     fixedCoord: number,
   ) => {
     const cuts = byWall[side].map(c => ({ a: c.a, b: c.b }));
+    const balGap =
+      balOnThisFloor && balOnThisFloor.front === side
+        ? {
+            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.doorSpanFt / 2),
+            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.doorSpanFt / 2),
+          }
+        : null;
+    if (balGap && balGap.b - balGap.a > 1) cuts.push(balGap);
     const solid = subtractOpenings(0, length, cuts);
+    if (balGap && balGap.b - balGap.a > 1) {
+      // Lintel above the sliding doors so the wall reads as continuous.
+      const gapLen = (balGap.b - balGap.a) * FT_TO_M;
+      const gapMid = ((balGap.a + balGap.b) / 2) * FT_TO_M;
+      const lintelH = h - 7 * FT_TO_M;
+      const lx = side === "N" || side === "S" ? gapMid - (plate.w / 2) * FT_TO_M : (fixedCoord - plate.w / 2) * FT_TO_M;
+      const lz = side === "E" || side === "W" ? gapMid - (plate.h / 2) * FT_TO_M : (fixedCoord - plate.h / 2) * FT_TO_M;
+      if (lintelH > 0.05) {
+        segments.push(
+          <mesh key={`bl${key++}`} position={[lx, 7 * FT_TO_M + lintelH / 2, lz]} castShadow receiveShadow>
+            <boxGeometry args={side === "N" || side === "S" ? [gapLen, lintelH, t] : [t, lintelH, gapLen]} />
+            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+          </mesh>,
+        );
+      }
+    }
+
     for (const s of solid) {
       const segLen = (s.b - s.a) * FT_TO_M;
       const segMid = ((s.a + s.b) / 2) * FT_TO_M;
