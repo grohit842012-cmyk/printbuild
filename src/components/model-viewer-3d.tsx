@@ -748,59 +748,105 @@ function ElevationFeatures({ variation, topY }: { variation: Variation; topY: nu
 
   const balcony = (wide = 1) => {
     const isNS = front === "N" || front === "S";
-    const towardHouseZ = front === "N" ? 1 : front === "S" ? -1 : 0;
-    const towardHouseX = front === "W" ? 1 : front === "E" ? -1 : 0;
-    const doorSpan = frontFeature.size[0] * wide * 0.85;
+    // Attach to the plate of the floor the balcony belongs to, so stepped /
+    // cantilevered massings line up with the actual wall instead of the ground box.
+    const level = variation.plates.length > 1 ? 1 : 0;
+    const plate = variation.plates[level];
+    const baseY = level * FLOOR_HEIGHT * FT_TO_M;
+
+    const depthFt = 5.5;
+    const spanFt = Math.min((isNS ? plate.w : plate.h) * 0.7, 22) * wide;
+    // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
+    const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
+    const spanM = spanFt * FT_TO_M;
+    const depthM = depthFt * FT_TO_M;
+
+    // Unit vector pointing OUT of the house (scene space).
+    const outX = front === "E" ? 1 : front === "W" ? -1 : 0;
+    const outZ = front === "S" ? 1 : front === "N" ? -1 : 0;
+
+    const doorSpan = Math.min(spanM * 0.6, 2.7);
     const doorH = 7 * FT_TO_M;
-    // Slider sits on the house wall face behind the balcony
-    const wallOffset: [number, number, number] = [
-      towardHouseX * (frontFeature.size[0] / 2),
-      0,
-      towardHouseZ * (frontFeature.size[2] / 2),
-    ];
+    const slabTop = 0.09;
+    const railH = 1.0;
+    // Wall plane = inner edge of the slab.
+    const wallPos: [number, number, number] = [-outX * (depthM / 2), slabTop, -outZ * (depthM / 2)];
+    // Lateral axis of the balcony (along the wall).
+    const lat = (t: number): [number, number, number] => (isNS ? [t, 0, 0] : [0, 0, t]);
+    const add = (a: [number, number, number], b: [number, number, number]): [number, number, number] =>
+      [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+
     return (
-      <group position={[frontFeature.pos[0], y1 + 0.05, frontFeature.pos[2]]}>
+      <group position={[feat.pos[0], baseY + 0.02, feat.pos[2]]}>
         {/* Slab */}
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[frontFeature.size[0] * wide, 0.16, frontFeature.size[2]]} />
+        <mesh castShadow receiveShadow position={[0, 0.02, 0]}>
+          <boxGeometry args={[isNS ? spanM : depthM, 0.16, isNS ? depthM : spanM]} />
           {trimMat}
         </mesh>
-        {/* Outer railing */}
-        <mesh position={[0, 0.6, front === "N" ? -frontFeature.size[2] / 2 : front === "S" ? frontFeature.size[2] / 2 : 0]} castShadow>
-          <boxGeometry args={[frontFeature.size[0] * wide, 0.9, 0.08]} />
+        {/* Railing — outer edge */}
+        <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
+          <boxGeometry args={[isNS ? spanM : 0.08, railH, isNS ? 0.08 : spanM]} />
           {railMat}
         </mesh>
-        {(front === "E" || front === "W") && (
-          <mesh position={[front === "W" ? -frontFeature.size[0] / 2 : frontFeature.size[0] / 2, 0.6, 0]} castShadow>
-            <boxGeometry args={[0.08, 0.9, frontFeature.size[2]]} />
+        {/* Railing — the two side returns */}
+        {[-1, 1].map((s) => (
+          <mesh key={`side${s}`} position={add(lat(s * (spanM / 2 - 0.04)), [0, slabTop + railH / 2, 0])} castShadow>
+            <boxGeometry args={[isNS ? 0.08 : depthM, railH, isNS ? depthM : 0.08]} />
             {railMat}
           </mesh>
-        )}
-        {/* Sliding-glass door — two leaves in a colored frame on the wall behind the balcony */}
-        <group position={wallOffset}>
-          {/* frame */}
-          <mesh position={[0, doorH / 2, 0]}>
-            <boxGeometry args={isNS ? [doorSpan + 0.15, doorH + 0.1, 0.06] : [0.06, doorH + 0.1, doorSpan + 0.15]} />
-            <meshStandardMaterial color={palette.accent} roughness={0.5} metalness={0.15} />
+        ))}
+        {/* Handrail cap */}
+        <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH + 0.03, outZ * (depthM / 2 - 0.05)]}>
+          <boxGeometry args={[isNS ? spanM : 0.12, 0.06, isNS ? 0.12 : spanM]} />
+          {accentMat}
+        </mesh>
+
+        {/* Sliding-glass door set, flush on the wall behind the balcony */}
+        <group position={wallPos}>
+          {/* dark recess so it reads as a real opening, not a sticker */}
+          <mesh position={[-outX * 0.09, doorH / 2, -outZ * 0.09]}>
+            <boxGeometry args={isNS ? [doorSpan, doorH, 0.14] : [0.14, doorH, doorSpan]} />
+            <meshStandardMaterial color="#1c1a17" roughness={0.95} />
           </mesh>
-          {/* two glass leaves */}
+          {/* outer frame */}
+          <mesh position={[outX * 0.03, doorH / 2, outZ * 0.03]}>
+            <boxGeometry args={isNS ? [doorSpan + 0.14, doorH + 0.12, 0.07] : [0.07, doorH + 0.12, doorSpan + 0.14]} />
+            <meshStandardMaterial color={palette.accent} roughness={0.5} metalness={0.18} />
+          </mesh>
+          {/* two glass leaves on offset tracks */}
           {[-1, 1].map((s) => (
-            <mesh key={s} position={isNS ? [s * doorSpan / 4, doorH / 2, 0.02 * -towardHouseZ] : [0.02 * -towardHouseX, doorH / 2, s * doorSpan / 4]}>
-              <boxGeometry args={isNS ? [doorSpan / 2 - 0.05, doorH * 0.96, 0.04] : [0.04, doorH * 0.96, doorSpan / 2 - 0.05]} />
-              <meshPhysicalMaterial color="#a8c4d8" transmission={0.7} opacity={0.55} transparent roughness={0.05} thickness={0.05} metalness={0.15} />
+            <mesh
+              key={s}
+              position={add(lat(s * doorSpan * 0.25), [outX * (0.05 + s * 0.015), doorH / 2, outZ * (0.05 + s * 0.015)])}
+            >
+              <boxGeometry args={isNS ? [doorSpan / 2 - 0.04, doorH * 0.95, 0.035] : [0.035, doorH * 0.95, doorSpan / 2 - 0.04]} />
+              <meshPhysicalMaterial color="#a8c4d8" transmission={0.72} opacity={0.5} transparent roughness={0.05} thickness={0.05} metalness={0.15} />
             </mesh>
           ))}
-          {/* horizontal handle bars */}
+          {/* leaf stiles */}
           {[-1, 1].map((s) => (
-            <mesh key={`h${s}`} position={isNS ? [s * 0.35, doorH * 0.5, 0.04 * -towardHouseZ] : [0.04 * -towardHouseX, doorH * 0.5, s * 0.35]}>
-              <boxGeometry args={isNS ? [0.05, 0.6, 0.03] : [0.03, 0.6, 0.05]} />
-              <meshStandardMaterial color="#c9c4bb" metalness={0.7} roughness={0.3} />
+            <mesh key={`st${s}`} position={add(lat(s * doorSpan * 0.5), [outX * 0.06, doorH / 2, outZ * 0.06])}>
+              <boxGeometry args={isNS ? [0.06, doorH * 0.95, 0.05] : [0.05, doorH * 0.95, 0.06]} />
+              <meshStandardMaterial color={palette.accent} roughness={0.45} metalness={0.2} />
             </mesh>
           ))}
+          {/* centre meeting stile + handles */}
+          {[-1, 1].map((s) => (
+            <mesh key={`h${s}`} position={add(lat(s * 0.06), [outX * 0.08, doorH * 0.45, outZ * 0.08])}>
+              <boxGeometry args={isNS ? [0.035, 0.7, 0.035] : [0.035, 0.7, 0.035]} />
+              <meshStandardMaterial color="#c9c4bb" metalness={0.75} roughness={0.28} />
+            </mesh>
+          ))}
+          {/* threshold / sill flush with the slab */}
+          <mesh position={[outX * 0.05, 0.02, outZ * 0.05]}>
+            <boxGeometry args={isNS ? [doorSpan + 0.14, 0.05, 0.16] : [0.16, 0.05, doorSpan + 0.14]} />
+            {accentMat}
+          </mesh>
         </group>
       </group>
     );
   };
+
 
   // Vertical fins / jaali placed on a SIDE wall of the UPPER floor only —
   // never the entrance side, never full-height (was blocking the door).
