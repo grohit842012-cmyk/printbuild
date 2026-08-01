@@ -408,7 +408,7 @@ function FloorMesh({
         <extrudeGeometry args={[slabShape, { depth: 0.1, bevelEnabled: false }]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
-      <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} />
+      <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} showBalcony={showBalcony} />
       {curvedCorners.map((c, i) => (
         <group key={`curve-${i}`} position={[c.x, (FLOOR_HEIGHT * FT_TO_M) / 2, c.z]}>
           <mesh castShadow receiveShadow>
