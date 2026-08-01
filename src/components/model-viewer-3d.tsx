@@ -334,8 +334,9 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean }) {
+
   const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
   const cz = plate.y + plate.h / 2;
