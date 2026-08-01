@@ -1842,10 +1842,12 @@ export function ModelViewer3D({
                 plotD={variation.plotDepthFt}
                 timeOfDay={timeOfDay}
                 showFurniture={showFurniture}
+                showBalcony={showBalcony}
               />
             ))}
           {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
-          {visibleFloor === "all" && <ElevationFeatures variation={variation} topY={topY} />}
+          <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
+
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
           <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
           <OrbitControls
