@@ -670,6 +670,23 @@ function NewDesignWizard() {
                   </label>
                 </RadioGroup>
               </div>
+
+              <div>
+                <Label>Balcony</Label>
+                <RadioGroup
+                  value={spec.balcony === false ? "no" : "yes"}
+                  onValueChange={(v) => setSpec({ ...spec, balcony: v === "yes" })}
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="yes" /> Yes — front balcony with sliding doors
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="no" /> No balcony
+                  </label>
+                </RadioGroup>
+              </div>
+
             </>
           )}
 
