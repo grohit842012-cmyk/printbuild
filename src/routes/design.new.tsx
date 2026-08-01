@@ -97,6 +97,7 @@ function NewDesignWizard() {
     parking: { count: 1, vehicle: "car", location: "inside", bikes: 0 },
     planMode: "closed",
     kitchenOpen: false,
+    balcony: true,
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
   });
 
