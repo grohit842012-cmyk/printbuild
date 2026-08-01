@@ -53,6 +53,9 @@ export interface DesignSpec {
   planMode?: "open" | "closed";
   // Kitchen open to dining/living vs walled-off.
   kitchenOpen?: boolean;
+  // Include a front balcony with sliding glass doors on the upper level.
+  balcony?: boolean;
+
   lifestyle: {
     familySize: number;
     workFromHome: boolean;
