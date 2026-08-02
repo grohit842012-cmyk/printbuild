@@ -172,6 +172,10 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   const DOOR_COLOR = "#5a3a22";   // walnut
   // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
   const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
+  // Stage 2 — procedural facade surface (bump + roughness variation).
+  const wallSurface = surfaceFor(palette.material as MaterialKind, variation.seed || 1);
+
+
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
