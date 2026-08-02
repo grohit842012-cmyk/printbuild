@@ -839,11 +839,13 @@ function ElevationFeatures({
     if (!spec) return null;
     // Visible in "All" view and in the balcony floor's own floor-wise view.
     if (!allFloors && visibleFloor !== spec.plate.floor) return null;
-    const { isNS, plate, level, spanFt, depthFt, doorSpanFt } = spec;
+    const { isNS, plate, level, spanFt, depthFt, doorSpanFt, cantilever } = spec;
     const baseY = level * FLOOR_HEIGHT * FT_TO_M;
 
-    // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
-    const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
+    // Projecting deck: slab sits outside the facade. Recessed loggia: the slab
+    // is carved back into the floor plate so the railing line stays inside the
+    // building envelope.
+    const feat = sidePosition(variation, plate, front, (cantilever ? 1 : -1) * (depthFt / 2), spanFt, depthFt);
     const spanM = spanFt * FT_TO_M;
     const depthM = depthFt * FT_TO_M;
 
@@ -856,7 +858,7 @@ function ElevationFeatures({
     const slabTop = 0;
     const railH = 1.0;
 
-    // Wall plane = inner edge of the slab.
+    // Wall plane holding the sliding doors = inner edge of the balcony.
     const wallPos: [number, number, number] = [-outX * (depthM / 2), slabTop, -outZ * (depthM / 2)];
     // Lateral axis of the balcony (along the wall).
     const lat = (t: number): [number, number, number] => (isNS ? [t, 0, 0] : [0, 0, t]);
@@ -871,16 +873,40 @@ function ElevationFeatures({
           {trimMat}
         </mesh>
 
+        {/* A projecting deck must look carried: soffit band + brackets. */}
+        {cantilever && (
+          <>
+            <mesh position={[0, -0.24, 0]} receiveShadow>
+              <boxGeometry args={[isNS ? spanM * 0.98 : depthM * 0.9, 0.12, isNS ? depthM * 0.9 : spanM * 0.98]} />
+              <meshStandardMaterial color={palette.trim} roughness={0.8} />
+            </mesh>
+            {[-1, 1].map((s) => (
+              <mesh
+                key={`br${s}`}
+                position={add(lat(s * (spanM / 2 - 0.35)), [outX * (depthM * 0.18), -0.62, outZ * (depthM * 0.18)])}
+                castShadow
+              >
+                <boxGeometry args={[isNS ? 0.16 : depthM * 0.55, 0.9, isNS ? depthM * 0.55 : 0.16]} />
+                {trimMat}
+              </mesh>
+            ))}
+          </>
+        )}
+
         {/* Railing — outer edge */}
         <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
           <boxGeometry args={[isNS ? spanM : 0.08, railH, isNS ? 0.08 : spanM]} />
           {railMat}
         </mesh>
-        {/* Railing — the two side returns */}
+        {/* Side returns — glass on a deck, solid cheek walls inside a loggia */}
         {[-1, 1].map((s) => (
-          <mesh key={`side${s}`} position={add(lat(s * (spanM / 2 - 0.04)), [0, slabTop + railH / 2, 0])} castShadow>
-            <boxGeometry args={[isNS ? 0.08 : depthM, railH, isNS ? depthM : 0.08]} />
-            {railMat}
+          <mesh
+            key={`side${s}`}
+            position={add(lat(s * (spanM / 2 - 0.04)), [0, slabTop + (cantilever ? railH / 2 : (FLOOR_HEIGHT * FT_TO_M) / 2), 0])}
+            castShadow
+          >
+            <boxGeometry args={[isNS ? 0.08 : depthM, cantilever ? railH : FLOOR_HEIGHT * FT_TO_M, isNS ? depthM : 0.08]} />
+            {cantilever ? railMat : trimMat}
           </mesh>
         ))}
         {/* Handrail cap */}
@@ -888,6 +914,13 @@ function ElevationFeatures({
           <boxGeometry args={[isNS ? spanM : 0.12, 0.06, isNS ? 0.12 : spanM]} />
           {accentMat}
         </mesh>
+        {/* Loggia head beam — closes the top of the carved-out opening */}
+        {!cantilever && (
+          <mesh position={[outX * (depthM / 2 - 0.05), doorH + (FLOOR_HEIGHT * FT_TO_M - doorH) / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
+            <boxGeometry args={[isNS ? spanM : 0.2, FLOOR_HEIGHT * FT_TO_M - doorH, isNS ? 0.2 : spanM]} />
+            {trimMat}
+          </mesh>
+        )}
 
         {/* Sliding-glass door set, flush on the wall behind the balcony */}
         <group position={wallPos}>
