@@ -1353,6 +1353,17 @@ export function generateVariations(
 
     ensureVerticalCoreInsideUpperPlates(plates, spec.plot.widthFt, spec.plot.depthFt);
 
+    // Stage 1 — vertical stack contract: no floating slabs, no hairline
+    // slivers, every room inside its own plate. Floors whose outline moved get
+    // their interior openings re-cut (keeping the front door untouched).
+    const stack = enforceStackContract(plates, spec.plot.widthFt, spec.plot.depthFt, SETBACK);
+    for (let f = 0; f < plates.length; f++) {
+      if (!stack.changed.has(plates[f].floor)) continue;
+      const keepDoor = plates[f].entranceDoor;
+      const keepHall = plates[f].hallway;
+      plates[f] = { ...rebuildInteriorOpenings(plates[f]), entranceDoor: keepDoor, hallway: keepHall };
+    }
+
     const allRooms = plates.flatMap((p) => p.rooms);
     const center = {
       x: plates[0].x + plates[0].w / 2,
@@ -1360,6 +1371,7 @@ export function generateVariations(
     };
     const vastuResult = scoreVastu(allRooms, vastu, entranceDir, center);
     const liveability = evaluateLiveability(plates, entranceDir);
+    liveability.issues.push(...stack.issues, ...alignmentIssues(plates));
 
     // Every variation must read as its own house — unique facade style AND
     // unique accent colour. Cycle both lists at coprime strides so 10
