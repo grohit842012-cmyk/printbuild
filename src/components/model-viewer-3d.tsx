@@ -800,12 +800,17 @@ function sidePosition(
   offsetFt: number,
   widthFt: number,
   depthFt: number,
+  alongFt = 0,
 ): { pos: [number, number, number]; size: [number, number, number] } {
   const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
-  const cx = side === "E" ? plate.x + plate.w + offsetFt : side === "W" ? plate.x - offsetFt : plate.x + plate.w / 2;
-  const cy = side === "S" ? plate.y + plate.h + offsetFt : side === "N" ? plate.y - offsetFt : plate.y + plate.h / 2;
-  const [sx, sz] = toScene(cx, cy);
   const isNS = side === "N" || side === "S";
+  const cx = side === "E" ? plate.x + plate.w + offsetFt
+    : side === "W" ? plate.x - offsetFt
+    : plate.x + plate.w / 2 + alongFt;
+  const cy = side === "S" ? plate.y + plate.h + offsetFt
+    : side === "N" ? plate.y - offsetFt
+    : plate.y + plate.h / 2 + (isNS ? 0 : alongFt);
+  const [sx, sz] = toScene(cx, cy);
   return {
     pos: [sx, 0, sz],
     size: [
@@ -814,6 +819,57 @@ function sidePosition(
       (isNS ? depthFt : widthFt) * FT_TO_M,
     ],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Opening resolver — the single source of truth for "what is already on this
+// wall". Facade features (fins, jaali, wood bands, pergola posts) ask it for a
+// free band before placing themselves, so decoration can never bury a door or
+// a window.
+// ---------------------------------------------------------------------------
+function wallCuts(plate: FloorPlate, side: "N" | "E" | "S" | "W"): Seg[] {
+  const tol = 0.6;
+  const cuts: Seg[] = [];
+  const all: Opening[] = [...plate.openings];
+  if (plate.entranceDoor) all.push(plate.entranceDoor);
+  for (const o of all) {
+    const onN = Math.abs(o.y1 - plate.y) < tol && Math.abs(o.y2 - plate.y) < tol;
+    const onS = Math.abs(o.y1 - (plate.y + plate.h)) < tol && Math.abs(o.y2 - (plate.y + plate.h)) < tol;
+    const onW = Math.abs(o.x1 - plate.x) < tol && Math.abs(o.x2 - plate.x) < tol;
+    const onE = Math.abs(o.x1 - (plate.x + plate.w)) < tol && Math.abs(o.x2 - (plate.x + plate.w)) < tol;
+    const here = side === "N" ? onN : side === "S" ? onS : side === "W" ? onW : onE;
+    if (!here) continue;
+    const isNS = side === "N" || side === "S";
+    const a = (isNS ? Math.min(o.x1, o.x2) - plate.x : Math.min(o.y1, o.y2) - plate.y) - 1;
+    const b = (isNS ? Math.max(o.x1, o.x2) - plate.x : Math.max(o.y1, o.y2) - plate.y) + 1;
+    cuts.push({ a, b });
+  }
+  return cuts;
+}
+
+/**
+ * Largest stretch of wall with nothing on it. Returns the band's centre as an
+ * offset from the wall's midpoint (feet) and how wide the feature may be.
+ */
+function freeBand(
+  plate: FloorPlate,
+  side: "N" | "E" | "S" | "W",
+  wantFt: number,
+  minFt = 3,
+): { alongFt: number; spanFt: number } | null {
+  const isNS = side === "N" || side === "S";
+  const length = isNS ? plate.w : plate.h;
+  const solid = subtractOpenings(0, length, wallCuts(plate, side));
+  let best: Seg | null = null;
+  for (const s of solid) {
+    if (!best || s.b - s.a > best.b - best.a) best = s;
+  }
+  if (!best) return null;
+  const avail = best.b - best.a - 0.6;
+  if (avail < minFt) return null;
+  const spanFt = Math.min(wantFt, avail);
+  const centre = (best.a + best.b) / 2;
+  return { alongFt: centre - length / 2, spanFt };
 }
 
 function ElevationFeatures({
