@@ -1076,7 +1076,9 @@ function ElevationFeatures({
     const side = (front === "N" || front === "S" ? "E" : "N") as "N" | "E" | "S" | "W";
     const plate = variation.plates[Math.min(variation.plates.length - 1, 1)];
     const span = side === "N" || side === "S" ? plate.w : plate.h;
-    const feat = sidePosition(variation, plate, side, 0.28, Math.min(span * 0.72, 20), 0.35);
+    const band = freeBand(plate, side, Math.min(span * 0.72, 20), 4);
+    if (!band) return null;
+    const feat = sidePosition(variation, plate, side, 0.28, band.spanFt, 0.35, band.alongFt);
     const isNS = side === "N" || side === "S";
     const sign = side === "N" || side === "W" ? -1 : 1;
     return (
