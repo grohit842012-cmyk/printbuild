@@ -1033,7 +1033,10 @@ function ElevationFeatures({
     const side = (front === "N" || front === "S" ? "E" : "S") as "N" | "E" | "S" | "W";
     const upper = variation.plates[variation.plates.length - 1];
     const span = side === "N" || side === "S" ? upper.w : upper.h;
-    const feat = sidePosition(variation, upper, side, 0.4, Math.min(span * 0.55, 14), 4);
+    // Ask the opening resolver for wall that is actually free.
+    const band = freeBand(upper, side, Math.min(span * 0.55, 14), 4);
+    if (!band) return null;
+    const feat = sidePosition(variation, upper, side, 0.4, band.spanFt, 4, band.alongFt);
     const height = 8.5 * FT_TO_M;
     const isNS = side === "N" || side === "S";
     const sign = side === "N" || side === "W" ? -1 : 1;
