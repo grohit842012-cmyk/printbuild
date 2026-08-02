@@ -3,6 +3,7 @@ import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/dr
 import { useEffect, useMemo, useState, useRef, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
 import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
+import { surfaceFor, lightingFor, type MaterialKind } from "@/lib/materials";
 
 const FLOOR_HEIGHT = 10; // ft
 const WALL_THICKNESS = 0.45;
@@ -230,7 +231,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`bl${key++}`} position={[lx, 7 * FT_TO_M + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={side === "N" || side === "S" ? [gapLen, lintelH, t] : [t, lintelH, gapLen]} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
       }
@@ -247,7 +248,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
       segments.push(
         <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
           <boxGeometry args={args} />
-          <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+          <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
         </mesh>,
       );
     }
@@ -262,7 +263,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // door frame trim
@@ -287,7 +288,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={sillArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // sill band (trim)
@@ -302,7 +303,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // top trim under lintel
