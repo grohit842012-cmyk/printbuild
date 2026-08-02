@@ -114,6 +114,10 @@ const BALCONY_WIDE: Record<string, number> = {
   "courtyard-cut": 0.8,
 };
 
+/** Massings whose balcony is a deliberate projecting deck; everything else is
+ *  carved back into the building envelope so the railing sits inside it. */
+const CANTILEVER_BALCONY = new Set(["cantilever-front", "tower-wing", "split-block"]);
+
 function balconySpec(variation: Variation) {
   const front = entranceWall(variation);
   const level = variation.plates.length > 1 ? 1 : 0;
@@ -122,9 +126,27 @@ function balconySpec(variation: Variation) {
   const isNS = front === "N" || front === "S";
   const wide = BALCONY_WIDE[variation.massingStyle ?? "pergola-terrace"] ?? 0.8;
   const wallLenFt = isNS ? plate.w : plate.h;
+  const plateDepthFt = isNS ? plate.h : plate.w;
   const spanFt = Math.min(wallLenFt * 0.7, 22) * wide;
   const doorSpanFt = Math.max(6, Math.min(spanFt * 0.6, 8.8));
-  return { front, level, plate, isNS, spanFt, depthFt: 5.5, doorSpanFt, centerFt: wallLenFt / 2 };
+  // Recessed only when the plate is deep enough to give the balcony away
+  // without eating the rooms behind it.
+  const cantilever = CANTILEVER_BALCONY.has(variation.massingStyle ?? "") || plateDepthFt < 26;
+  const depthFt = cantilever ? 5.5 : Math.min(6, plateDepthFt * 0.2);
+  return {
+    front,
+    level,
+    plate,
+    isNS,
+    spanFt,
+    depthFt,
+    doorSpanFt,
+    centerFt: wallLenFt / 2,
+    cantilever,
+    // How wide a hole the perimeter wall needs: the whole loggia when recessed,
+    // just the sliding-door bay when it projects.
+    openSpanFt: cantilever ? doorSpanFt : spanFt,
+  };
 }
 
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
