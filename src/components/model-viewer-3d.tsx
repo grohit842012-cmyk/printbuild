@@ -213,8 +213,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
     const balGap =
       balOnThisFloor && balOnThisFloor.front === side
         ? {
-            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.doorSpanFt / 2),
-            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.doorSpanFt / 2),
+            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.openSpanFt / 2),
+            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.openSpanFt / 2),
           }
         : null;
     if (balGap && balGap.b - balGap.a > 1) cuts.push(balGap);
