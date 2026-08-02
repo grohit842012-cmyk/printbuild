@@ -1681,12 +1681,12 @@ function Plot({ variation }: { variation: Variation }) {
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w + 14, d + 14]} />
-        <meshStandardMaterial color={groundTint} roughness={0.97} {...grassSurface} />
+        <meshStandardMaterial color={groundTint} {...grassSurface} roughness={0.97} />
       </mesh>
       {/* Driveway hint */}
       <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#8b8478" roughness={0.88} {...paveSurface} />
+        <meshStandardMaterial color="#8b8478" {...paveSurface} roughness={0.88} />
       </mesh>
       {/* Ground shrubs / hedge dabs for realism */}
       {Array.from({ length: 22 }).map((_, i) => {
