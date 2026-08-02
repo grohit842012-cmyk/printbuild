@@ -3,6 +3,7 @@ import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/dr
 import { useEffect, useMemo, useState, useRef, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
 import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
+import { surfaceFor, lightingFor, type MaterialKind } from "@/lib/materials";
 
 const FLOOR_HEIGHT = 10; // ft
 const WALL_THICKNESS = 0.45;
@@ -114,6 +115,10 @@ const BALCONY_WIDE: Record<string, number> = {
   "courtyard-cut": 0.8,
 };
 
+/** Massings whose balcony is a deliberate projecting deck; everything else is
+ *  carved back into the building envelope so the railing sits inside it. */
+const CANTILEVER_BALCONY = new Set(["cantilever-front", "tower-wing", "split-block"]);
+
 function balconySpec(variation: Variation) {
   const front = entranceWall(variation);
   const level = variation.plates.length > 1 ? 1 : 0;
@@ -122,9 +127,27 @@ function balconySpec(variation: Variation) {
   const isNS = front === "N" || front === "S";
   const wide = BALCONY_WIDE[variation.massingStyle ?? "pergola-terrace"] ?? 0.8;
   const wallLenFt = isNS ? plate.w : plate.h;
+  const plateDepthFt = isNS ? plate.h : plate.w;
   const spanFt = Math.min(wallLenFt * 0.7, 22) * wide;
   const doorSpanFt = Math.max(6, Math.min(spanFt * 0.6, 8.8));
-  return { front, level, plate, isNS, spanFt, depthFt: 5.5, doorSpanFt, centerFt: wallLenFt / 2 };
+  // Recessed only when the plate is deep enough to give the balcony away
+  // without eating the rooms behind it.
+  const cantilever = CANTILEVER_BALCONY.has(variation.massingStyle ?? "") || plateDepthFt < 26;
+  const depthFt = cantilever ? 5.5 : Math.min(6, plateDepthFt * 0.2);
+  return {
+    front,
+    level,
+    plate,
+    isNS,
+    spanFt,
+    depthFt,
+    doorSpanFt,
+    centerFt: wallLenFt / 2,
+    cantilever,
+    // How wide a hole the perimeter wall needs: the whole loggia when recessed,
+    // just the sliding-door bay when it projects.
+    openSpanFt: cantilever ? doorSpanFt : spanFt,
+  };
 }
 
 /** Outer perimeter wall built per side, with door/window cutouts and windows on top. */
@@ -149,6 +172,10 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   const DOOR_COLOR = "#5a3a22";   // walnut
   // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
   const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
+  // Stage 2 — procedural facade surface (bump + roughness variation).
+  const wallSurface = surfaceFor(palette.material as MaterialKind, variation.seed || 1);
+
+
 
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
@@ -191,8 +218,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
     const balGap =
       balOnThisFloor && balOnThisFloor.front === side
         ? {
-            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.doorSpanFt / 2),
-            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.doorSpanFt / 2),
+            a: Math.max(0.5, balOnThisFloor.centerFt - balOnThisFloor.openSpanFt / 2),
+            b: Math.min(length - 0.5, balOnThisFloor.centerFt + balOnThisFloor.openSpanFt / 2),
           }
         : null;
     if (balGap && balGap.b - balGap.a > 1) cuts.push(balGap);
@@ -208,7 +235,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`bl${key++}`} position={[lx, 7 * FT_TO_M + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={side === "N" || side === "S" ? [gapLen, lintelH, t] : [t, lintelH, gapLen]} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
       }
@@ -225,7 +252,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
       segments.push(
         <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
           <boxGeometry args={args} />
-          <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+          <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
         </mesh>,
       );
     }
@@ -240,7 +267,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // door frame trim
@@ -265,7 +292,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={sillArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // sill band (trim)
@@ -280,7 +307,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} {...wallSurface} />
           </mesh>,
         );
         // top trim under lintel
@@ -778,12 +805,17 @@ function sidePosition(
   offsetFt: number,
   widthFt: number,
   depthFt: number,
+  alongFt = 0,
 ): { pos: [number, number, number]; size: [number, number, number] } {
   const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
-  const cx = side === "E" ? plate.x + plate.w + offsetFt : side === "W" ? plate.x - offsetFt : plate.x + plate.w / 2;
-  const cy = side === "S" ? plate.y + plate.h + offsetFt : side === "N" ? plate.y - offsetFt : plate.y + plate.h / 2;
-  const [sx, sz] = toScene(cx, cy);
   const isNS = side === "N" || side === "S";
+  const cx = side === "E" ? plate.x + plate.w + offsetFt
+    : side === "W" ? plate.x - offsetFt
+    : plate.x + plate.w / 2 + alongFt;
+  const cy = side === "S" ? plate.y + plate.h + offsetFt
+    : side === "N" ? plate.y - offsetFt
+    : plate.y + plate.h / 2 + (isNS ? 0 : alongFt);
+  const [sx, sz] = toScene(cx, cy);
   return {
     pos: [sx, 0, sz],
     size: [
@@ -792,6 +824,57 @@ function sidePosition(
       (isNS ? depthFt : widthFt) * FT_TO_M,
     ],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Opening resolver — the single source of truth for "what is already on this
+// wall". Facade features (fins, jaali, wood bands, pergola posts) ask it for a
+// free band before placing themselves, so decoration can never bury a door or
+// a window.
+// ---------------------------------------------------------------------------
+function wallCuts(plate: FloorPlate, side: "N" | "E" | "S" | "W"): Seg[] {
+  const tol = 0.6;
+  const cuts: Seg[] = [];
+  const all: Opening[] = [...plate.openings];
+  if (plate.entranceDoor) all.push(plate.entranceDoor);
+  for (const o of all) {
+    const onN = Math.abs(o.y1 - plate.y) < tol && Math.abs(o.y2 - plate.y) < tol;
+    const onS = Math.abs(o.y1 - (plate.y + plate.h)) < tol && Math.abs(o.y2 - (plate.y + plate.h)) < tol;
+    const onW = Math.abs(o.x1 - plate.x) < tol && Math.abs(o.x2 - plate.x) < tol;
+    const onE = Math.abs(o.x1 - (plate.x + plate.w)) < tol && Math.abs(o.x2 - (plate.x + plate.w)) < tol;
+    const here = side === "N" ? onN : side === "S" ? onS : side === "W" ? onW : onE;
+    if (!here) continue;
+    const isNS = side === "N" || side === "S";
+    const a = (isNS ? Math.min(o.x1, o.x2) - plate.x : Math.min(o.y1, o.y2) - plate.y) - 1;
+    const b = (isNS ? Math.max(o.x1, o.x2) - plate.x : Math.max(o.y1, o.y2) - plate.y) + 1;
+    cuts.push({ a, b });
+  }
+  return cuts;
+}
+
+/**
+ * Largest stretch of wall with nothing on it. Returns the band's centre as an
+ * offset from the wall's midpoint (feet) and how wide the feature may be.
+ */
+function freeBand(
+  plate: FloorPlate,
+  side: "N" | "E" | "S" | "W",
+  wantFt: number,
+  minFt = 3,
+): { alongFt: number; spanFt: number } | null {
+  const isNS = side === "N" || side === "S";
+  const length = isNS ? plate.w : plate.h;
+  const solid = subtractOpenings(0, length, wallCuts(plate, side));
+  let best: Seg | null = null;
+  for (const s of solid) {
+    if (!best || s.b - s.a > best.b - best.a) best = s;
+  }
+  if (!best) return null;
+  const avail = best.b - best.a - 0.6;
+  if (avail < minFt) return null;
+  const spanFt = Math.min(wantFt, avail);
+  const centre = (best.a + best.b) / 2;
+  return { alongFt: centre - length / 2, spanFt };
 }
 
 function ElevationFeatures({
@@ -817,11 +900,13 @@ function ElevationFeatures({
     if (!spec) return null;
     // Visible in "All" view and in the balcony floor's own floor-wise view.
     if (!allFloors && visibleFloor !== spec.plate.floor) return null;
-    const { isNS, plate, level, spanFt, depthFt, doorSpanFt } = spec;
+    const { isNS, plate, level, spanFt, depthFt, doorSpanFt, cantilever } = spec;
     const baseY = level * FLOOR_HEIGHT * FT_TO_M;
 
-    // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
-    const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
+    // Projecting deck: slab sits outside the facade. Recessed loggia: the slab
+    // is carved back into the floor plate so the railing line stays inside the
+    // building envelope.
+    const feat = sidePosition(variation, plate, front, (cantilever ? 1 : -1) * (depthFt / 2), spanFt, depthFt);
     const spanM = spanFt * FT_TO_M;
     const depthM = depthFt * FT_TO_M;
 
@@ -834,7 +919,7 @@ function ElevationFeatures({
     const slabTop = 0;
     const railH = 1.0;
 
-    // Wall plane = inner edge of the slab.
+    // Wall plane holding the sliding doors = inner edge of the balcony.
     const wallPos: [number, number, number] = [-outX * (depthM / 2), slabTop, -outZ * (depthM / 2)];
     // Lateral axis of the balcony (along the wall).
     const lat = (t: number): [number, number, number] => (isNS ? [t, 0, 0] : [0, 0, t]);
@@ -849,16 +934,40 @@ function ElevationFeatures({
           {trimMat}
         </mesh>
 
+        {/* A projecting deck must look carried: soffit band + brackets. */}
+        {cantilever && (
+          <>
+            <mesh position={[0, -0.24, 0]} receiveShadow>
+              <boxGeometry args={[isNS ? spanM * 0.98 : depthM * 0.9, 0.12, isNS ? depthM * 0.9 : spanM * 0.98]} />
+              <meshStandardMaterial color={palette.trim} roughness={0.8} />
+            </mesh>
+            {[-1, 1].map((s) => (
+              <mesh
+                key={`br${s}`}
+                position={add(lat(s * (spanM / 2 - 0.35)), [outX * (depthM * 0.18), -0.62, outZ * (depthM * 0.18)])}
+                castShadow
+              >
+                <boxGeometry args={[isNS ? 0.16 : depthM * 0.55, 0.9, isNS ? depthM * 0.55 : 0.16]} />
+                {trimMat}
+              </mesh>
+            ))}
+          </>
+        )}
+
         {/* Railing — outer edge */}
         <mesh position={[outX * (depthM / 2 - 0.05), slabTop + railH / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
           <boxGeometry args={[isNS ? spanM : 0.08, railH, isNS ? 0.08 : spanM]} />
           {railMat}
         </mesh>
-        {/* Railing — the two side returns */}
+        {/* Side returns — glass on a deck, solid cheek walls inside a loggia */}
         {[-1, 1].map((s) => (
-          <mesh key={`side${s}`} position={add(lat(s * (spanM / 2 - 0.04)), [0, slabTop + railH / 2, 0])} castShadow>
-            <boxGeometry args={[isNS ? 0.08 : depthM, railH, isNS ? depthM : 0.08]} />
-            {railMat}
+          <mesh
+            key={`side${s}`}
+            position={add(lat(s * (spanM / 2 - 0.04)), [0, slabTop + (cantilever ? railH / 2 : (FLOOR_HEIGHT * FT_TO_M) / 2), 0])}
+            castShadow
+          >
+            <boxGeometry args={[isNS ? 0.08 : depthM, cantilever ? railH : FLOOR_HEIGHT * FT_TO_M, isNS ? depthM : 0.08]} />
+            {cantilever ? railMat : trimMat}
           </mesh>
         ))}
         {/* Handrail cap */}
@@ -866,6 +975,13 @@ function ElevationFeatures({
           <boxGeometry args={[isNS ? spanM : 0.12, 0.06, isNS ? 0.12 : spanM]} />
           {accentMat}
         </mesh>
+        {/* Loggia head beam — closes the top of the carved-out opening */}
+        {!cantilever && (
+          <mesh position={[outX * (depthM / 2 - 0.05), doorH + (FLOOR_HEIGHT * FT_TO_M - doorH) / 2, outZ * (depthM / 2 - 0.05)]} castShadow>
+            <boxGeometry args={[isNS ? spanM : 0.2, FLOOR_HEIGHT * FT_TO_M - doorH, isNS ? 0.2 : spanM]} />
+            {trimMat}
+          </mesh>
+        )}
 
         {/* Sliding-glass door set, flush on the wall behind the balcony */}
         <group position={wallPos}>
@@ -922,7 +1038,10 @@ function ElevationFeatures({
     const side = (front === "N" || front === "S" ? "E" : "S") as "N" | "E" | "S" | "W";
     const upper = variation.plates[variation.plates.length - 1];
     const span = side === "N" || side === "S" ? upper.w : upper.h;
-    const feat = sidePosition(variation, upper, side, 0.4, Math.min(span * 0.55, 14), 4);
+    // Ask the opening resolver for wall that is actually free.
+    const band = freeBand(upper, side, Math.min(span * 0.55, 14), 4);
+    if (!band) return null;
+    const feat = sidePosition(variation, upper, side, 0.4, band.spanFt, 4, band.alongFt);
     const height = 8.5 * FT_TO_M;
     const isNS = side === "N" || side === "S";
     const sign = side === "N" || side === "W" ? -1 : 1;
@@ -962,7 +1081,9 @@ function ElevationFeatures({
     const side = (front === "N" || front === "S" ? "E" : "N") as "N" | "E" | "S" | "W";
     const plate = variation.plates[Math.min(variation.plates.length - 1, 1)];
     const span = side === "N" || side === "S" ? plate.w : plate.h;
-    const feat = sidePosition(variation, plate, side, 0.28, Math.min(span * 0.72, 20), 0.35);
+    const band = freeBand(plate, side, Math.min(span * 0.72, 20), 4);
+    if (!band) return null;
+    const feat = sidePosition(variation, plate, side, 0.28, band.spanFt, 0.35, band.alongFt);
     const isNS = side === "N" || side === "S";
     const sign = side === "N" || side === "W" ? -1 : 1;
     return (
@@ -1529,6 +1650,10 @@ function LiftShaft({ variation }: { variation: Variation }) {
 }
 
 function Plot({ variation }: { variation: Variation }) {
+  const rig = lightingFor(variation.dna?.mood, variation.seed || 0);
+  const groundTint = new THREE.Color("#7ca25a").lerp(new THREE.Color(rig.groundTint), 0.35).getStyle();
+  const grassSurface = surfaceFor("render", (variation.seed || 1) + 11, 6);
+  const paveSurface = surfaceFor("stone", (variation.seed || 1) + 23, 2);
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
   // Deterministic tree placement around the plot edge
@@ -1556,12 +1681,12 @@ function Plot({ variation }: { variation: Variation }) {
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w + 14, d + 14]} />
-        <meshStandardMaterial color="#7ca25a" roughness={0.95} />
+        <meshStandardMaterial color={groundTint} {...grassSurface} roughness={0.97} />
       </mesh>
       {/* Driveway hint */}
       <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#8b8478" roughness={0.85} />
+        <meshStandardMaterial color="#8b8478" {...paveSurface} roughness={0.88} />
       </mesh>
       {/* Ground shrubs / hedge dabs for realism */}
       {Array.from({ length: 22 }).map((_, i) => {
@@ -1761,6 +1886,9 @@ export function ModelViewer3D({
   );
   const topY = baseYs[baseYs.length - 1] + FLOOR_HEIGHT * FT_TO_M;
   const camDist = Math.max(variation.plotWidthFt, variation.plotDepthFt) * FT_TO_M * 1.4;
+  // Stage 2 — per-variation lighting rig driven by the design's DNA mood.
+  const rig = lightingFor(variation.dna?.mood, variation.seed || 0);
+  const night = timeOfDay === "night";
 
   if (!mounted) {
     return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-orange-200 via-rose-300 to-indigo-700 grid place-items-center text-xs text-white/80">Loading 3D model…</div>;
@@ -1787,38 +1915,51 @@ export function ModelViewer3D({
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.15;
+          gl.toneMappingExposure = night ? 0.85 : rig.exposure;
         }}
       >
         <Suspense fallback={null}>
           {/* Bright daylight sky */}
           <Sky
             distance={450000}
-            sunPosition={[-0.6, 0.9, 0.4]}
-            inclination={0.15}
-            azimuth={0.25}
-            turbidity={4}
-            rayleigh={1.5}
+            sunPosition={[rig.sun[0] / 22, Math.max(0.05, rig.sun[1] / 22), rig.sun[2] / 22]}
+            turbidity={rig.skyTurbidity}
+            rayleigh={rig.skyRayleigh}
             mieCoefficient={0.006}
-            mieDirectionalG={0.8}
+            mieDirectionalG={0.82}
           />
-          <fog attach="fog" args={["#dfe8ee", camDist * 3, camDist * 8]} />
-          <ambientLight intensity={0.7} color="#ffffff" />
-          {/* Sun */}
+          <fog attach="fog" args={[night ? "#141a24" : "#dfe8ee", camDist * 3, camDist * 8]} />
+          <ambientLight
+            intensity={night ? 0.22 : Number(rig.ambientIntensity)}
+            color={night ? "#3b4763" : rig.ambientColor}
+          />
+          {/* Key sun — angle + colour temperature come from the design's mood */}
           <directionalLight
-            position={[-camDist * 0.8, camDist * 1.4, camDist * 0.6]}
-            intensity={1.4}
-            color="#fff5e0"
+            position={[
+              (rig.sun[0] / 22) * camDist * 1.6,
+              (rig.sun[1] / 22) * camDist * 2.2,
+              (rig.sun[2] / 22) * camDist * 1.6,
+            ]}
+            intensity={night ? 0.35 : rig.sunIntensity}
+            color={night ? "#8fa8d8" : rig.sunColor}
             castShadow
             shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0004}
+            shadow-normalBias={0.02}
             shadow-camera-left={-camDist}
             shadow-camera-right={camDist}
             shadow-camera-top={camDist}
             shadow-camera-bottom={-camDist}
           />
-          {/* Cool fill from opposite side */}
-          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.55} color="#e8f0ff" />
-          <Environment preset="park" />
+          {/* Sky bounce fill from the opposite side — softens the shadow side */}
+          <directionalLight
+            position={[camDist, camDist * 0.7, -camDist * 0.6]}
+            intensity={night ? 0.12 : rig.fillIntensity}
+            color="#e8f0ff"
+          />
+          {/* Ground bounce */}
+          <hemisphereLight args={[rig.ambientColor, rig.groundTint, night ? 0.15 : 0.35]} />
+          <Environment preset={night ? "night" : rig.environment} />
 
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
@@ -1853,7 +1994,7 @@ export function ModelViewer3D({
           <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
 
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
-          <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
+          <ContactShadows position={[0, 0.005, 0]} opacity={night ? 0.35 : 0.7} scale={camDist * 2.5} blur={2.2} far={camDist} resolution={1024} />
           <OrbitControls
             enablePan={false}
             autoRotate={autoRotate}
