@@ -1650,6 +1650,10 @@ function LiftShaft({ variation }: { variation: Variation }) {
 }
 
 function Plot({ variation }: { variation: Variation }) {
+  const rig = lightingFor(variation.dna?.mood, variation.seed || 0);
+  const groundTint = new THREE.Color("#7ca25a").lerp(new THREE.Color(rig.groundTint), 0.35).getStyle();
+  const grassSurface = surfaceFor("render", (variation.seed || 1) + 11, 6);
+  const paveSurface = surfaceFor("stone", (variation.seed || 1) + 23, 2);
   const w = variation.plotWidthFt * FT_TO_M;
   const d = variation.plotDepthFt * FT_TO_M;
   // Deterministic tree placement around the plot edge
@@ -1677,12 +1681,12 @@ function Plot({ variation }: { variation: Variation }) {
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w + 14, d + 14]} />
-        <meshStandardMaterial color="#7ca25a" roughness={0.95} />
+        <meshStandardMaterial color={groundTint} roughness={0.97} {...grassSurface} />
       </mesh>
       {/* Driveway hint */}
       <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#8b8478" roughness={0.85} />
+        <meshStandardMaterial color="#8b8478" roughness={0.88} {...paveSurface} />
       </mesh>
       {/* Ground shrubs / hedge dabs for realism */}
       {Array.from({ length: 22 }).map((_, i) => {
@@ -1882,6 +1886,9 @@ export function ModelViewer3D({
   );
   const topY = baseYs[baseYs.length - 1] + FLOOR_HEIGHT * FT_TO_M;
   const camDist = Math.max(variation.plotWidthFt, variation.plotDepthFt) * FT_TO_M * 1.4;
+  // Stage 2 — per-variation lighting rig driven by the design's DNA mood.
+  const rig = lightingFor(variation.dna?.mood, variation.seed || 0);
+  const night = timeOfDay === "night";
 
   if (!mounted) {
     return <div className="w-full aspect-[4/3] rounded-xl bg-gradient-to-br from-orange-200 via-rose-300 to-indigo-700 grid place-items-center text-xs text-white/80">Loading 3D model…</div>;
@@ -1908,38 +1915,51 @@ export function ModelViewer3D({
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.15;
+          gl.toneMappingExposure = night ? 0.85 : rig.exposure;
         }}
       >
         <Suspense fallback={null}>
           {/* Bright daylight sky */}
           <Sky
             distance={450000}
-            sunPosition={[-0.6, 0.9, 0.4]}
-            inclination={0.15}
-            azimuth={0.25}
-            turbidity={4}
-            rayleigh={1.5}
+            sunPosition={[rig.sun[0] / 22, Math.max(0.05, rig.sun[1] / 22), rig.sun[2] / 22]}
+            turbidity={rig.skyTurbidity}
+            rayleigh={rig.skyRayleigh}
             mieCoefficient={0.006}
-            mieDirectionalG={0.8}
+            mieDirectionalG={0.82}
           />
-          <fog attach="fog" args={["#dfe8ee", camDist * 3, camDist * 8]} />
-          <ambientLight intensity={0.7} color="#ffffff" />
-          {/* Sun */}
+          <fog attach="fog" args={[night ? "#141a24" : "#dfe8ee", camDist * 3, camDist * 8]} />
+          <ambientLight
+            intensity={night ? 0.22 : Number(rig.ambientIntensity)}
+            color={night ? "#3b4763" : rig.ambientColor}
+          />
+          {/* Key sun — angle + colour temperature come from the design's mood */}
           <directionalLight
-            position={[-camDist * 0.8, camDist * 1.4, camDist * 0.6]}
-            intensity={1.4}
-            color="#fff5e0"
+            position={[
+              (rig.sun[0] / 22) * camDist * 1.6,
+              (rig.sun[1] / 22) * camDist * 2.2,
+              (rig.sun[2] / 22) * camDist * 1.6,
+            ]}
+            intensity={night ? 0.35 : rig.sunIntensity}
+            color={night ? "#8fa8d8" : rig.sunColor}
             castShadow
             shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0004}
+            shadow-normalBias={0.02}
             shadow-camera-left={-camDist}
             shadow-camera-right={camDist}
             shadow-camera-top={camDist}
             shadow-camera-bottom={-camDist}
           />
-          {/* Cool fill from opposite side */}
-          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.55} color="#e8f0ff" />
-          <Environment preset="park" />
+          {/* Sky bounce fill from the opposite side — softens the shadow side */}
+          <directionalLight
+            position={[camDist, camDist * 0.7, -camDist * 0.6]}
+            intensity={night ? 0.12 : rig.fillIntensity}
+            color="#e8f0ff"
+          />
+          {/* Ground bounce */}
+          <hemisphereLight args={[rig.ambientColor, rig.groundTint, night ? 0.15 : 0.35]} />
+          <Environment preset={night ? "night" : rig.environment} />
 
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
@@ -1974,7 +1994,7 @@ export function ModelViewer3D({
           <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
 
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
-          <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
+          <ContactShadows position={[0, 0.005, 0]} opacity={night ? 0.35 : 0.7} scale={camDist * 2.5} blur={2.2} far={camDist} resolution={1024} />
           <OrbitControls
             enablePan={false}
             autoRotate={autoRotate}
