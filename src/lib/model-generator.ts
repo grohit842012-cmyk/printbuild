@@ -13,6 +13,7 @@ import type {
 } from "./design-types";
 import { DIRECTION_ANGLES, scoreVastu } from "./vastu";
 import { generateDnaSet } from "./design-dna";
+import { alignmentIssues, enforceStackContract } from "./massing-align";
 
 // ---------- Seeded RNG ----------
 function mulberry32(seed: number) {
