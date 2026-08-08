@@ -668,6 +668,11 @@ function layoutSide(
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
     if (i === zones.length - 1) depth = remaining;
+    // Rear-most room takes its door near the corridor end so the corridor
+    // serves doors along its whole length instead of dead-ending in a
+    // pointless walk-past strip.
+    const isRear = i === orderedZones.length - 1 && z.type !== "stairs";
+
 
     const width = sideWidth;
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
