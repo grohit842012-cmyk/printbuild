@@ -709,8 +709,11 @@ function layoutSide(
       } else {
         rooms.push({
           type: z.type, x, y, w: width, h: depth,
-          floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
+          floor: floorIndex, label: LABEL[z.type],
+          doorWall,
+          doorMid: isRear ? Math.max(depth / 2, depth - 3) : depth / 2,
         });
+
       }
 
     cursorY += depth;
