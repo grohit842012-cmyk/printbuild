@@ -607,6 +607,92 @@ function planFloor(
 }
 
 /**
+ * Daylight-driven glazing.
+ * Windows are sized by what the room is FOR and which way the wall faces
+ * (northern-hemisphere sun): south/east walls get generous glazing, north gets
+ * soft even light, west is restrained to keep afternoon heat out. Living rooms
+ * and master bedrooms get wide (or split twin) openings; wet/service rooms get
+ * a small high vent instead of nothing.
+ */
+function pushWindows(
+  openings: Opening[],
+  r: RoomRect,
+  ri: number,
+  floor: number,
+  fx: number,
+  fy: number,
+  fw: number,
+  fh: number,
+) {
+  const service = ["stairs", "lift", "parking", "courtyard"].includes(r.type);
+  if (service) return;
+  const wet = ["bath", "utility", "pooja"].includes(r.type);
+
+  const tol = 0.6;
+  type ExtWall = { wall: "N" | "E" | "S" | "W"; len: number };
+  const ext: ExtWall[] = [];
+  if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
+  if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
+  if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
+  if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
+  if (ext.length === 0) return;
+
+  // Solar desirability of each orientation.
+  const solar: Record<"N" | "E" | "S" | "W", number> = { S: 1.0, E: 0.9, N: 0.75, W: 0.5 };
+  ext.sort((a, b) => solar[b.wall] * b.len - solar[a.wall] * a.len);
+
+  // How much of the wall becomes glass, by room purpose.
+  const base =
+    r.type === "living" ? 0.62 :
+    r.type === "master_bedroom" ? 0.55 :
+    r.type === "dining" ? 0.5 :
+    r.type === "bedroom" || r.type === "study" ? 0.48 :
+    r.type === "kitchen" ? 0.42 : 0.22;
+
+  // Wet rooms: single small high vent on the best wall only.
+  const walls = wet ? ext.slice(0, 1) : ext.slice(0, 2);
+
+  walls.forEach((e, idx) => {
+    const primary = idx === 0;
+    let frac = base * solar[e.wall];
+    if (!primary) frac *= 0.7;
+    if (e.wall === "W" && !wet) frac = Math.min(frac, 0.32); // heat control
+    const minW = wet ? 1.8 : 3;
+    const maxW = wet ? 2.5 : 9;
+    let span = Math.max(minW, Math.min(maxW, e.len * frac));
+    if (span > e.len - 2) span = Math.max(minW, e.len - 2);
+    if (span < minW) return;
+
+    // Wide openings on living/master split into a twin bay for real facades.
+    const twin = !wet && span > 7 && (r.type === "living" || r.type === "master_bedroom");
+    const segments = twin
+      ? [{ c: 0.34, s: span / 2 - 0.4 }, { c: 0.66, s: span / 2 - 0.4 }]
+      : [{ c: 0.5, s: span }];
+
+    for (const seg of segments) {
+      if (e.wall === "W" || e.wall === "E") {
+        const cy = r.y + r.h * seg.c;
+        const x = e.wall === "W" ? r.x : r.x + r.w;
+        openings.push({
+          kind: "window",
+          x1: x, y1: cy - seg.s / 2, x2: x, y2: cy + seg.s / 2,
+          floor, t: 0.5, width: seg.s, wall: e.wall, roomIndex: ri,
+        });
+      } else {
+        const cx = r.x + r.w * seg.c;
+        const y = e.wall === "N" ? r.y : r.y + r.h;
+        openings.push({
+          kind: "window",
+          x1: cx - seg.s / 2, y1: y, x2: cx + seg.s / 2, y2: y,
+          floor, t: 0.5, width: seg.s, wall: e.wall, roomIndex: ri,
+        });
+      }
+    }
+  });
+
+}
+
+/**
  * Lay out one side of the hallway as a vertical stack of rooms.
  * Returns RoomRect[] in plate-local coordinates where:
  *   x=0 is the side wall (or hallway edge for the inner side)
