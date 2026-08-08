@@ -960,20 +960,8 @@ function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
       else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
     }
 
-    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
-    if (!habitable) continue;
-    const tol = 0.6;
-    const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
-    if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
-    if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
-    if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
-    if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
-    const e = ext.sort((a, b) => b.len - a.len)[0];
-    if (!e) continue;
-    if (e.wall === "W") openings.push({ kind: "window", x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "W", roomIndex: ri });
-    else if (e.wall === "E") openings.push({ kind: "window", x1: r.x + r.w, y1: r.y + r.h * 0.3, x2: r.x + r.w, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "E", roomIndex: ri });
-    else if (e.wall === "N") openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "N", roomIndex: ri });
-    else openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y + r.h, x2: r.x + r.w * 0.7, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "S", roomIndex: ri });
+    pushWindows(openings, r, ri, plate.floor, fx, fy, fw, fh);
+
   }
 
   return { ...plate, openings, entranceDoor: undefined };
