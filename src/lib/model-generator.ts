@@ -163,6 +163,59 @@ function ensureVerticalCoreInsideUpperPlates(
   return plates;
 }
 
+/** Structural sanity: no floor may hang off the floor below by more than a
+ * plausible cantilever. Each upper plate is clamped into the plate beneath it
+ * (plus a small cantilever allowance), and its rooms are clamped with it so
+ * nothing pokes outside the walls. Rooms that get crushed are dropped. */
+const MAX_CANTILEVER = 2.5; // ft of allowed overhang on any side
+
+function supportUpperPlates(plates: FloorPlate[]): FloorPlate[] {
+  if (plates.length <= 1) return plates;
+  for (let i = 1; i < plates.length; i++) {
+    const below = plates[i - 1];
+    const p = plates[i];
+    const minX = below.x - MAX_CANTILEVER;
+    const minY = below.y - MAX_CANTILEVER;
+    const maxX = below.x + below.w + MAX_CANTILEVER;
+    const maxY = below.y + below.h + MAX_CANTILEVER;
+
+    const nx = Math.max(p.x, minX);
+    const ny = Math.max(p.y, minY);
+    const nx2 = Math.min(p.x + p.w, maxX);
+    const ny2 = Math.min(p.y + p.h, maxY);
+    const nw = nx2 - nx;
+    const nh = ny2 - ny;
+    if (nw < 8 || nh < 8) continue;
+    if (Math.abs(nx - p.x) < 0.05 && Math.abs(ny - p.y) < 0.05 && Math.abs(nw - p.w) < 0.05 && Math.abs(nh - p.h) < 0.05) {
+      continue;
+    }
+
+    const rooms = plates[i].rooms
+      .map((r) => {
+        const rx = Math.max(r.x, nx);
+        const ry = Math.max(r.y, ny);
+        const rx2 = Math.min(r.x + r.w, nx2);
+        const ry2 = Math.min(r.y + r.h, ny2);
+        return { ...r, x: rx, y: ry, w: rx2 - rx, h: ry2 - ry };
+      })
+      .filter((r) => r.type === "stairs" || r.type === "lift" ? r.w > 2 && r.h > 2 : r.w >= 5 && r.h >= 5);
+
+    let hallway = plates[i].hallway;
+    if (hallway) {
+      const hx = Math.max(hallway.x, nx);
+      const hy = Math.max(hallway.y, ny);
+      const hx2 = Math.min(hallway.x + hallway.w, nx2);
+      const hy2 = Math.min(hallway.y + hallway.h, ny2);
+      hallway = hx2 - hx > 1 && hy2 - hy > 1 ? { x: hx, y: hy, w: hx2 - hx, h: hy2 - hy } : undefined;
+    }
+
+    plates[i] = rebuildInteriorOpenings({ ...plates[i], x: nx, y: ny, w: nw, h: nh, rooms, hallway });
+  }
+  return plates;
+}
+
+
+
 /** Pick the plan family that fits the user's program & plot best.
  *
  * Non-box shapes (L, U, courtyard) carve a notch out of the NE corner of the
