@@ -540,7 +540,27 @@ function planFloor(
     pushTo(r, side);
   };
   if (stairs) pushTo(stairs, stairSide);
-  for (const r of publicRooms) pushAlt(r);
+  // Kitchen and dining must be adjacent (same side of the corridor, back to
+  // back) so serving food isn't a trek across the house.
+  const kIdx = publicRooms.findIndex((r) => r.type === "kitchen");
+  const dIdx = publicRooms.findIndex((r) => r.type === "dining");
+  if (kIdx >= 0 && dIdx >= 0 && Math.abs(kIdx - dIdx) > 1) {
+    const [dining] = publicRooms.splice(dIdx, 1);
+    publicRooms.splice(publicRooms.findIndex((r) => r.type === "kitchen") + 1, 0, dining);
+  }
+  for (let pi = 0; pi < publicRooms.length; pi++) {
+    const r = publicRooms[pi];
+    const prev = publicRooms[pi - 1];
+    // Dining follows the kitchen onto the SAME side of the corridor.
+    if (r.type === "dining" && prev?.type === "kitchen") {
+      pushTo(r, order[order.length - 1].side);
+    } else if (r.type === "kitchen" && publicRooms[pi + 1]?.type === "dining") {
+      pushAlt(r);
+    } else {
+      pushAlt(r);
+    }
+  }
+
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
   for (const r of privateRooms) pushAlt(r);
