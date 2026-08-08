@@ -1321,7 +1321,36 @@ export function generateVariations(
   }
 
 
+  // ---- Bathroom sufficiency ----
+  // Every floor that has bedrooms needs at least one bath per two bedrooms,
+  // and any floor with living space gets at least a powder room, so nobody has
+  // to climb a floor at 3am. Only added when the floor still has area for it.
+  for (let f = 0; f < perFloor.length; f++) {
+    const list = perFloor[f];
+    if (list.length === 0) continue;
+    if (list.some((r) => r.type === "parking")) continue; // stilt floor
+    const beds = list.filter((r) => r.type === "bedroom" || r.type === "master_bedroom").length;
+    const social = list.some((r) => ["living", "dining", "kitchen", "study"].includes(r.type));
+    const want = beds > 0 ? Math.max(1, Math.ceil(beds / 2)) : social ? 1 : 0;
+    let have = list.filter((r) => r.type === "bath").length;
+    while (have < want) {
+      // Check the extra bath still fits on this floor.
+      const usable =
+        (spec.plot.widthFt - SETBACK * 2) * (spec.plot.depthFt - SETBACK * 2) -
+        HALLWAY_WIDTH * (spec.plot.depthFt - SETBACK * 2);
+      const used = list.reduce((sum, r) => {
+        const m = dimsFor(r.type, r.sizePref);
+        return sum + m.w * m.h;
+      }, 0);
+      const extra = dimsFor("bath", beds === 0 ? "small" : "medium");
+      if (used + extra.w * extra.h > usable) break;
+      list.push({ type: "bath", sizePref: beds === 0 ? "small" : "medium" });
+      have++;
+    }
+  }
+
   // Inject stair on every habitable floor when multi-floor. Sloped/butterfly
+
   // roofs only suppress the roof mumty in the 3D roof renderer — the top floor
   // still needs a real stair landing so people can reach it.
   if (spec.floors > 1) {
