@@ -24,7 +24,10 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Create an account to design and save your custom home." },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>) => ({ next: safeNext(s.next) }),
+  validateSearch: (s: Record<string, unknown>): { next?: string } => {
+    const next = safeNext(s.next);
+    return next ? { next } : {};
+  },
   component: AuthPage,
 });
 
