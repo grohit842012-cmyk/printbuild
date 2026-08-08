@@ -1404,6 +1404,7 @@ export function generateVariations(
       }
     }
 
+    supportUpperPlates(plates);
     ensureVerticalCoreInsideUpperPlates(plates, spec.plot.widthFt, spec.plot.depthFt);
 
     const allRooms = plates.flatMap((p) => p.rooms);
