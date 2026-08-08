@@ -540,7 +540,27 @@ function planFloor(
     pushTo(r, side);
   };
   if (stairs) pushTo(stairs, stairSide);
-  for (const r of publicRooms) pushAlt(r);
+  // Kitchen and dining must be adjacent (same side of the corridor, back to
+  // back) so serving food isn't a trek across the house.
+  const kIdx = publicRooms.findIndex((r) => r.type === "kitchen");
+  const dIdx = publicRooms.findIndex((r) => r.type === "dining");
+  if (kIdx >= 0 && dIdx >= 0 && Math.abs(kIdx - dIdx) > 1) {
+    const [dining] = publicRooms.splice(dIdx, 1);
+    publicRooms.splice(publicRooms.findIndex((r) => r.type === "kitchen") + 1, 0, dining);
+  }
+  for (let pi = 0; pi < publicRooms.length; pi++) {
+    const r = publicRooms[pi];
+    const prev = publicRooms[pi - 1];
+    // Dining follows the kitchen onto the SAME side of the corridor.
+    if (r.type === "dining" && prev?.type === "kitchen") {
+      pushTo(r, order[order.length - 1].side);
+    } else if (r.type === "kitchen" && publicRooms[pi + 1]?.type === "dining") {
+      pushAlt(r);
+    } else {
+      pushAlt(r);
+    }
+  }
+
   // Cluster bathrooms (skip ensuite, handled with master)
   for (const r of baths) pushAlt(r);
   for (const r of privateRooms) pushAlt(r);
@@ -584,6 +604,92 @@ function planFloor(
   right.forEach((o, i) => (o.order = i));
 
   return [...left, ...right];
+}
+
+/**
+ * Daylight-driven glazing.
+ * Windows are sized by what the room is FOR and which way the wall faces
+ * (northern-hemisphere sun): south/east walls get generous glazing, north gets
+ * soft even light, west is restrained to keep afternoon heat out. Living rooms
+ * and master bedrooms get wide (or split twin) openings; wet/service rooms get
+ * a small high vent instead of nothing.
+ */
+function pushWindows(
+  openings: Opening[],
+  r: RoomRect,
+  ri: number,
+  floor: number,
+  fx: number,
+  fy: number,
+  fw: number,
+  fh: number,
+) {
+  const service = ["stairs", "lift", "parking", "courtyard"].includes(r.type);
+  if (service) return;
+  const wet = ["bath", "utility", "pooja"].includes(r.type);
+
+  const tol = 0.6;
+  type ExtWall = { wall: "N" | "E" | "S" | "W"; len: number };
+  const ext: ExtWall[] = [];
+  if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
+  if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
+  if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
+  if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
+  if (ext.length === 0) return;
+
+  // Solar desirability of each orientation.
+  const solar: Record<"N" | "E" | "S" | "W", number> = { S: 1.0, E: 0.9, N: 0.75, W: 0.5 };
+  ext.sort((a, b) => solar[b.wall] * b.len - solar[a.wall] * a.len);
+
+  // How much of the wall becomes glass, by room purpose.
+  const base =
+    r.type === "living" ? 0.62 :
+    r.type === "master_bedroom" ? 0.55 :
+    r.type === "dining" ? 0.5 :
+    r.type === "bedroom" || r.type === "study" ? 0.48 :
+    r.type === "kitchen" ? 0.42 : 0.22;
+
+  // Wet rooms: single small high vent on the best wall only.
+  const walls = wet ? ext.slice(0, 1) : ext.slice(0, 2);
+
+  walls.forEach((e, idx) => {
+    const primary = idx === 0;
+    let frac = base * solar[e.wall];
+    if (!primary) frac *= 0.7;
+    if (e.wall === "W" && !wet) frac = Math.min(frac, 0.32); // heat control
+    const minW = wet ? 1.8 : 3;
+    const maxW = wet ? 2.5 : 9;
+    let span = Math.max(minW, Math.min(maxW, e.len * frac));
+    if (span > e.len - 2) span = Math.max(minW, e.len - 2);
+    if (span < minW) return;
+
+    // Wide openings on living/master split into a twin bay for real facades.
+    const twin = !wet && span > 7 && (r.type === "living" || r.type === "master_bedroom");
+    const segments = twin
+      ? [{ c: 0.34, s: span / 2 - 0.4 }, { c: 0.66, s: span / 2 - 0.4 }]
+      : [{ c: 0.5, s: span }];
+
+    for (const seg of segments) {
+      if (e.wall === "W" || e.wall === "E") {
+        const cy = r.y + r.h * seg.c;
+        const x = e.wall === "W" ? r.x : r.x + r.w;
+        openings.push({
+          kind: "window",
+          x1: x, y1: cy - seg.s / 2, x2: x, y2: cy + seg.s / 2,
+          floor, t: 0.5, width: seg.s, wall: e.wall, roomIndex: ri,
+        });
+      } else {
+        const cx = r.x + r.w * seg.c;
+        const y = e.wall === "N" ? r.y : r.y + r.h;
+        openings.push({
+          kind: "window",
+          x1: cx - seg.s / 2, y1: y, x2: cx + seg.s / 2, y2: y,
+          floor, t: 0.5, width: seg.s, wall: e.wall, roomIndex: ri,
+        });
+      }
+    }
+  });
+
 }
 
 /**
@@ -648,6 +754,11 @@ function layoutSide(
       depth = Math.max(min.h, remaining - (remainingZones - 1) * min.h);
     }
     if (i === zones.length - 1) depth = remaining;
+    // Rear-most room takes its door near the corridor end so the corridor
+    // serves doors along its whole length instead of dead-ending in a
+    // pointless walk-past strip.
+    const isRear = i === orderedZones.length - 1 && z.type !== "stairs";
+
 
     const width = sideWidth;
     const x = startWall === "left" ? hallwayX - width : hallwayX + hallwayW;
@@ -684,8 +795,11 @@ function layoutSide(
       } else {
         rooms.push({
           type: z.type, x, y, w: width, h: depth,
-          floor: floorIndex, label: LABEL[z.type], doorWall, doorMid: depth / 2,
+          floor: floorIndex, label: LABEL[z.type],
+          doorWall,
+          doorMid: isRear ? Math.max(depth / 2, depth - 3) : depth / 2,
         });
+
       }
 
     cursorY += depth;
@@ -853,52 +967,9 @@ function buildPlate(
       }
     }
 
-    // Windows on the outer wall (the wall opposite the hallway side)
-    const tol = 0.6;
-    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
-    if (habitable) {
-      // Determine the longest exterior wall and place ONE window there
-      type ExtWall = { wall: "N" | "E" | "S" | "W"; len: number };
-      const ext: ExtWall[] = [];
-      if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
-      if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
-      if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
-      if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
-      ext.sort((a, b) => b.len - a.len);
-      for (const e of ext) {
-        if (e.wall === "W") {
-          openings.push({
-            kind: "window",
-            x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7,
-            floor: floorIndex, t: 0.5, width: r.h * 0.4,
-            wall: "W", roomIndex: ri,
-          });
-        } else if (e.wall === "E") {
-          openings.push({
-            kind: "window",
-            x1: r.x + r.w, y1: r.y + r.h * 0.3,
-            x2: r.x + r.w, y2: r.y + r.h * 0.7,
-            floor: floorIndex, t: 0.5, width: r.h * 0.4,
-            wall: "E", roomIndex: ri,
-          });
-        } else if (e.wall === "N") {
-          openings.push({
-            kind: "window",
-            x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y,
-            floor: floorIndex, t: 0.5, width: r.w * 0.4,
-            wall: "N", roomIndex: ri,
-          });
-        } else if (e.wall === "S") {
-          openings.push({
-            kind: "window",
-            x1: r.x + r.w * 0.3, y1: r.y + r.h,
-            x2: r.x + r.w * 0.7, y2: r.y + r.h,
-            floor: floorIndex, t: 0.5, width: r.w * 0.4,
-            wall: "S", roomIndex: ri,
-          });
-        }
-      }
-    }
+    // Windows: daylight-driven, not just "one per room"
+    pushWindows(openings, r, ri, floorIndex, fx, fy, fw, fh);
+
   }
 
   // Front door at hallway entry on the entrance wall
@@ -975,20 +1046,8 @@ function rebuildInteriorOpenings(plate: FloorPlate): FloorPlate {
       else openings.push({ kind: "door", x1: r.x + mid - dwidth / 2, y1: r.y + r.h, x2: r.x + mid + dwidth / 2, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: dwidth, wall: "S", roomIndex: ri });
     }
 
-    const habitable = !["bath","stairs","pooja","lift","utility","parking"].includes(r.type);
-    if (!habitable) continue;
-    const tol = 0.6;
-    const ext: { wall: "N" | "E" | "S" | "W"; len: number }[] = [];
-    if (Math.abs(r.x - fx) < tol) ext.push({ wall: "W", len: r.h });
-    if (Math.abs(r.x + r.w - (fx + fw)) < tol) ext.push({ wall: "E", len: r.h });
-    if (Math.abs(r.y - fy) < tol) ext.push({ wall: "N", len: r.w });
-    if (Math.abs(r.y + r.h - (fy + fh)) < tol) ext.push({ wall: "S", len: r.w });
-    const e = ext.sort((a, b) => b.len - a.len)[0];
-    if (!e) continue;
-    if (e.wall === "W") openings.push({ kind: "window", x1: r.x, y1: r.y + r.h * 0.3, x2: r.x, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "W", roomIndex: ri });
-    else if (e.wall === "E") openings.push({ kind: "window", x1: r.x + r.w, y1: r.y + r.h * 0.3, x2: r.x + r.w, y2: r.y + r.h * 0.7, floor: plate.floor, t: 0.5, width: r.h * 0.4, wall: "E", roomIndex: ri });
-    else if (e.wall === "N") openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y, x2: r.x + r.w * 0.7, y2: r.y, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "N", roomIndex: ri });
-    else openings.push({ kind: "window", x1: r.x + r.w * 0.3, y1: r.y + r.h, x2: r.x + r.w * 0.7, y2: r.y + r.h, floor: plate.floor, t: 0.5, width: r.w * 0.4, wall: "S", roomIndex: ri });
+    pushWindows(openings, r, ri, plate.floor, fx, fy, fw, fh);
+
   }
 
   return { ...plate, openings, entranceDoor: undefined };
@@ -1262,7 +1321,36 @@ export function generateVariations(
   }
 
 
+  // ---- Bathroom sufficiency ----
+  // Every floor that has bedrooms needs at least one bath per two bedrooms,
+  // and any floor with living space gets at least a powder room, so nobody has
+  // to climb a floor at 3am. Only added when the floor still has area for it.
+  for (let f = 0; f < perFloor.length; f++) {
+    const list = perFloor[f];
+    if (list.length === 0) continue;
+    if (list.some((r) => r.type === "parking")) continue; // stilt floor
+    const beds = list.filter((r) => r.type === "bedroom" || r.type === "master_bedroom").length;
+    const social = list.some((r) => ["living", "dining", "kitchen", "study"].includes(r.type));
+    const want = beds > 0 ? Math.max(1, Math.ceil(beds / 2)) : social ? 1 : 0;
+    let have = list.filter((r) => r.type === "bath").length;
+    while (have < want) {
+      // Check the extra bath still fits on this floor.
+      const usable =
+        (spec.plot.widthFt - SETBACK * 2) * (spec.plot.depthFt - SETBACK * 2) -
+        HALLWAY_WIDTH * (spec.plot.depthFt - SETBACK * 2);
+      const used = list.reduce((sum, r) => {
+        const m = dimsFor(r.type, r.sizePref);
+        return sum + m.w * m.h;
+      }, 0);
+      const extra = dimsFor("bath", beds === 0 ? "small" : "medium");
+      if (used + extra.w * extra.h > usable) break;
+      list.push({ type: "bath", sizePref: beds === 0 ? "small" : "medium" });
+      have++;
+    }
+  }
+
   // Inject stair on every habitable floor when multi-floor. Sloped/butterfly
+
   // roofs only suppress the roof mumty in the 3D roof renderer — the top floor
   // still needs a real stair landing so people can reach it.
   if (spec.floors > 1) {
