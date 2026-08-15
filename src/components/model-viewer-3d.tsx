@@ -2076,7 +2076,16 @@ export function ModelViewer3D({
             className={`text-xs px-2 py-1 rounded ${visibleFloor === p.floor ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
           >Floor {p.floor}</button>
         ))}
+        <button
+          onClick={() => { setInterior((v) => !v); if (!interior && visibleFloor === "all") setVisibleFloor(0); }}
+          className={`text-xs px-2 py-1 rounded ${interior ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+        >{interior ? "Exit interior" : "Walk inside"}</button>
       </div>
+      {interior && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[10px] px-2 py-1 rounded bg-background/80 border border-border text-muted-foreground">
+          WASD / arrows to walk, drag to look
+        </div>
+      )}
       <Canvas
         shadows
         camera={{ position: [camDist, camDist * 0.8, camDist], fov: 45 }}
@@ -2144,21 +2153,36 @@ export function ModelViewer3D({
                 timeOfDay={timeOfDay}
                 showFurniture={showFurniture}
                 showBalcony={showBalcony}
+                interior={interior}
               />
             ))}
-          {visibleFloor === "all" && <Roof variation={variation} topY={topY} />}
+          {visibleFloor === "all" && !interior && <Roof variation={variation} topY={topY} />}
           <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
 
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
-          <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />
-          <OrbitControls
-            enablePan={false}
-            autoRotate={autoRotate}
-            autoRotateSpeed={0.45}
-            minDistance={camDist * 0.6}
-            maxDistance={camDist * 2.8}
-            maxPolarAngle={Math.PI / 2.05}
-          />
+          {!interior && <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />}
+          {interior ? (
+            <FirstPersonRig
+              colliders={colliders}
+              start={startPos}
+              eyeY={(baseYs[walkFloor] ?? 0) + 5.4 * FT_TO_M}
+              move={move}
+              bounds={walkBounds}
+            />
+          ) : (
+            <OrbitControls
+              enablePan={false}
+              autoRotate={autoRotate}
+              autoRotateSpeed={0.45}
+              minDistance={camDist * 0.6}
+              maxDistance={camDist * 2.8}
+              maxPolarAngle={Math.PI / 2.05}
+            />
+          )}
+          <EffectComposer enableNormalPass={false}>
+            <Bloom intensity={interior ? 0.35 : 0.18} luminanceThreshold={0.85} luminanceSmoothing={0.3} mipmapBlur />
+            <Vignette eskil={false} offset={0.25} darkness={interior ? 0.6 : 0.35} />
+          </EffectComposer>
         </Suspense>
       </Canvas>
     </div>
