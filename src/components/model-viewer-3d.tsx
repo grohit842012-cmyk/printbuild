@@ -349,8 +349,12 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true, interior = false,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean; interior?: boolean }) {
+  const scheme = useMemo(
+    () => interiorSchemeFor(variation.seed || 1, paletteFor(variation).accent),
+    [variation],
+  );
 
   const toScene = makeToScene(plotW, plotD);
   const cx = plate.x + plate.w / 2;
@@ -433,7 +437,7 @@ function FloorMesh({
         </group>
       ))}
       {plate.rooms.map((r, i) => (
-        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} />
+        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} scheme={scheme} interior={interior} />
       ))}
     </group>
   );
@@ -555,7 +559,7 @@ function RoomBlock({
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
         <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} />
       )}
-      {/* Accent wall in the主 living/sleeping spaces */}
+      {/* Accent wall in the main living/sleeping spaces */}
       {interior && (room.type === "living" || room.type === "master_bedroom" || room.type === "dining") && (
         <mesh position={[0, h / 2, -d / 2 + 0.09]}>
           <boxGeometry args={[w * 0.985, h * 0.99, 0.02]} />
@@ -696,7 +700,7 @@ function RoomBlock({
   );
 }
 
-function Furniture({ room, w, d }: { room: RoomRect; w: number; d: number }) {
+function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme }) {
   if (["stairs", "lift", "parking", "courtyard", "utility"].includes(room.type)) return null;
   const wood = <meshStandardMaterial color="#7b5637" roughness={0.72} />;
   const fabric = <meshStandardMaterial color={room.type === "bedroom" || room.type === "master_bedroom" ? "#e9dfcf" : "#b7c0a5"} roughness={0.85} />;
