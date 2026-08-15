@@ -673,11 +673,18 @@ function Furniture({ room, w, d }: { room: RoomRect; w: number; d: number }) {
   return null;
 }
 
-function RoomWalls({ w, d, h, room }: { w: number; d: number; h: number; room: RoomRect }) {
+function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme }) {
   const t = WALL_THICKNESS * 0.5 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
   const doorW = 3 * FT_TO_M;
-  const mat = <meshStandardMaterial color="#f8fafc" roughness={0.85} />;
+  const mat = (
+    <meshStandardMaterial
+      color={scheme?.wallColor ?? "#f8fafc"}
+      map={scheme?.wallMap ?? undefined}
+      roughness={0.92}
+    />
+  );
+
 
   // Compute door gap center along the wall (local coords, wall centered at 0)
   // doorMid is in feet from the room's origin along the door wall
