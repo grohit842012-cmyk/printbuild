@@ -702,72 +702,188 @@ function RoomBlock({
 
 function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme }) {
   if (["stairs", "lift", "parking", "courtyard", "utility"].includes(room.type)) return null;
-  const wood = <meshStandardMaterial color="#7b5637" roughness={0.72} />;
-  const fabric = <meshStandardMaterial color={room.type === "bedroom" || room.type === "master_bedroom" ? "#e9dfcf" : "#b7c0a5"} roughness={0.85} />;
-  const stone = <meshStandardMaterial color="#eee7dc" roughness={0.75} />;
-  const metal = <meshStandardMaterial color="#94a3b8" roughness={0.4} metalness={0.55} />;
+  const accent = scheme?.accentWall ?? "#8a6a4a";
+  const wood = <meshStandardMaterial color="#7b5637" roughness={0.62} />;
+  const darkWood = <meshStandardMaterial color="#4e3524" roughness={0.55} />;
+  const fabric = <meshStandardMaterial color={room.type === "bedroom" || room.type === "master_bedroom" ? "#eae1d2" : "#cbc4b4"} roughness={0.95} />;
+  const stone = <meshStandardMaterial color="#eee7dc" roughness={0.35} metalness={0.05} />;
+  const metal = <meshStandardMaterial color="#b8bec7" roughness={0.28} metalness={0.85} />;
+  const rugMat = <meshStandardMaterial color={accent} roughness={1} />;
   const safeW = Math.max(1.2, w * 0.82);
   const safeD = Math.max(1.2, d * 0.82);
 
+  const FloorLamp = ({ x, z }: { x: number; z: number }) => (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.02, 0]} castShadow><cylinderGeometry args={[0.16, 0.18, 0.04, 20]} />{metal}</mesh>
+      <mesh position={[0, 0.75, 0]} castShadow><cylinderGeometry args={[0.02, 0.02, 1.5, 10]} />{metal}</mesh>
+      <mesh position={[0, 1.55, 0]} castShadow>
+        <cylinderGeometry args={[0.16, 0.21, 0.28, 20, 1, true]} />
+        <meshStandardMaterial color="#f6e7cd" roughness={0.9} emissive="#ffcf92" emissiveIntensity={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      <pointLight position={[0, 1.5, 0]} intensity={0.9} distance={3.4} color="#ffcf92" />
+    </group>
+  );
+
+  const Art = ({ x, z, rotY, wSize }: { x: number; z: number; rotY: number; wSize: number }) => (
+    <group position={[x, 1.55, z]} rotation={[0, rotY, 0]}>
+      <mesh castShadow><boxGeometry args={[wSize, wSize * 0.72, 0.04]} /><meshStandardMaterial color="#33291f" roughness={0.6} /></mesh>
+      <mesh position={[0, 0, 0.026]}><boxGeometry args={[wSize * 0.9, wSize * 0.63, 0.01]} /><meshStandardMaterial color={accent} roughness={0.8} /></mesh>
+    </group>
+  );
+
   if (room.type === "living") {
+    const sofaW = Math.min(safeW * 0.66, 2.4);
     return (
       <group>
-        <mesh position={[-safeW * 0.22, 0.22, safeD * 0.12]} castShadow receiveShadow><boxGeometry args={[safeW * 0.42, 0.38, safeD * 0.14]} />{fabric}</mesh>
-        <mesh position={[-safeW * 0.22, 0.55, safeD * 0.22]} castShadow><boxGeometry args={[safeW * 0.42, 0.58, 0.08]} />{fabric}</mesh>
-        <mesh position={[safeW * 0.12, 0.18, -safeD * 0.08]} castShadow receiveShadow><boxGeometry args={[safeW * 0.28, 0.12, safeD * 0.18]} />{wood}</mesh>
-        <mesh position={[safeW * 0.36, 0.42, -safeD * 0.3]} castShadow><boxGeometry args={[safeW * 0.22, 0.35, 0.06]} />{metal}</mesh>
+        {/* rug */}
+        <mesh position={[0, 0.028, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <circleGeometry args={[Math.min(safeW, safeD) * 0.34, 40]} />{rugMat}
+        </mesh>
+        {/* sofa: base + rolled back + arms + cushions */}
+        <group position={[-safeW * 0.16, 0, safeD * 0.2]}>
+          <mesh position={[0, 0.2, 0]} castShadow receiveShadow><boxGeometry args={[sofaW, 0.34, 0.82]} />{fabric}</mesh>
+          <mesh position={[0, 0.55, 0.34]} castShadow><cylinderGeometry args={[0.19, 0.19, sofaW, 18]} rotation={[0, 0, Math.PI / 2]} /><meshStandardMaterial color="#ded5c5" roughness={0.95} /></mesh>
+          <mesh position={[0, 0.5, 0.3]} rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.2, 0.2, sofaW, 20]} />{fabric}</mesh>
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * sofaW / 2, 0.36, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.18, 0.18, 0.82, 18]} />{fabric}
+            </mesh>
+          ))}
+          {[-0.28, 0.28].map((o) => (
+            <mesh key={o} position={[o * sofaW, 0.42, -0.02]} castShadow><boxGeometry args={[sofaW * 0.4, 0.14, 0.66]} /><meshStandardMaterial color="#e3dacb" roughness={0.95} /></mesh>
+          ))}
+        </group>
+        {/* round coffee table */}
+        <mesh position={[safeW * 0.02, 0.36, -safeD * 0.02]} castShadow receiveShadow>
+          <cylinderGeometry args={[Math.min(0.45, safeW * 0.18), Math.min(0.45, safeW * 0.18), 0.05, 30]} />{darkWood}
+        </mesh>
+        <mesh position={[safeW * 0.02, 0.18, -safeD * 0.02]} castShadow><cylinderGeometry args={[0.06, 0.1, 0.34, 14]} />{metal}</mesh>
+        {/* armchair */}
+        <group position={[safeW * 0.3, 0, -safeD * 0.22]}>
+          <mesh position={[0, 0.24, 0]} castShadow receiveShadow><cylinderGeometry args={[0.42, 0.38, 0.4, 26]} />{fabric}</mesh>
+          <mesh position={[0, 0.55, -0.22]} rotation={[0.18, 0, 0]} castShadow><cylinderGeometry args={[0.36, 0.36, 0.44, 26, 1, true, -Math.PI * 0.75, Math.PI * 1.5]} /><meshStandardMaterial color="#ded5c5" roughness={0.95} side={THREE.DoubleSide} /></mesh>
+        </group>
+        <FloorLamp x={-safeW * 0.42} z={-safeD * 0.3} />
+        <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.9, safeW * 0.32)} />
       </group>
     );
   }
   if (room.type === "bedroom" || room.type === "master_bedroom") {
+    const bw = Math.min(safeW * 0.62, 1.8);
     return (
       <group>
-        <mesh position={[0, 0.2, safeD * 0.1]} castShadow receiveShadow><boxGeometry args={[safeW * 0.52, 0.25, safeD * 0.48]} />{wood}</mesh>
-        <mesh position={[0, 0.38, safeD * 0.1]} castShadow><boxGeometry args={[safeW * 0.48, 0.16, safeD * 0.42]} />{fabric}</mesh>
-        <mesh position={[0, 0.58, safeD * 0.35]} castShadow><boxGeometry args={[safeW * 0.5, 0.42, 0.08]} />{wood}</mesh>
-        {[-1, 1].map((s) => <mesh key={s} position={[s * safeW * 0.36, 0.22, safeD * 0.22]} castShadow><boxGeometry args={[0.28, 0.28, 0.28]} />{wood}</mesh>)}
+        <mesh position={[0, 0.026, safeD * 0.02]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <planeGeometry args={[bw * 1.7, safeD * 0.62]} />{rugMat}
+        </mesh>
+        {/* bed */}
+        <group position={[0, 0, safeD * 0.06]}>
+          <mesh position={[0, 0.18, 0]} castShadow receiveShadow><boxGeometry args={[bw, 0.3, safeD * 0.5]} />{darkWood}</mesh>
+          <mesh position={[0, 0.42, 0]} castShadow><boxGeometry args={[bw * 0.98, 0.22, safeD * 0.49]} /><meshStandardMaterial color="#f2ece1" roughness={0.98} /></mesh>
+          {/* duvet fold */}
+          <mesh position={[0, 0.52, -safeD * 0.1]} castShadow><boxGeometry args={[bw * 0.99, 0.06, safeD * 0.24]} /><meshStandardMaterial color={accent} roughness={0.95} /></mesh>
+          {/* pillows */}
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * bw * 0.24, 0.58, safeD * 0.2]} rotation={[0.2, 0, 0]} castShadow>
+              <boxGeometry args={[bw * 0.4, 0.12, 0.3]} /><meshStandardMaterial color="#ffffff" roughness={1} />
+            </mesh>
+          ))}
+          {/* upholstered headboard */}
+          <mesh position={[0, 0.7, safeD * 0.27]} castShadow><boxGeometry args={[bw * 1.06, 0.9, 0.1]} />{fabric}</mesh>
+        </group>
+        {[-1, 1].map((s) => (
+          <group key={s} position={[s * (bw / 2 + 0.28), 0, safeD * 0.24]}>
+            <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.4, 0.44, 0.36]} />{wood}</mesh>
+            <mesh position={[0, 0.58, 0]}><cylinderGeometry args={[0.1, 0.12, 0.22, 16]} /><meshStandardMaterial color="#f6e7cd" emissive="#ffcf92" emissiveIntensity={0.7} roughness={0.9} /></mesh>
+          </group>
+        ))}
+        <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.8, safeW * 0.3)} />
       </group>
     );
   }
   if (room.type === "kitchen") {
     return (
       <group>
-        <mesh position={[-safeW * 0.3, 0.42, -safeD * 0.33]} castShadow receiveShadow><boxGeometry args={[safeW * 0.58, 0.8, 0.36]} />{wood}</mesh>
-        <mesh position={[safeW * 0.34, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[0.36, 0.8, safeD * 0.62]} />{wood}</mesh>
-        <mesh position={[-safeW * 0.05, 0.86, -safeD * 0.33]} castShadow><boxGeometry args={[safeW * 0.18, 0.06, 0.28]} />{metal}</mesh>
+        {/* run of base units with a stone worktop */}
+        <group position={[0, 0, -safeD * 0.34]}>
+          <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.8, 0.84, 0.6]} />{darkWood}</mesh>
+          <mesh position={[0, 0.86, 0]} castShadow><boxGeometry args={[safeW * 0.82, 0.05, 0.64]} />{stone}</mesh>
+          <mesh position={[0, 1.55, 0.02]} castShadow><boxGeometry args={[safeW * 0.6, 0.7, 0.36]} />{wood}</mesh>
+          <mesh position={[-safeW * 0.18, 0.87, 0]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
+          <mesh position={[-safeW * 0.18, 1.0, 0.16]} rotation={[0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
+        </group>
+        {/* island */}
+        {safeD > 2.6 && (
+          <group position={[0, 0, safeD * 0.12]}>
+            <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.5, 0.84, 0.7]} /><meshStandardMaterial color={accent} roughness={0.7} /></mesh>
+            <mesh position={[0, 0.87, 0]} castShadow><boxGeometry args={[safeW * 0.54, 0.06, 0.78]} />{stone}</mesh>
+          </group>
+        )}
       </group>
     );
   }
   if (room.type === "dining") {
+    const tw = Math.min(safeW * 0.5, 1.6);
     return (
       <group>
-        <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.46, 0.1, safeD * 0.32]} />{wood}</mesh>
-        {[[0, 1], [0, -1], [1, 0], [-1, 0]].map(([x, z], i) => <mesh key={i} position={[x * safeW * 0.32, 0.24, z * safeD * 0.24]} castShadow><boxGeometry args={[0.28, 0.3, 0.28]} />{fabric}</mesh>)}
+        <mesh position={[0, 0.026, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><planeGeometry args={[tw * 1.8, safeD * 0.6]} />{rugMat}</mesh>
+        <mesh position={[0, 0.74, 0]} castShadow receiveShadow><boxGeometry args={[tw, 0.06, safeD * 0.4]} />{darkWood}</mesh>
+        {[-1, 1].map((s) => <mesh key={s} position={[s * tw * 0.4, 0.37, 0]} castShadow><boxGeometry args={[0.08, 0.72, safeD * 0.3]} />{darkWood}</mesh>)}
+        {[[-1, -1], [-1, 1], [1, -1], [1, 1], [0, -1], [0, 1]].map(([x, z], i) => (
+          <group key={i} position={[x * tw * 0.3, 0, z * safeD * 0.26]}>
+            <mesh position={[0, 0.23, 0]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.1, 20]} />{fabric}</mesh>
+            <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.05, 0.05, 0.24, 10]} />{metal}</mesh>
+            <mesh position={[0, 0.46, z * 0.17]} rotation={[z * 0.15, 0, 0]} castShadow><boxGeometry args={[0.36, 0.42, 0.05]} />{fabric}</mesh>
+          </group>
+        ))}
+        {/* pendant cluster */}
+        {[-0.35, 0, 0.35].map((o) => (
+          <group key={o} position={[o * tw, 0, 0]}>
+            <mesh position={[0, 2.15, 0]}><cylinderGeometry args={[0.008, 0.008, 0.7, 6]} />{metal}</mesh>
+            <mesh position={[0, 1.78, 0]} castShadow><coneGeometry args={[0.14, 0.2, 20, 1, true]} /><meshStandardMaterial color="#e9c98f" emissive="#ffbf72" emissiveIntensity={1.1} roughness={0.5} metalness={0.4} side={THREE.DoubleSide} /></mesh>
+          </group>
+        ))}
       </group>
     );
   }
   if (room.type === "study") {
     return (
       <group>
-        <mesh position={[0, 0.42, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[safeW * 0.5, 0.1, safeD * 0.18]} />{wood}</mesh>
-        <mesh position={[0, 0.25, -safeD * 0.05]} castShadow><boxGeometry args={[0.32, 0.36, 0.32]} />{fabric}</mesh>
-        <mesh position={[safeW * 0.28, 0.55, safeD * 0.2]} castShadow><boxGeometry args={[0.12, 0.9, safeD * 0.36]} />{wood}</mesh>
+        <mesh position={[0, 0.74, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[safeW * 0.55, 0.06, 0.6]} />{darkWood}</mesh>
+        {[-1, 1].map((s) => <mesh key={s} position={[s * safeW * 0.25, 0.37, -safeD * 0.28]} castShadow><boxGeometry args={[0.06, 0.72, 0.55]} />{metal}</mesh>)}
+        <group position={[0, 0, -safeD * 0.05]}>
+          <mesh position={[0, 0.46, 0]} castShadow><cylinderGeometry args={[0.22, 0.2, 0.1, 20]} />{fabric}</mesh>
+          <mesh position={[0, 0.24, 0]} castShadow><cylinderGeometry args={[0.05, 0.05, 0.42, 10]} />{metal}</mesh>
+          <mesh position={[0, 0.72, 0.18]} rotation={[0.18, 0, 0]} castShadow><boxGeometry args={[0.4, 0.44, 0.05]} />{fabric}</mesh>
+        </group>
+        <mesh position={[safeW * 0.34, 0.9, safeD * 0.2]} castShadow><boxGeometry args={[0.3, 1.8, safeD * 0.4]} />{wood}</mesh>
+        <Art x={0} z={-safeD * 0.46} rotY={0} wSize={0.6} />
       </group>
     );
   }
   if (room.type === "pooja") {
-    return <mesh position={[0, 0.45, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[safeW * 0.52, 0.8, 0.2]} />{wood}</mesh>;
+    return (
+      <group>
+        <mesh position={[0, 0.45, -safeD * 0.3]} castShadow receiveShadow><boxGeometry args={[safeW * 0.52, 0.9, 0.3]} />{darkWood}</mesh>
+        <mesh position={[0, 1.05, -safeD * 0.3]}><boxGeometry args={[safeW * 0.36, 0.3, 0.08]} /><meshStandardMaterial color="#e2b661" emissive="#e2a13a" emissiveIntensity={0.5} metalness={0.6} roughness={0.4} /></mesh>
+        <pointLight position={[0, 1.3, -safeD * 0.2]} intensity={0.5} distance={2} color="#ffcf8a" />
+      </group>
+    );
   }
   if (room.type === "bath") {
     return (
       <group>
-        <mesh position={[-safeW * 0.25, 0.25, -safeD * 0.2]} castShadow receiveShadow><boxGeometry args={[0.42, 0.28, 0.55]} />{stone}</mesh>
-        <mesh position={[safeW * 0.22, 0.38, safeD * 0.2]} castShadow><cylinderGeometry args={[0.18, 0.18, 0.5, 16]} />{stone}</mesh>
+        <mesh position={[-safeW * 0.25, 0.45, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[0.8, 0.86, 0.5]} />{darkWood}</mesh>
+        <mesh position={[-safeW * 0.25, 0.9, -safeD * 0.28]} castShadow><boxGeometry args={[0.86, 0.05, 0.55]} />{stone}</mesh>
+        <mesh position={[-safeW * 0.25, 0.95, -safeD * 0.28]} castShadow><cylinderGeometry args={[0.17, 0.19, 0.12, 24]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+        <mesh position={[-safeW * 0.25, 1.55, -safeD * 0.33]}><boxGeometry args={[0.6, 0.8, 0.03]} /><meshStandardMaterial color="#dfe8ee" roughness={0.05} metalness={0.9} /></mesh>
+        <mesh position={[safeW * 0.24, 0.2, safeD * 0.2]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.4, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.15} /></mesh>
+        <mesh position={[safeW * 0.24, 0.44, safeD * 0.2]}><cylinderGeometry args={[0.2, 0.2, 0.06, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
       </group>
     );
   }
   return null;
 }
+
 
 function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme }) {
   const t = WALL_THICKNESS * 0.5 * FT_TO_M;
