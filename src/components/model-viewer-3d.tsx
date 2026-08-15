@@ -492,8 +492,8 @@ function TerraceBridges({ lower, upper, baseY, variation }: { lower: FloorPlate;
 }
 
 function RoomBlock({
-  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture,
-}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean }) {
+  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture, scheme, interior = false,
+}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean; scheme: InteriorScheme; interior?: boolean }) {
   const localX = (room.x + room.w / 2) - (plate.x + plate.w / 2);
   const localZ = (room.y + room.h / 2) - (plate.y + plate.h / 2);
   const w = room.w * FT_TO_M;
@@ -501,25 +501,104 @@ function RoomBlock({
   const h = (FLOOR_HEIGHT - 0.5) * FT_TO_M;
   const color = ROOM_COLORS[room.type] ?? "#e2e8f0";
   const open = isOpen(room.type, planMode, kitchenOpen);
+  const service = ["stairs", "lift", "parking", "courtyard"].includes(room.type);
+  const wet = room.type === "bath" || room.type === "utility";
+  const lit = interior || timeOfDay === "night";
 
   return (
     <group position={[localX * FT_TO_M, 0, localZ * FT_TO_M]}>
-      <mesh position={[0, 0.01, 0]} receiveShadow>
-        <boxGeometry args={[w * 0.96, 0.02, d * 0.96]} />
-        <meshStandardMaterial color={color} roughness={0.9} />
+      {/* Finished floor */}
+      <mesh position={[0, 0.012, 0]} receiveShadow>
+        <boxGeometry args={[w * 0.99, 0.024, d * 0.99]} />
+        {service ? (
+          <meshStandardMaterial color={color} roughness={0.9} />
+        ) : (
+          <meshStandardMaterial
+            color={wet ? "#e7ecef" : scheme.floorColor}
+            map={wet ? (scheme.wallMap ?? undefined) : (scheme.floorMap ?? undefined)}
+            roughness={wet ? 0.35 : scheme.floorRoughness}
+            metalness={0.04}
+          />
+        )}
       </mesh>
-      {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
-        <RoomWalls w={w} d={d} h={h} room={room} />
+      {/* Skirting trim where wall meets floor */}
+      {!service && !open && (
+        <group>
+          {[[0, -d / 2], [0, d / 2]].map(([x, z], i) => (
+            <mesh key={`sk-ns-${i}`} position={[x, 0.06, z]}>
+              <boxGeometry args={[w * 0.99, 0.1, 0.03]} />
+              <meshStandardMaterial color={scheme.trim} roughness={0.55} />
+            </mesh>
+          ))}
+          {[[-w / 2, 0], [w / 2, 0]].map(([x, z], i) => (
+            <mesh key={`sk-ew-${i}`} position={[x, 0.06, z]}>
+              <boxGeometry args={[0.03, 0.1, d * 0.99]} />
+              <meshStandardMaterial color={scheme.trim} roughness={0.55} />
+            </mesh>
+          ))}
+        </group>
       )}
-      {showFurniture && <Furniture room={room} w={w} d={d} />}
-      {timeOfDay === "night" && !["stairs", "lift", "parking", "bath"].includes(room.type) && (
+      {/* Ceiling with a recessed cove — only in walk-through mode so the
+          aerial/exterior views stay readable. */}
+      {interior && !service && (
+        <group>
+          <mesh position={[0, h + 0.02, 0]} receiveShadow>
+            <boxGeometry args={[w, 0.06, d]} />
+            <meshStandardMaterial color={scheme.ceilingColor} roughness={0.95} />
+          </mesh>
+          <mesh position={[0, h - 0.09, 0]}>
+            <boxGeometry args={[w * 0.72, 0.05, d * 0.72]} />
+            <meshStandardMaterial color={scheme.ceilingColor} roughness={0.9} emissive={scheme.lightColor} emissiveIntensity={0.35} />
+          </mesh>
+        </group>
+      )}
+      {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
+        <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} />
+      )}
+      {/* Accent wall in the主 living/sleeping spaces */}
+      {interior && (room.type === "living" || room.type === "master_bedroom" || room.type === "dining") && (
+        <mesh position={[0, h / 2, -d / 2 + 0.09]}>
+          <boxGeometry args={[w * 0.985, h * 0.99, 0.02]} />
+          <meshStandardMaterial color={scheme.accentWall} map={scheme.wallMap ?? undefined} roughness={0.95} />
+        </mesh>
+      )}
+      {showFurniture && <Furniture room={room} w={w} d={d} scheme={scheme} />}
+      {lit && !["stairs", "lift", "parking"].includes(room.type) && (
         <>
-          <pointLight position={[0, 2.25, 0]} intensity={0.55} color="#ffd08a" distance={4.5} />
-          <mesh position={[0, 2.7, 0]}>
-            <sphereGeometry args={[0.08, 10, 8]} />
-            <meshStandardMaterial color="#ffd08a" emissive="#ffd08a" emissiveIntensity={1.3} />
+          {/* Warm ceiling downlight */}
+          <pointLight
+            position={[0, h - 0.35, 0]}
+            intensity={interior ? 1.35 : 0.55}
+            color={scheme.lightColor}
+            distance={Math.max(w, d) * 1.8}
+            decay={2}
+            castShadow={interior}
+            shadow-mapSize={[512, 512]}
+          />
+          {/* Wall-wash strip — the glow-down-the-wall look */}
+          {interior && !wet && (
+            <>
+              <spotLight
+                position={[0, h - 0.2, -d / 2 + 0.5]}
+                target-position={[0, 0.4, -d / 2]}
+                angle={0.85}
+                penumbra={1}
+                intensity={2.4}
+                distance={Math.max(w, d) * 2}
+                color={scheme.lightColor}
+              />
+              <mesh position={[0, h - 0.14, -d / 2 + 0.42]}>
+                <boxGeometry args={[w * 0.6, 0.03, 0.05]} />
+                <meshStandardMaterial color={scheme.lightColor} emissive={scheme.lightColor} emissiveIntensity={2.2} />
+              </mesh>
+            </>
+          )}
+          <mesh position={[0, h - 0.06, 0]}>
+            <cylinderGeometry args={[0.09, 0.09, 0.03, 12]} />
+            <meshStandardMaterial color={scheme.lightColor} emissive={scheme.lightColor} emissiveIntensity={interior ? 2.6 : 1.3} />
           </mesh>
         </>
+
       )}
       {room.type === "stairs" && (() => {
         // Switchback (U-shape) staircase: two flights running in OPPOSITE directions
