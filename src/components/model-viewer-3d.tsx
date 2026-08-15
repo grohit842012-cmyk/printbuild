@@ -1,8 +1,21 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useState, useRef, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
 import type { Variation, FloorPlate, RoomRect, Opening } from "@/lib/design-types";
+import {
+  interiorSchemeFor,
+  plasterTexture,
+  battenTexture,
+  stoneTexture,
+  concreteTexture,
+  grassTexture,
+  pavingTexture,
+  type InteriorScheme,
+} from "@/lib/interior-materials";
+import { FirstPersonRig, TouchJoystick, type Collider, type MoveInput } from "@/components/interior-controls";
+
 
 const FLOOR_HEIGHT = 10; // ft
 const WALL_THICKNESS = 0.45;
