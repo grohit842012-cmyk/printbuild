@@ -742,7 +742,7 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
         {/* sofa: base + rolled back + arms + cushions */}
         <group position={[-safeW * 0.16, 0, safeD * 0.2]}>
           <mesh position={[0, 0.2, 0]} castShadow receiveShadow><boxGeometry args={[sofaW, 0.34, 0.82]} />{fabric}</mesh>
-          <mesh position={[0, 0.55, 0.34]} castShadow><cylinderGeometry args={[0.19, 0.19, sofaW, 18]} rotation={[0, 0, Math.PI / 2]} /><meshStandardMaterial color="#ded5c5" roughness={0.95} /></mesh>
+          
           <mesh position={[0, 0.5, 0.3]} rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.2, 0.2, sofaW, 20]} />{fabric}</mesh>
           {[-1, 1].map((s) => (
             <mesh key={s} position={[s * sofaW / 2, 0.36, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
