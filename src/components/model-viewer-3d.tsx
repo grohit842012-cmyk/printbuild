@@ -1788,12 +1788,17 @@ function Plot({ variation }: { variation: Variation }) {
       {/* Lawn */}
       <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w + 14, d + 14]} />
-        <meshStandardMaterial color="#7ca25a" roughness={0.95} />
+        <meshStandardMaterial color="#ffffff" map={grassTexture([12, 12]) ?? undefined} roughness={1} />
       </mesh>
-      {/* Driveway hint */}
-      <mesh position={[0, -0.09, d / 2 + 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w * 0.6, 2]} />
-        <meshStandardMaterial color="#8b8478" roughness={0.85} />
+      {/* Paved apron around the house */}
+      <mesh position={[0, -0.095, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w + 2.2, d + 2.2]} />
+        <meshStandardMaterial color="#cfc8ba" map={pavingTexture("#cfc8ba", [8, 8]) ?? undefined} roughness={0.85} />
+      </mesh>
+      {/* Driveway */}
+      <mesh position={[0, -0.088, d / 2 + 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w * 0.55, 5]} />
+        <meshStandardMaterial color="#b6ada0" map={pavingTexture("#b6ada0", [4, 6]) ?? undefined} roughness={0.9} />
       </mesh>
       {/* Ground shrubs / hedge dabs for realism */}
       {Array.from({ length: 22 }).map((_, i) => {
@@ -1986,7 +1991,67 @@ export function ModelViewer3D({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
+  const [interior, setInterior] = useState(false);
+  const move = useRef<MoveInput>({ x: 0, y: 0 });
   useEffect(() => setMounted(true), []);
+
+  // Which floor we walk through (interior mode always shows a single level).
+  const walkFloor = typeof visibleFloor === "number" ? visibleFloor : 0;
+  const walkPlate = variation.plates[walkFloor] ?? variation.plates[0];
+
+  const { colliders, startPos, walkBounds } = useMemo(() => {
+    const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
+    const list: Collider[] = [];
+    const t = WALL_THICKNESS * FT_TO_M;
+    const push = (ax: number, ay: number, bx: number, by: number) => {
+      const [x1, z1] = toScene(ax, ay);
+      const [x2, z2] = toScene(bx, by);
+      list.push({
+        x1: Math.min(x1, x2) - t / 2, z1: Math.min(z1, z2) - t / 2,
+        x2: Math.max(x1, x2) + t / 2, z2: Math.max(z1, z2) + t / 2,
+      });
+    };
+    const p = walkPlate;
+    if (p) {
+      // Perimeter
+      push(p.x, p.y, p.x + p.w, p.y);
+      push(p.x, p.y + p.h, p.x + p.w, p.y + p.h);
+      push(p.x, p.y, p.x, p.y + p.h);
+      push(p.x + p.w, p.y, p.x + p.w, p.y + p.h);
+      const gap = 3.4;
+      for (const r of p.rooms) {
+        if (["stairs", "lift", "courtyard", "parking"].includes(r.type)) continue;
+        if (isOpen(r.type, planMode, kitchenOpen)) continue;
+        const mid = r.doorMid ?? 0;
+        const sides: ("N" | "S" | "E" | "W")[] = ["N", "S", "E", "W"];
+        for (const side of sides) {
+          const hasDoor = r.doorWall === side;
+          const along = side === "N" || side === "S" ? r.w : r.h;
+          const d0 = hasDoor ? Math.max(0, mid - gap / 2) : along;
+          const d1 = hasDoor ? Math.min(along, mid + gap / 2) : along;
+          const spans: [number, number][] = hasDoor ? [[0, d0], [d1, along]] : [[0, along]];
+          for (const [a, b] of spans) {
+            if (b - a < 0.2) continue;
+            if (side === "N") push(r.x + a, r.y, r.x + b, r.y);
+            else if (side === "S") push(r.x + a, r.y + r.h, r.x + b, r.y + r.h);
+            else if (side === "W") push(r.x, r.y + a, r.x, r.y + b);
+            else push(r.x + r.w, r.y + a, r.x + r.w, r.y + b);
+          }
+        }
+      }
+    }
+    const home = p?.rooms.find((r) => r.type === "living") ?? p?.rooms.find((r) => !["stairs", "lift", "parking"].includes(r.type)) ?? p?.rooms[0];
+    const [hx, hz] = home
+      ? toScene(home.x + home.w / 2, home.y + home.h / 2)
+      : toScene(variation.plotWidthFt / 2, variation.plotDepthFt / 2);
+    const [b1x, b1z] = p ? toScene(p.x + 1, p.y + 1) : [-5, -5];
+    const [b2x, b2z] = p ? toScene(p.x + p.w - 1, p.y + p.h - 1) : [5, 5];
+    return {
+      colliders: list,
+      startPos: [hx, hz] as [number, number],
+      walkBounds: { x1: Math.min(b1x, b2x), z1: Math.min(b1z, b2z), x2: Math.max(b1x, b2x), z2: Math.max(b1z, b2z) },
+    };
+  }, [variation, walkPlate, planMode, kitchenOpen]);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
     [variation],
