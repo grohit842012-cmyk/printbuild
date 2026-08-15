@@ -1,40 +1,50 @@
-# Photorealistic Interiors + Walk-Through Mode
+# Photorealistic Interiors + Exteriors + Walk-Through Mode
 
-Goal: make the inside of a generated house look like the reference — warm wall-wash lighting, soft shadows, real materials on floors/walls, and a first-person view you move through, instead of the current procedural blocks seen from outside.
+Honest framing first: this runs in a browser in real time, so it won't match an offline render frame-for-frame. What the reference clip actually shows is achievable in-browser — warm wall-wash lighting, soft shadows, believable materials, and smooth first-person movement — and that is the bar I'll hold. It will look close to that. It will not look like a Corona/V-Ray still, and any promise otherwise would be a lie.
 
-## What you'll get
+## 1. Interior view mode
 
-1. **New "Interior" view mode** in the 3D viewer toolbar (alongside the existing exterior/floor views)
-   - Camera drops inside the house at eye height (5.5 ft) in the living room.
-   - WASD + mouse-look on desktop (pointer lock), on-screen joystick + drag-look on mobile.
-   - Collision against walls so you can't walk through them; doorway openings let you pass between rooms.
-   - "Exit interior" button returns to the orbit view.
+- New "Interior" mode in the 3D viewer toolbar.
+- Camera drops inside at eye height (5.5 ft) in the living room.
+- WASD + mouse-look on desktop (pointer lock); on-screen joystick + drag-look on mobile.
+- Wall collision so you can't walk through walls; door openings let you pass between rooms.
+- "Exit interior" returns to the orbit view.
 
-2. **Cinematic interior lighting**
-   - Warm ceiling downlights and wall-wash strips per room (the glow-on-wall look from the reference).
-   - Daylight spilling through each window/sliding door as a directional shaft.
-   - Soft shadows, ambient occlusion in corners, and a subtle bloom on light sources.
-   - Day/night already exists — night becomes the moody lamp-lit version, day stays bright.
+## 2. Cinematic lighting (interior and exterior)
 
-3. **Real interior materials** (replacing flat colors)
-   - Floors: wide-plank wood, polished concrete, or stone per design variation (keeps every model unique).
-   - Walls: matte plaster with faint texture; one accent wall per living/master room in the variation's accent tone.
-   - Ceilings: white matte with a recessed cove where lights sit.
-   - Skirting trim line at the wall/floor junction, and door/window reveals so walls read as thick.
+- Interior: warm ceiling downlights and wall-wash strips per room (the glow-on-wall look from the reference), daylight shafts through each window/sliding door, soft shadows, corner ambient occlusion, subtle bloom on light sources.
+- Exterior: a real sun position with soft shadow cascades, sky-and-ground bounce light, and a golden-hour / midday / dusk selector driving both sun angle and colour temperature.
+- Day/night already exists — night becomes the lamp-lit moody version, windows glowing from outside.
 
-4. **Better furniture**
-   - Rounded, upholstered forms (sofa with cushions, armchair, round coffee table, bed with headboard, dining set, kitchen counters with worktop) instead of plain boxes.
-   - Rugs, a floor lamp, and framed wall art, placed against walls and clear of doorways.
+## 3. Materials — interior
+
+- Floors: wide-plank wood, polished concrete, or stone per variation (keeps every model unique).
+- Walls: matte plaster with faint texture; one accent wall per living/master room in the variation's accent tone.
+- Ceilings: white matte with a recessed cove where the lights sit.
+- Skirting trim at the wall/floor junction; door and window reveals so walls read as thick, not paper.
+
+## 4. Materials — exterior
+
+- Facade surfaces get real surface response: stucco tooth, wood-batten grain, exposed-concrete mottling, stone coursing — each variation keeps its own combination so no two models look alike.
+- Glass gets proper reflection and slight tint rather than flat panels; frames in the variation's accent metal.
+- Ground plane becomes a site: driveway paving, a grass/gravel apron, boundary edge, and soft shadow contact where the building meets ground.
+- Roof materials differentiated (tile, standing-seam metal, membrane) instead of a single flat tone.
+- Existing swaying trees stay and get shadow-casting so the facade gets dappled light.
+
+## 5. Furniture
+
+- Rounded, upholstered forms — sofa with cushions, armchair, round coffee table, bed with headboard, dining set, kitchen counters with worktop — instead of plain boxes.
+- Rugs, a floor lamp, and framed wall art, placed against walls and clear of doorways.
 
 ## Technical notes
 
-- Work is confined to `src/components/model-viewer-3d.tsx` plus a new `src/lib/interior-materials.ts` (per-variation palette + texture picks) and `src/components/interior-controls.tsx` (movement/collision).
-- Reuse the existing `FloorPlate` / `RoomRect` / openings data — no changes to `model-generator.ts`, so plans and elevations stay as they are.
-- Lighting cost is managed: lights are only instantiated for the floor currently being viewed, and shadow maps limited to nearby lights so it stays smooth on a laptop.
-- Post-processing (bloom + AO) via `@react-three/postprocessing`, enabled only in interior mode.
-- Textures generated procedurally in-code (canvas-based wood grain/plaster noise) so no large image downloads.
+- Work stays in `src/components/model-viewer-3d.tsx`, plus new `src/lib/interior-materials.ts` (per-variation palette and texture picks) and `src/components/interior-controls.tsx` (movement and collision).
+- Reuses existing `FloorPlate` / `RoomRect` / opening data — `model-generator.ts` is untouched, so plans and elevations don't change.
+- Post-processing (bloom, ambient occlusion, subtle sharpening) via `@react-three/postprocessing`.
+- Textures generated procedurally in-code (canvas-based grain/noise/plaster) so there are no heavy image downloads.
+- Performance guard: lights and shadow maps only instantiated for the floor in view, capped shadow resolution, and a quality toggle (High / Balanced) so it stays smooth on a laptop.
 
-## Out of scope for this pass
+## Out of scope this pass
 
-- Automated camera tour on rails (can be added after).
-- Interior design styling per room type beyond materials + furniture (e.g. curated decor sets).
+- Automated camera tour on rails.
+- Curated per-room decor sets beyond materials and the furniture list above.
