@@ -163,6 +163,19 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
   const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
 
+  // Facade surface texture — each material family gets its own grain so the
+  // exterior reads as a real built surface, not flat paint.
+  const facadeMap =
+    palette.material === "timber"
+      ? battenTexture(WALL_COLOR, [3, 1.6])
+      : palette.material === "stone" || palette.material === "brick"
+        ? stoneTexture(WALL_COLOR, [2.4, 1.6])
+        : palette.material === "glass"
+          ? null
+          : palette.material === "corten"
+            ? concreteTexture(WALL_COLOR, [2, 1.4])
+            : plasterTexture(WALL_COLOR, [2.6, 1.8], 20);
+
   const tol = 0.6;
   const byWall: Record<"N" | "E" | "S" | "W", { o: Opening; isDoor: boolean; a: number; b: number }[]> = {
     N: [], E: [], S: [], W: [],
@@ -238,7 +251,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
       segments.push(
         <mesh key={`w${key++}`} position={[lx, h / 2, lz]} castShadow receiveShadow>
           <boxGeometry args={args} />
-          <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+          <meshStandardMaterial color={WALL_COLOR} map={facadeMap ?? undefined} roughness={palette.material === "glass" ? 0.18 : 0.92} metalness={palette.material === "corten" ? 0.35 : 0.02} />
         </mesh>,
       );
     }
@@ -253,7 +266,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`l${key++}`} position={[lx, doorH + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} map={facadeMap ?? undefined} roughness={palette.material === "glass" ? 0.18 : 0.92} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // door frame trim
@@ -278,7 +291,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`s${key++}`} position={[lx, sillH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={sillArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} map={facadeMap ?? undefined} roughness={palette.material === "glass" ? 0.18 : 0.92} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // sill band (trim)
@@ -293,7 +306,7 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
         segments.push(
           <mesh key={`li${key++}`} position={[lx, winTop + lintelH / 2, lz]} castShadow receiveShadow>
             <boxGeometry args={lintelArgs} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={palette.material === "glass" ? 0.18 : 0.85} metalness={palette.material === "corten" ? 0.35 : 0.02} />
+            <meshStandardMaterial color={WALL_COLOR} map={facadeMap ?? undefined} roughness={palette.material === "glass" ? 0.18 : 0.92} metalness={palette.material === "corten" ? 0.35 : 0.02} />
           </mesh>,
         );
         // top trim under lintel
