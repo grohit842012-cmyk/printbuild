@@ -98,6 +98,9 @@ function NewDesignWizard() {
     planMode: "closed",
     kitchenOpen: false,
     balcony: true,
+    setbackFt: 5,
+    mainDoor: { style: "double", color: "#5a3a22", design: "paneled" },
+
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
   });
 
