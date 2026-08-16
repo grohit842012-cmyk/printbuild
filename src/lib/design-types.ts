@@ -200,6 +200,8 @@ export interface Variation {
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "sloped";
   mainDoor?: MainDoorSpec;
+  elevationStyle: ElevationStyle;
+
 
   massingStyle?:
     | "courtyard-cut"
