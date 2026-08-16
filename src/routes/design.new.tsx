@@ -98,6 +98,9 @@ function NewDesignWizard() {
     planMode: "closed",
     kitchenOpen: false,
     balcony: true,
+    setbackFt: 5,
+    mainDoor: { style: "double", color: "#5a3a22", design: "paneled" },
+
     lifestyle: { familySize: 4, workFromHome: true, entertaining: false, notes: "" },
   });
 
@@ -687,6 +690,105 @@ function NewDesignWizard() {
                   </label>
                 </RadioGroup>
               </div>
+
+              <div>
+                <Label>Open space around the house (setback)</Label>
+                <RadioGroup
+                  value={String(spec.setbackFt ?? 5)}
+                  onValueChange={(v) => setSpec({ ...spec, setbackFt: v === "3" ? 3 : 5 })}
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="5" /> 5 ft on all sides — recommended
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="3" /> 3 ft on all sides — bigger house, tighter site
+                  </label>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground mt-1">
+                  5 ft keeps room for drainage, maintenance access and cross-ventilation.
+                </p>
+              </div>
+
+              <div>
+                <Label>Main entrance door</Label>
+                <RadioGroup
+                  value={spec.mainDoor?.style ?? "double"}
+                  onValueChange={(v) =>
+                    setSpec({
+                      ...spec,
+                      mainDoor: { style: v as "single" | "double", color: spec.mainDoor?.color ?? "#5a3a22", design: spec.mainDoor?.design ?? "paneled" },
+                    })
+                  }
+                  className="grid sm:grid-cols-2 gap-2 mt-2"
+                >
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="double" /> Double door (grand entrance)
+                  </label>
+                  <label className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                    <RadioGroupItem value="single" /> Single door
+                  </label>
+                </RadioGroup>
+
+                <div className="mt-3">
+                  <Label className="text-sm">Door design</Label>
+                  <RadioGroup
+                    value={spec.mainDoor?.design ?? "paneled"}
+                    onValueChange={(v) =>
+                      setSpec({
+                        ...spec,
+                        mainDoor: { style: spec.mainDoor?.style ?? "double", color: spec.mainDoor?.color ?? "#5a3a22", design: v as "flush" | "paneled" | "carved" | "glass-inlay" },
+                      })
+                    }
+                    className="grid sm:grid-cols-2 gap-2 mt-2"
+                  >
+                    {([
+                      ["paneled", "Paneled — classic raised panels"],
+                      ["flush", "Flush — clean modern slab"],
+                      ["carved", "Carved — traditional teak carving"],
+                      ["glass-inlay", "Glass inlay — vertical glazed strips"],
+                    ] as const).map(([v, label]) => (
+                      <label key={v} className="border border-border rounded-lg p-3 cursor-pointer hover:bg-accent/5 flex items-center gap-2">
+                        <RadioGroupItem value={v} /> {label}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="mt-3">
+                  <Label className="text-sm">Door colour</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {([
+                      ["#5a3a22", "Walnut"],
+                      ["#8a5a2b", "Teak"],
+                      ["#2f2a26", "Charcoal"],
+                      ["#1f3b2c", "Deep green"],
+                      ["#7a2626", "Oxblood"],
+                      ["#c9b48a", "Natural oak"],
+                    ] as const).map(([hex, name]) => {
+                      const active = (spec.mainDoor?.color ?? "#5a3a22") === hex;
+                      return (
+                        <button
+                          key={hex}
+                          type="button"
+                          onClick={() =>
+                            setSpec({
+                              ...spec,
+                              mainDoor: { style: spec.mainDoor?.style ?? "double", design: spec.mainDoor?.design ?? "paneled", color: hex },
+                            })
+                          }
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${active ? "border-primary ring-2 ring-primary/40" : "border-border"}`}
+                          aria-pressed={active}
+                        >
+                          <span className="h-4 w-4 rounded-sm border border-border" style={{ background: hex }} />
+                          {name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
 
             </>
           )}

@@ -37,6 +37,8 @@ const ROOM_COLORS: Record<string, string> = {
   parking: "#e8b46a",
 };
 
+const FLOOR_LABELS = ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor"];
+
 const PUBLIC_OPEN = new Set(["living", "dining", "kitchen", "courtyard"]);
 
 interface Props {
@@ -161,7 +163,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   const FRAME_COLOR = new THREE.Color(palette.accent).lerp(new THREE.Color(palette.trim), 0.25).getStyle();
   const DOOR_COLOR = "#5a3a22";   // walnut
   // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
-  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
+  // Glass stays clear on every model — only the frames/muntins take the theme accent.
+  const GLASS_TINT = "cfe0ea";
 
   // Facade surface texture — each material family gets its own grain so the
   // exterior reads as a real built surface, not flat paint.
@@ -277,13 +280,55 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
             <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
           </mesh>,
         );
-        const dArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.95, doorH * 0.98, t * 0.45] : [t * 0.45, doorH * 0.98, segLen * 0.95];
-        segments.push(
-          <mesh key={`d${key++}`} position={[lx, doorH / 2, lz]} castShadow>
-            <boxGeometry args={dArgs} />
-            <meshStandardMaterial color={DOOR_COLOR} roughness={0.45} metalness={0.05} />
-          </mesh>,
-        );
+        const spec = variation.mainDoor;
+        const doorColor = spec?.color ?? DOOR_COLOR;
+        const leaves = spec?.style === "single" ? 1 : 2;
+        const alongX = side === "N" || side === "S";
+        const leafLen = (segLen * 0.95) / leaves;
+        for (let li = 0; li < leaves; li++) {
+          const off = (li - (leaves - 1) / 2) * leafLen;
+          const dArgs: [number, number, number] = alongX
+            ? [leafLen * 0.98, doorH * 0.98, t * 0.45]
+            : [t * 0.45, doorH * 0.98, leafLen * 0.98];
+          segments.push(
+            <mesh key={`d${key++}`} position={[alongX ? lx + off : lx, doorH / 2, alongX ? lz : lz + off]} castShadow>
+              <boxGeometry args={dArgs} />
+              <meshStandardMaterial color={doorColor} roughness={spec?.design === "flush" ? 0.35 : 0.5} metalness={0.05} />
+            </mesh>,
+          );
+          // design detailing on the leaf face
+          const design = spec?.design ?? "paneled";
+          if (design !== "flush") {
+            const rows = design === "carved" ? 4 : design === "glass-inlay" ? 1 : 2;
+            for (let r = 0; r < rows; r++) {
+              const py = doorH * (0.22 + (r * 0.56) / Math.max(1, rows - 1 || 1));
+              const pw = leafLen * (design === "glass-inlay" ? 0.28 : 0.62);
+              const ph = doorH * (design === "carved" ? 0.13 : design === "glass-inlay" ? 0.5 : 0.26);
+              const pArgs: [number, number, number] = alongX ? [pw, ph, t * 0.5] : [t * 0.5, ph, pw];
+              segments.push(
+                <mesh key={`dp${key++}`} position={[alongX ? lx + off : lx, py, alongX ? lz : lz + off]}>
+                  <boxGeometry args={pArgs} />
+                  {design === "glass-inlay" ? (
+                    <meshPhysicalMaterial color="#cfe0ea" transmission={0.6} transparent opacity={0.75} roughness={0.1} />
+                  ) : (
+                    <meshStandardMaterial
+                      color={new THREE.Color(doorColor).lerp(new THREE.Color("#000000"), 0.25).getStyle()}
+                      roughness={0.6}
+                    />
+                  )}
+                </mesh>,
+              );
+            }
+          }
+          // handle
+          const hOff = leaves === 1 ? leafLen * 0.36 : (li === 0 ? leafLen * 0.38 : -leafLen * 0.38);
+          segments.push(
+            <mesh key={`dh${key++}`} position={[alongX ? lx + off + hOff : lx, doorH * 0.45, alongX ? lz : lz + off + hOff]}>
+              <boxGeometry args={alongX ? [0.05, 0.34, t * 0.62] : [t * 0.62, 0.34, 0.05]} />
+              <meshStandardMaterial color="#c8b072" roughness={0.3} metalness={0.85} />
+            </mesh>,
+          );
+        }
       } else {
         const sillH = winBot;
         const lintelH = h - winTop;
@@ -362,8 +407,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true, interior = false,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean; interior?: boolean }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true, interior = false, doorsOpen = true,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean; interior?: boolean; doorsOpen?: boolean }) {
   const scheme = useMemo(
     () => interiorSchemeFor(variation.seed || 1, paletteFor(variation).accent),
     [variation],
@@ -450,7 +495,7 @@ function FloorMesh({
         </group>
       ))}
       {plate.rooms.map((r, i) => (
-        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} scheme={scheme} interior={interior} />
+        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} scheme={scheme} interior={interior} doorsOpen={doorsOpen} />
       ))}
     </group>
   );
@@ -509,8 +554,22 @@ function TerraceBridges({ lower, upper, baseY, variation }: { lower: FloorPlate;
 }
 
 function RoomBlock({
-  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture, scheme, interior = false,
-}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean; scheme: InteriorScheme; interior?: boolean }) {
+  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture, scheme, interior = false, doorsOpen = true,
+}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean; scheme: InteriorScheme; interior?: boolean; doorsOpen?: boolean }) {
+  // Which of the room's walls carry a window — furniture never backs onto one.
+  const windowWalls = new Set<"N" | "S" | "E" | "W">();
+  for (const o of plate.openings) {
+    if (o.kind === "door") continue;
+    const ox1 = Math.min(o.x1, o.x2), ox2 = Math.max(o.x1, o.x2);
+    const oy1 = Math.min(o.y1, o.y2), oy2 = Math.max(o.y1, o.y2);
+    const tol = 0.6;
+    const overlapX = ox2 > room.x + 0.2 && ox1 < room.x + room.w - 0.2;
+    const overlapY = oy2 > room.y + 0.2 && oy1 < room.y + room.h - 0.2;
+    if (overlapX && Math.abs(oy1 - room.y) < tol) windowWalls.add("N");
+    if (overlapX && Math.abs(oy1 - (room.y + room.h)) < tol) windowWalls.add("S");
+    if (overlapY && Math.abs(ox1 - room.x) < tol) windowWalls.add("W");
+    if (overlapY && Math.abs(ox1 - (room.x + room.w)) < tol) windowWalls.add("E");
+  }
   const localX = (room.x + room.w / 2) - (plate.x + plate.w / 2);
   const localZ = (room.y + room.h / 2) - (plate.y + plate.h / 2);
   const w = room.w * FT_TO_M;
@@ -570,7 +629,7 @@ function RoomBlock({
         </group>
       )}
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
-        <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} />
+        <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} doorsOpen={doorsOpen} />
       )}
       {/* Accent wall in the main living/sleeping spaces */}
       {interior && (room.type === "living" || room.type === "master_bedroom" || room.type === "dining") && (
@@ -579,7 +638,7 @@ function RoomBlock({
           <meshStandardMaterial color={scheme.accentWall} map={scheme.wallMap ?? undefined} roughness={0.95} />
         </mesh>
       )}
-      {showFurniture && <Furniture room={room} w={w} d={d} scheme={scheme} />}
+      {showFurniture && <Furniture room={room} w={w} d={d} scheme={scheme} windowWalls={windowWalls} />}
       {lit && !["stairs", "lift", "parking"].includes(room.type) && (
         <>
           {/* Warm ceiling downlight */}
@@ -713,7 +772,7 @@ function RoomBlock({
   );
 }
 
-function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme }) {
+function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme; windowWalls?: Set<"N" | "S" | "E" | "W"> }) {
   if (["stairs", "lift", "parking", "courtyard", "utility"].includes(room.type)) return null;
   const accent = scheme?.accentWall ?? "#8a6a4a";
   const wood = <meshStandardMaterial color="#7b5637" roughness={0.62} />;
@@ -724,6 +783,21 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
   const rugMat = <meshStandardMaterial color={accent} roughness={1} />;
   const safeW = Math.max(1.2, w * 0.82);
   const safeD = Math.max(1.2, d * 0.82);
+
+  // Pick a solid wall (no door, no window) to mount tall units against, so TV
+  // units / cabinets / wardrobes sit flush on the wall and never in front of glass.
+  type Side = "N" | "S" | "E" | "W";
+  const order: Side[] = ["N", "S", "W", "E"];
+  const solidSides = order.filter((sd) => sd !== room.doorWall && !windowWalls?.has(sd));
+  const backWall: Side = solidSides[0] ?? order.find((sd) => sd !== room.doorWall) ?? "N";
+  const wallSpan = backWall === "N" || backWall === "S" ? w : d;
+  const wallPos: [number, number, number] =
+    backWall === "N" ? [0, 0, -d / 2] : backWall === "S" ? [0, 0, d / 2] : backWall === "W" ? [-w / 2, 0, 0] : [w / 2, 0, 0];
+  const wallRotY = backWall === "N" ? 0 : backWall === "S" ? Math.PI : backWall === "W" ? Math.PI / 2 : -Math.PI / 2;
+  /** Children are drawn with +z pointing into the room; z=0 is the wall face. */
+  const WallUnit = ({ children }: { children: React.ReactNode }) => (
+    <group position={wallPos} rotation={[0, wallRotY, 0]}>{children}</group>
+  );
 
   const FloorLamp = ({ x, z }: { x: number; z: number }) => (
     <group position={[x, 0, z]}>
@@ -776,13 +850,29 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
           <mesh position={[0, 0.24, 0]} castShadow receiveShadow><cylinderGeometry args={[0.42, 0.38, 0.4, 26]} />{fabric}</mesh>
           <mesh position={[0, 0.55, -0.22]} rotation={[0.18, 0, 0]} castShadow><cylinderGeometry args={[0.36, 0.36, 0.44, 26, 1, true, -Math.PI * 0.75, Math.PI * 1.5]} /><meshStandardMaterial color="#ded5c5" roughness={0.95} side={THREE.DoubleSide} /></mesh>
         </group>
+        <WallUnit>
+          {/* low TV console, back flush against the wall */}
+          <mesh position={[0, 0.26, 0.24]} castShadow receiveShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.6, 2.1), 0.52, 0.44]} />{darkWood}
+          </mesh>
+          <mesh position={[0, 1.25, 0.04]} castShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.5, 1.5), 0.86, 0.05]} />
+            <meshStandardMaterial color="#15181c" roughness={0.25} metalness={0.4} />
+          </mesh>
+          {/* tall side cabinet, also on the wall */}
+          <mesh position={[Math.min(wallSpan * 0.38, 1.5), 0.95, 0.2]} castShadow receiveShadow>
+            <boxGeometry args={[0.5, 1.9, 0.38]} />{wood}
+          </mesh>
+        </WallUnit>
         <FloorLamp x={-safeW * 0.42} z={-safeD * 0.3} />
         <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.9, safeW * 0.32)} />
       </group>
     );
   }
   if (room.type === "bedroom" || room.type === "master_bedroom") {
-    const bw = Math.min(safeW * 0.62, 1.8);
+    // Small bedrooms get a single bed (0.95 m) instead of a double (1.8 m).
+    const smallRoom = room.w < 10.5 || room.h < 10.5;
+    const bw = smallRoom ? Math.min(safeW * 0.5, 0.95) : Math.min(safeW * 0.62, 1.8);
     return (
       <group>
         <mesh position={[0, 0.026, safeD * 0.02]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -809,6 +899,17 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
             <mesh position={[0, 0.58, 0]}><cylinderGeometry args={[0.1, 0.12, 0.22, 16]} /><meshStandardMaterial color="#f6e7cd" emissive="#ffcf92" emissiveIntensity={0.7} roughness={0.9} /></mesh>
           </group>
         ))}
+        <WallUnit>
+          {/* wardrobe — full height, flush to a solid wall */}
+          <mesh position={[0, 1.1, 0.3]} castShadow receiveShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.55, 1.9), 2.2, 0.6]} />{wood}
+          </mesh>
+          {[-1, 1].map((s2) => (
+            <mesh key={s2} position={[s2 * 0.06, 1.1, 0.61]}>
+              <boxGeometry args={[0.03, 0.9, 0.03]} />{metal}
+            </mesh>
+          ))}
+        </WallUnit>
         <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.8, safeW * 0.3)} />
       </group>
     );
@@ -817,13 +918,14 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
     return (
       <group>
         {/* run of base units with a stone worktop */}
-        <group position={[0, 0, -safeD * 0.34]}>
-          <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.8, 0.84, 0.6]} />{darkWood}</mesh>
-          <mesh position={[0, 0.86, 0]} castShadow><boxGeometry args={[safeW * 0.82, 0.05, 0.64]} />{stone}</mesh>
-          <mesh position={[0, 1.55, 0.02]} castShadow><boxGeometry args={[safeW * 0.6, 0.7, 0.36]} />{wood}</mesh>
-          <mesh position={[-safeW * 0.18, 0.87, 0]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
-          <mesh position={[-safeW * 0.18, 1.0, 0.16]} rotation={[0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
-        </group>
+        <WallUnit>
+          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[Math.min(wallSpan * 0.8, 3.2), 0.84, 0.6]} />{darkWood}</mesh>
+          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.82, 3.3), 0.05, 0.64]} />{stone}</mesh>
+          {/* wall cabinets hung on the wall itself */}
+          <mesh position={[0, 1.62, 0.19]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.62, 2.4), 0.7, 0.36]} />{wood}</mesh>
+          <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 0.87, 0.3]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
+          <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 1.0, 0.46]} rotation={[-0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
+        </WallUnit>
         {/* island */}
         {safeD > 2.6 && (
           <group position={[0, 0, safeD * 0.12]}>
@@ -898,7 +1000,7 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
 }
 
 
-function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme }) {
+function RoomWalls({ w, d, h, room, scheme, doorsOpen = true }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme; doorsOpen?: boolean }) {
   const t = WALL_THICKNESS * 0.5 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
   const doorW = 3 * FT_TO_M;
@@ -981,6 +1083,26 @@ function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number;
           <boxGeometry args={alongX ? [lintelLen, lintelH, t] : [t, lintelH, lintelLen]} />
           {mat}
         </mesh>,
+      );
+    }
+    // Door leaf — every room (including baths) gets a hung door that swings
+    // open/closed with the walk-through "Doors" button.
+    const leafLen = hi - lo;
+    if (leafLen > 0.02) {
+      const swing = doorsOpen ? 1.35 : 0;
+      const baseRotY = alongX ? 0 : -Math.PI / 2;
+      const hingePos: [number, number, number] = alongX ? [lo, 0, wallZ] : [wallX, 0, lo];
+      segments.push(
+        <group key={`${key}-door`} position={hingePos} rotation={[0, baseRotY - swing, 0]}>
+          <mesh position={[leafLen / 2, doorH / 2, 0]} castShadow>
+            <boxGeometry args={[leafLen * 0.97, doorH * 0.98, 0.045]} />
+            <meshStandardMaterial color={"#6b4a30"} roughness={0.5} />
+          </mesh>
+          <mesh position={[leafLen * 0.86, doorH * 0.45, 0.05]}>
+            <boxGeometry args={[0.04, 0.2, 0.03]} />
+            <meshStandardMaterial color="#c8b072" roughness={0.3} metalness={0.85} />
+          </mesh>
+        </group>,
       );
     }
     return <group key={key}>{segments}</group>;
@@ -1992,6 +2114,7 @@ export function ModelViewer3D({
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
   const [interior, setInterior] = useState(false);
+  const [doorsOpen, setDoorsOpen] = useState(true);
   const move = useRef<MoveInput>({ x: 0, y: 0 });
   useEffect(() => setMounted(true), []);
 
@@ -2018,7 +2141,7 @@ export function ModelViewer3D({
       push(p.x, p.y + p.h, p.x + p.w, p.y + p.h);
       push(p.x, p.y, p.x, p.y + p.h);
       push(p.x + p.w, p.y, p.x + p.w, p.y + p.h);
-      const gap = 3.4;
+      const gap = doorsOpen ? 3.4 : 0;
       for (const r of p.rooms) {
         if (["stairs", "lift", "courtyard", "parking"].includes(r.type)) continue;
         if (isOpen(r.type, planMode, kitchenOpen)) continue;
@@ -2051,7 +2174,7 @@ export function ModelViewer3D({
       startPos: [hx, hz] as [number, number],
       walkBounds: { x1: Math.min(b1x, b2x), z1: Math.min(b1z, b2z), x2: Math.max(b1x, b2x), z2: Math.max(b1z, b2z) },
     };
-  }, [variation, walkPlate, planMode, kitchenOpen]);
+  }, [variation, walkPlate, planMode, kitchenOpen, doorsOpen]);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
     [variation],
@@ -2074,16 +2197,22 @@ export function ModelViewer3D({
             key={p.floor}
             onClick={() => setVisibleFloor(p.floor)}
             className={`text-xs px-2 py-1 rounded ${visibleFloor === p.floor ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-          >Floor {p.floor}</button>
+          >{FLOOR_LABELS[p.floor] ?? `Floor ${p.floor}`}</button>
         ))}
+        {interior && (
+          <button
+            onClick={() => setDoorsOpen((v) => !v)}
+            className="text-xs px-2 py-1 rounded hover:bg-secondary"
+          >{doorsOpen ? "Close doors" : "Open doors"}</button>
+        )}
         <button
-          onClick={() => { setInterior((v) => !v); if (!interior && visibleFloor === "all") setVisibleFloor(0); }}
+          onClick={() => setInterior((v) => !v)}
           className={`text-xs px-2 py-1 rounded ${interior ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
         >{interior ? "Exit interior" : "Walk inside"}</button>
       </div>
       {interior && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[10px] px-2 py-1 rounded bg-background/80 border border-border text-muted-foreground">
-          WASD / arrows to walk, drag to look
+          WASD / arrows to walk, drag to look — use the floor buttons to change level
         </div>
       )}
       <Canvas
@@ -2139,12 +2268,12 @@ export function ModelViewer3D({
           ))}
           {variation.plates
             .map((plate, i) => ({ plate, i }))
-            .filter(({ plate }) => visibleFloor === "all" || plate.floor === visibleFloor)
+            .filter(({ plate }) => interior || visibleFloor === "all" || plate.floor === visibleFloor)
             .map(({ plate, i }) => (
               <FloorMesh
                 key={plate.floor}
                 plate={plate}
-                baseY={baseYs[i]}
+                baseY={interior || visibleFloor === "all" ? baseYs[i] : 0}
                 variation={variation}
                 planMode={planMode}
                 kitchenOpen={kitchenOpen}
@@ -2154,6 +2283,7 @@ export function ModelViewer3D({
                 showFurniture={showFurniture}
                 showBalcony={showBalcony}
                 interior={interior}
+                doorsOpen={doorsOpen}
               />
             ))}
           {visibleFloor === "all" && !interior && <Roof variation={variation} topY={topY} />}

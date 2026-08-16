@@ -55,6 +55,11 @@ export interface DesignSpec {
   kitchenOpen?: boolean;
   // Include a front balcony with sliding glass doors on the upper level.
   balcony?: boolean;
+  // Open space (setback) left around the house on every side, in feet.
+  setbackFt?: 3 | 5;
+  // Main entrance door preference.
+  mainDoor?: MainDoorSpec;
+
 
   lifestyle: {
     familySize: number;
@@ -161,7 +166,14 @@ export interface ParkingArea {
   bikeBays?: { x: number; y: number; w: number; h: number; count: number };
 }
 
+export interface MainDoorSpec {
+  style: "single" | "double";
+  color: string;
+  design: "flush" | "paneled" | "carved" | "glass-inlay";
+}
+
 export interface DesignDNARef {
+
   massing: string;
   facade: string;
   roof: string;
@@ -187,7 +199,10 @@ export interface Variation {
   vastuScore: number;
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "sloped";
+  mainDoor?: MainDoorSpec;
   elevationStyle: ElevationStyle;
+
+
   massingStyle?:
     | "courtyard-cut"
     | "cantilever-front"
