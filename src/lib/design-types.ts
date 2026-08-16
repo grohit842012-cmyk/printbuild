@@ -55,6 +55,11 @@ export interface DesignSpec {
   kitchenOpen?: boolean;
   // Include a front balcony with sliding glass doors on the upper level.
   balcony?: boolean;
+  // Open space (setback) left around the house on every side, in feet.
+  setbackFt?: 3 | 5;
+  // Main entrance door preference.
+  mainDoor?: MainDoorSpec;
+
 
   lifestyle: {
     familySize: number;
