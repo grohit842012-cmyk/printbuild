@@ -37,6 +37,8 @@ const ROOM_COLORS: Record<string, string> = {
   parking: "#e8b46a",
 };
 
+const FLOOR_LABELS = ["Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor"];
+
 const PUBLIC_OPEN = new Set(["living", "dining", "kitchen", "courtyard"]);
 
 interface Props {
@@ -405,8 +407,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
 }
 
 function FloorMesh({
-  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true, interior = false,
-}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean; interior?: boolean }) {
+  plate, baseY, variation, planMode, kitchenOpen, plotW, plotD, timeOfDay, showFurniture, showBalcony = true, interior = false, doorsOpen = true,
+}: { plate: FloorPlate; baseY: number; variation: Variation; planMode: string; kitchenOpen: boolean; plotW: number; plotD: number; timeOfDay: "day" | "night"; showFurniture: boolean; showBalcony?: boolean; interior?: boolean; doorsOpen?: boolean }) {
   const scheme = useMemo(
     () => interiorSchemeFor(variation.seed || 1, paletteFor(variation).accent),
     [variation],
@@ -493,7 +495,7 @@ function FloorMesh({
         </group>
       ))}
       {plate.rooms.map((r, i) => (
-        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} scheme={scheme} interior={interior} />
+        <RoomBlock key={i} room={r} plate={plate} planMode={planMode} kitchenOpen={kitchenOpen} timeOfDay={timeOfDay} showFurniture={showFurniture} scheme={scheme} interior={interior} doorsOpen={doorsOpen} />
       ))}
     </group>
   );
@@ -2112,6 +2114,7 @@ export function ModelViewer3D({
   const [mounted, setMounted] = useState(false);
   const [visibleFloor, setVisibleFloor] = useState<"all" | number>("all");
   const [interior, setInterior] = useState(false);
+  const [doorsOpen, setDoorsOpen] = useState(true);
   const move = useRef<MoveInput>({ x: 0, y: 0 });
   useEffect(() => setMounted(true), []);
 
@@ -2138,7 +2141,7 @@ export function ModelViewer3D({
       push(p.x, p.y + p.h, p.x + p.w, p.y + p.h);
       push(p.x, p.y, p.x, p.y + p.h);
       push(p.x + p.w, p.y, p.x + p.w, p.y + p.h);
-      const gap = 3.4;
+      const gap = doorsOpen ? 3.4 : 0;
       for (const r of p.rooms) {
         if (["stairs", "lift", "courtyard", "parking"].includes(r.type)) continue;
         if (isOpen(r.type, planMode, kitchenOpen)) continue;
@@ -2171,7 +2174,7 @@ export function ModelViewer3D({
       startPos: [hx, hz] as [number, number],
       walkBounds: { x1: Math.min(b1x, b2x), z1: Math.min(b1z, b2z), x2: Math.max(b1x, b2x), z2: Math.max(b1z, b2z) },
     };
-  }, [variation, walkPlate, planMode, kitchenOpen]);
+  }, [variation, walkPlate, planMode, kitchenOpen, doorsOpen]);
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
     [variation],
@@ -2194,16 +2197,22 @@ export function ModelViewer3D({
             key={p.floor}
             onClick={() => setVisibleFloor(p.floor)}
             className={`text-xs px-2 py-1 rounded ${visibleFloor === p.floor ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-          >Floor {p.floor}</button>
+          >{FLOOR_LABELS[p.floor] ?? `Floor ${p.floor}`}</button>
         ))}
+        {interior && (
+          <button
+            onClick={() => setDoorsOpen((v) => !v)}
+            className="text-xs px-2 py-1 rounded hover:bg-secondary"
+          >{doorsOpen ? "Close doors" : "Open doors"}</button>
+        )}
         <button
-          onClick={() => { setInterior((v) => !v); if (!interior && visibleFloor === "all") setVisibleFloor(0); }}
+          onClick={() => setInterior((v) => !v)}
           className={`text-xs px-2 py-1 rounded ${interior ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
         >{interior ? "Exit interior" : "Walk inside"}</button>
       </div>
       {interior && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[10px] px-2 py-1 rounded bg-background/80 border border-border text-muted-foreground">
-          WASD / arrows to walk, drag to look
+          WASD / arrows to walk, drag to look — use the floor buttons to change level
         </div>
       )}
       <Canvas
@@ -2259,12 +2268,12 @@ export function ModelViewer3D({
           ))}
           {variation.plates
             .map((plate, i) => ({ plate, i }))
-            .filter(({ plate }) => visibleFloor === "all" || plate.floor === visibleFloor)
+            .filter(({ plate }) => interior || visibleFloor === "all" || plate.floor === visibleFloor)
             .map(({ plate, i }) => (
               <FloorMesh
                 key={plate.floor}
                 plate={plate}
-                baseY={baseYs[i]}
+                baseY={interior || visibleFloor === "all" ? baseYs[i] : 0}
                 variation={variation}
                 planMode={planMode}
                 kitchenOpen={kitchenOpen}
@@ -2274,6 +2283,7 @@ export function ModelViewer3D({
                 showFurniture={showFurniture}
                 showBalcony={showBalcony}
                 interior={interior}
+                doorsOpen={doorsOpen}
               />
             ))}
           {visibleFloor === "all" && !interior && <Roof variation={variation} topY={topY} />}
