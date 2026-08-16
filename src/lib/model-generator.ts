@@ -328,7 +328,11 @@ interface FlatRoom {
 // Rule Book v2.0: corridor minimum 4.5 ft, preferred 5 ft.
 const HALLWAY_WIDTH = 5;
 
-const SETBACK = 3;
+let SETBACK = 5;
+/** Open space left around the house on every side (user preference, ft). */
+function applySetback(spec: DesignSpec) {
+  SETBACK = spec.setbackFt === 3 ? 3 : 5;
+}
 
 // Rule Book v2.0 — Parking Validation. Realistic bay sizes (ft).
 export const PARKING_DIMS = {
@@ -369,6 +373,7 @@ export interface PlotValidationIssue {
  * single room dimension against plate dims.
  */
 export function validatePlotFit(spec: DesignSpec): PlotValidationIssue[] {
+  applySetback(spec);
   const issues: PlotValidationIssue[] = [];
   const fw = spec.plot.widthFt - SETBACK * 2;
   const fh = spec.plot.depthFt - SETBACK * 2;
@@ -1257,6 +1262,7 @@ export function generateVariations(
   vastu: VastuPreferences,
   count = 10,
 ): Variation[] {
+  applySetback(spec);
   const variations: Variation[] = [];
   const baseSeed = Math.floor(Math.random() * 1_000_000);
 
@@ -1557,6 +1563,7 @@ export function generateVariations(
       vastuScore: vastuResult.score,
       vastuTier: vastuResult.tier,
       roofType: spec.roofStyle,
+      mainDoor: spec.mainDoor,
       elevationStyle,
       massingStyle,
       parking,
