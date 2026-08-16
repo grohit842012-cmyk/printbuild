@@ -166,7 +166,14 @@ export interface ParkingArea {
   bikeBays?: { x: number; y: number; w: number; h: number; count: number };
 }
 
+export interface MainDoorSpec {
+  style: "single" | "double";
+  color: string;
+  design: "flush" | "paneled" | "carved" | "glass-inlay";
+}
+
 export interface DesignDNARef {
+
   massing: string;
   facade: string;
   roof: string;
