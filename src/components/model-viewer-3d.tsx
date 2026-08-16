@@ -770,7 +770,7 @@ function RoomBlock({
   );
 }
 
-function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme }) {
+function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: number; d: number; scheme?: InteriorScheme; windowWalls?: Set<"N" | "S" | "E" | "W"> }) {
   if (["stairs", "lift", "parking", "courtyard", "utility"].includes(room.type)) return null;
   const accent = scheme?.accentWall ?? "#8a6a4a";
   const wood = <meshStandardMaterial color="#7b5637" roughness={0.62} />;
@@ -781,6 +781,21 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
   const rugMat = <meshStandardMaterial color={accent} roughness={1} />;
   const safeW = Math.max(1.2, w * 0.82);
   const safeD = Math.max(1.2, d * 0.82);
+
+  // Pick a solid wall (no door, no window) to mount tall units against, so TV
+  // units / cabinets / wardrobes sit flush on the wall and never in front of glass.
+  type Side = "N" | "S" | "E" | "W";
+  const order: Side[] = ["N", "S", "W", "E"];
+  const solidSides = order.filter((sd) => sd !== room.doorWall && !windowWalls?.has(sd));
+  const backWall: Side = solidSides[0] ?? order.find((sd) => sd !== room.doorWall) ?? "N";
+  const wallSpan = backWall === "N" || backWall === "S" ? w : d;
+  const wallPos: [number, number, number] =
+    backWall === "N" ? [0, 0, -d / 2] : backWall === "S" ? [0, 0, d / 2] : backWall === "W" ? [-w / 2, 0, 0] : [w / 2, 0, 0];
+  const wallRotY = backWall === "N" ? 0 : backWall === "S" ? Math.PI : backWall === "W" ? Math.PI / 2 : -Math.PI / 2;
+  /** Children are drawn with +z pointing into the room; z=0 is the wall face. */
+  const WallUnit = ({ children }: { children: React.ReactNode }) => (
+    <group position={wallPos} rotation={[0, wallRotY, 0]}>{children}</group>
+  );
 
   const FloorLamp = ({ x, z }: { x: number; z: number }) => (
     <group position={[x, 0, z]}>
@@ -833,13 +848,29 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
           <mesh position={[0, 0.24, 0]} castShadow receiveShadow><cylinderGeometry args={[0.42, 0.38, 0.4, 26]} />{fabric}</mesh>
           <mesh position={[0, 0.55, -0.22]} rotation={[0.18, 0, 0]} castShadow><cylinderGeometry args={[0.36, 0.36, 0.44, 26, 1, true, -Math.PI * 0.75, Math.PI * 1.5]} /><meshStandardMaterial color="#ded5c5" roughness={0.95} side={THREE.DoubleSide} /></mesh>
         </group>
+        <WallUnit>
+          {/* low TV console, back flush against the wall */}
+          <mesh position={[0, 0.26, 0.24]} castShadow receiveShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.6, 2.1), 0.52, 0.44]} />{darkWood}
+          </mesh>
+          <mesh position={[0, 1.25, 0.04]} castShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.5, 1.5), 0.86, 0.05]} />
+            <meshStandardMaterial color="#15181c" roughness={0.25} metalness={0.4} />
+          </mesh>
+          {/* tall side cabinet, also on the wall */}
+          <mesh position={[Math.min(wallSpan * 0.38, 1.5), 0.95, 0.2]} castShadow receiveShadow>
+            <boxGeometry args={[0.5, 1.9, 0.38]} />{wood}
+          </mesh>
+        </WallUnit>
         <FloorLamp x={-safeW * 0.42} z={-safeD * 0.3} />
         <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.9, safeW * 0.32)} />
       </group>
     );
   }
   if (room.type === "bedroom" || room.type === "master_bedroom") {
-    const bw = Math.min(safeW * 0.62, 1.8);
+    // Small bedrooms get a single bed (0.95 m) instead of a double (1.8 m).
+    const smallRoom = room.w < 10.5 || room.h < 10.5;
+    const bw = smallRoom ? Math.min(safeW * 0.5, 0.95) : Math.min(safeW * 0.62, 1.8);
     return (
       <group>
         <mesh position={[0, 0.026, safeD * 0.02]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -866,6 +897,17 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
             <mesh position={[0, 0.58, 0]}><cylinderGeometry args={[0.1, 0.12, 0.22, 16]} /><meshStandardMaterial color="#f6e7cd" emissive="#ffcf92" emissiveIntensity={0.7} roughness={0.9} /></mesh>
           </group>
         ))}
+        <WallUnit>
+          {/* wardrobe — full height, flush to a solid wall */}
+          <mesh position={[0, 1.1, 0.3]} castShadow receiveShadow>
+            <boxGeometry args={[Math.min(wallSpan * 0.55, 1.9), 2.2, 0.6]} />{wood}
+          </mesh>
+          {[-1, 1].map((s2) => (
+            <mesh key={s2} position={[s2 * 0.06, 1.1, 0.61]}>
+              <boxGeometry args={[0.03, 0.9, 0.03]} />{metal}
+            </mesh>
+          ))}
+        </WallUnit>
         <Art x={0} z={-safeD * 0.46} rotY={0} wSize={Math.min(0.8, safeW * 0.3)} />
       </group>
     );
@@ -874,13 +916,14 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
     return (
       <group>
         {/* run of base units with a stone worktop */}
-        <group position={[0, 0, -safeD * 0.34]}>
-          <mesh position={[0, 0.42, 0]} castShadow receiveShadow><boxGeometry args={[safeW * 0.8, 0.84, 0.6]} />{darkWood}</mesh>
-          <mesh position={[0, 0.86, 0]} castShadow><boxGeometry args={[safeW * 0.82, 0.05, 0.64]} />{stone}</mesh>
-          <mesh position={[0, 1.55, 0.02]} castShadow><boxGeometry args={[safeW * 0.6, 0.7, 0.36]} />{wood}</mesh>
-          <mesh position={[-safeW * 0.18, 0.87, 0]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
-          <mesh position={[-safeW * 0.18, 1.0, 0.16]} rotation={[0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
-        </group>
+        <WallUnit>
+          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[Math.min(wallSpan * 0.8, 3.2), 0.84, 0.6]} />{darkWood}</mesh>
+          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.82, 3.3), 0.05, 0.64]} />{stone}</mesh>
+          {/* wall cabinets hung on the wall itself */}
+          <mesh position={[0, 1.62, 0.19]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.62, 2.4), 0.7, 0.36]} />{wood}</mesh>
+          <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 0.87, 0.3]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
+          <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 1.0, 0.46]} rotation={[-0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
+        </WallUnit>
         {/* island */}
         {safeD > 2.6 && (
           <group position={[0, 0, safeD * 0.12]}>
@@ -1051,7 +1094,7 @@ function RoomWalls({ w, d, h, room, scheme, doorsOpen = true }: { w: number; d: 
         <group key={`${key}-door`} position={hingePos} rotation={[0, baseRotY - swing, 0]}>
           <mesh position={[leafLen / 2, doorH / 2, 0]} castShadow>
             <boxGeometry args={[leafLen * 0.97, doorH * 0.98, 0.045]} />
-            <meshStandardMaterial color={scheme?.doorColor ?? "#6b4a30"} roughness={0.5} />
+            <meshStandardMaterial color={"#6b4a30"} roughness={0.5} />
           </mesh>
           <mesh position={[leafLen * 0.86, doorH * 0.45, 0.05]}>
             <boxGeometry args={[0.04, 0.2, 0.03]} />
