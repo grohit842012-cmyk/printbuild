@@ -552,8 +552,22 @@ function TerraceBridges({ lower, upper, baseY, variation }: { lower: FloorPlate;
 }
 
 function RoomBlock({
-  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture, scheme, interior = false,
-}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean; scheme: InteriorScheme; interior?: boolean }) {
+  room, plate, planMode, kitchenOpen, timeOfDay, showFurniture, scheme, interior = false, doorsOpen = true,
+}: { room: RoomRect; plate: FloorPlate; planMode: string; kitchenOpen: boolean; timeOfDay: "day" | "night"; showFurniture: boolean; scheme: InteriorScheme; interior?: boolean; doorsOpen?: boolean }) {
+  // Which of the room's walls carry a window — furniture never backs onto one.
+  const windowWalls = new Set<"N" | "S" | "E" | "W">();
+  for (const o of plate.openings) {
+    if (o.kind === "door") continue;
+    const ox1 = Math.min(o.x1, o.x2), ox2 = Math.max(o.x1, o.x2);
+    const oy1 = Math.min(o.y1, o.y2), oy2 = Math.max(o.y1, o.y2);
+    const tol = 0.6;
+    const overlapX = ox2 > room.x + 0.2 && ox1 < room.x + room.w - 0.2;
+    const overlapY = oy2 > room.y + 0.2 && oy1 < room.y + room.h - 0.2;
+    if (overlapX && Math.abs(oy1 - room.y) < tol) windowWalls.add("N");
+    if (overlapX && Math.abs(oy1 - (room.y + room.h)) < tol) windowWalls.add("S");
+    if (overlapY && Math.abs(ox1 - room.x) < tol) windowWalls.add("W");
+    if (overlapY && Math.abs(ox1 - (room.x + room.w)) < tol) windowWalls.add("E");
+  }
   const localX = (room.x + room.w / 2) - (plate.x + plate.w / 2);
   const localZ = (room.y + room.h / 2) - (plate.y + plate.h / 2);
   const w = room.w * FT_TO_M;
@@ -613,7 +627,7 @@ function RoomBlock({
         </group>
       )}
       {!open && room.type !== "stairs" && room.type !== "lift" && room.type !== "parking" && (
-        <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} />
+        <RoomWalls w={w} d={d} h={h} room={room} scheme={scheme} doorsOpen={doorsOpen} />
       )}
       {/* Accent wall in the main living/sleeping spaces */}
       {interior && (room.type === "living" || room.type === "master_bedroom" || room.type === "dining") && (
@@ -622,7 +636,7 @@ function RoomBlock({
           <meshStandardMaterial color={scheme.accentWall} map={scheme.wallMap ?? undefined} roughness={0.95} />
         </mesh>
       )}
-      {showFurniture && <Furniture room={room} w={w} d={d} scheme={scheme} />}
+      {showFurniture && <Furniture room={room} w={w} d={d} scheme={scheme} windowWalls={windowWalls} />}
       {lit && !["stairs", "lift", "parking"].includes(room.type) && (
         <>
           {/* Warm ceiling downlight */}
@@ -941,7 +955,7 @@ function Furniture({ room, w, d, scheme }: { room: RoomRect; w: number; d: numbe
 }
 
 
-function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme }) {
+function RoomWalls({ w, d, h, room, scheme, doorsOpen = true }: { w: number; d: number; h: number; room: RoomRect; scheme?: InteriorScheme; doorsOpen?: boolean }) {
   const t = WALL_THICKNESS * 0.5 * FT_TO_M;
   const doorH = 7 * FT_TO_M;
   const doorW = 3 * FT_TO_M;
@@ -1024,6 +1038,26 @@ function RoomWalls({ w, d, h, room, scheme }: { w: number; d: number; h: number;
           <boxGeometry args={alongX ? [lintelLen, lintelH, t] : [t, lintelH, lintelLen]} />
           {mat}
         </mesh>,
+      );
+    }
+    // Door leaf — every room (including baths) gets a hung door that swings
+    // open/closed with the walk-through "Doors" button.
+    const leafLen = hi - lo;
+    if (leafLen > 0.02) {
+      const swing = doorsOpen ? 1.35 : 0;
+      const baseRotY = alongX ? 0 : -Math.PI / 2;
+      const hingePos: [number, number, number] = alongX ? [lo, 0, wallZ] : [wallX, 0, lo];
+      segments.push(
+        <group key={`${key}-door`} position={hingePos} rotation={[0, baseRotY - swing, 0]}>
+          <mesh position={[leafLen / 2, doorH / 2, 0]} castShadow>
+            <boxGeometry args={[leafLen * 0.97, doorH * 0.98, 0.045]} />
+            <meshStandardMaterial color={scheme?.doorColor ?? "#6b4a30"} roughness={0.5} />
+          </mesh>
+          <mesh position={[leafLen * 0.86, doorH * 0.45, 0.05]}>
+            <boxGeometry args={[0.04, 0.2, 0.03]} />
+            <meshStandardMaterial color="#c8b072" roughness={0.3} metalness={0.85} />
+          </mesh>
+        </group>,
       );
     }
     return <group key={key}>{segments}</group>;
