@@ -199,7 +199,8 @@ export interface Variation {
   vastuScore: number;
   vastuTier: "strict" | "mostly" | "partial";
   roofType: "flat" | "sloped";
-  elevationStyle: ElevationStyle;
+  mainDoor?: MainDoorSpec;
+
   massingStyle?:
     | "courtyard-cut"
     | "cantilever-front"
