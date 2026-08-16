@@ -161,7 +161,8 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   const FRAME_COLOR = new THREE.Color(palette.accent).lerp(new THREE.Color(palette.trim), 0.25).getStyle();
   const DOOR_COLOR = "#5a3a22";   // walnut
   // Window tint — leans strongly into the variation accent so every model has a distinct glass hue.
-  const GLASS_TINT = new THREE.Color(palette.accent).lerp(new THREE.Color("#a8c8e2"), 0.35).getHexString();
+  // Glass stays clear on every model — only the frames/muntins take the theme accent.
+  const GLASS_TINT = "cfe0ea";
 
   // Facade surface texture — each material family gets its own grain so the
   // exterior reads as a real built surface, not flat paint.
@@ -277,13 +278,55 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
             <meshStandardMaterial color={TRIM_COLOR} roughness={0.6} />
           </mesh>,
         );
-        const dArgs: [number, number, number] = side === "N" || side === "S" ? [segLen * 0.95, doorH * 0.98, t * 0.45] : [t * 0.45, doorH * 0.98, segLen * 0.95];
-        segments.push(
-          <mesh key={`d${key++}`} position={[lx, doorH / 2, lz]} castShadow>
-            <boxGeometry args={dArgs} />
-            <meshStandardMaterial color={DOOR_COLOR} roughness={0.45} metalness={0.05} />
-          </mesh>,
-        );
+        const spec = variation.mainDoor;
+        const doorColor = spec?.color ?? DOOR_COLOR;
+        const leaves = spec?.style === "single" ? 1 : 2;
+        const alongX = side === "N" || side === "S";
+        const leafLen = (segLen * 0.95) / leaves;
+        for (let li = 0; li < leaves; li++) {
+          const off = (li - (leaves - 1) / 2) * leafLen;
+          const dArgs: [number, number, number] = alongX
+            ? [leafLen * 0.98, doorH * 0.98, t * 0.45]
+            : [t * 0.45, doorH * 0.98, leafLen * 0.98];
+          segments.push(
+            <mesh key={`d${key++}`} position={[alongX ? lx + off : lx, doorH / 2, alongX ? lz : lz + off]} castShadow>
+              <boxGeometry args={dArgs} />
+              <meshStandardMaterial color={doorColor} roughness={spec?.design === "flush" ? 0.35 : 0.5} metalness={0.05} />
+            </mesh>,
+          );
+          // design detailing on the leaf face
+          const design = spec?.design ?? "paneled";
+          if (design !== "flush") {
+            const rows = design === "carved" ? 4 : design === "glass-inlay" ? 1 : 2;
+            for (let r = 0; r < rows; r++) {
+              const py = doorH * (0.22 + (r * 0.56) / Math.max(1, rows - 1 || 1));
+              const pw = leafLen * (design === "glass-inlay" ? 0.28 : 0.62);
+              const ph = doorH * (design === "carved" ? 0.13 : design === "glass-inlay" ? 0.5 : 0.26);
+              const pArgs: [number, number, number] = alongX ? [pw, ph, t * 0.5] : [t * 0.5, ph, pw];
+              segments.push(
+                <mesh key={`dp${key++}`} position={[alongX ? lx + off : lx, py, alongX ? lz : lz + off]}>
+                  <boxGeometry args={pArgs} />
+                  {design === "glass-inlay" ? (
+                    <meshPhysicalMaterial color="#cfe0ea" transmission={0.6} transparent opacity={0.75} roughness={0.1} />
+                  ) : (
+                    <meshStandardMaterial
+                      color={new THREE.Color(doorColor).lerp(new THREE.Color("#000000"), 0.25).getStyle()}
+                      roughness={0.6}
+                    />
+                  )}
+                </mesh>,
+              );
+            }
+          }
+          // handle
+          const hOff = leaves === 1 ? leafLen * 0.36 : (li === 0 ? leafLen * 0.38 : -leafLen * 0.38);
+          segments.push(
+            <mesh key={`dh${key++}`} position={[alongX ? lx + off + hOff : lx, doorH * 0.45, alongX ? lz : lz + off + hOff]}>
+              <boxGeometry args={alongX ? [0.05, 0.34, t * 0.62] : [t * 0.62, 0.34, 0.05]} />
+              <meshStandardMaterial color="#c8b072" roughness={0.3} metalness={0.85} />
+            </mesh>,
+          );
+        }
       } else {
         const sillH = winBot;
         const lintelH = h - winTop;
