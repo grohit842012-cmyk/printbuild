@@ -1002,17 +1002,28 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
     );
   }
   if (room.type === "bath") {
+    const vanW = Math.min(wallSpan * 0.5, 1.0);
     return (
       <group>
-        <mesh position={[-safeW * 0.25, 0.45, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[0.8, 0.86, 0.5]} />{darkWood}</mesh>
-        <mesh position={[-safeW * 0.25, 0.9, -safeD * 0.28]} castShadow><boxGeometry args={[0.86, 0.05, 0.55]} />{stone}</mesh>
-        <mesh position={[-safeW * 0.25, 0.95, -safeD * 0.28]} castShadow><cylinderGeometry args={[0.17, 0.19, 0.12, 24]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
-        <mesh position={[-safeW * 0.25, 1.55, -safeD * 0.33]}><boxGeometry args={[0.6, 0.8, 0.03]} /><meshStandardMaterial color="#dfe8ee" roughness={0.05} metalness={0.9} /></mesh>
-        <mesh position={[safeW * 0.24, 0.2, safeD * 0.2]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.4, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.15} /></mesh>
-        <mesh position={[safeW * 0.24, 0.44, safeD * 0.2]}><cylinderGeometry args={[0.2, 0.2, 0.06, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+        <WallUnit>
+          {/* vanity — carcass sits on the floor, back flush to the wall */}
+          <mesh position={[-wallSpan * 0.18, 0.43, 0.26]} castShadow receiveShadow><boxGeometry args={[vanW, 0.86, 0.5]} />{darkWood}</mesh>
+          <mesh position={[-wallSpan * 0.18, 0.88, 0.27]} castShadow><boxGeometry args={[vanW + 0.04, 0.05, 0.53]} />{stone}</mesh>
+          <mesh position={[-wallSpan * 0.18, 0.95, 0.27]} castShadow><cylinderGeometry args={[0.17, 0.19, 0.12, 24]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+          {/* mirror + tall storage cupboard, both mounted on the wall face */}
+          <mesh position={[-wallSpan * 0.18, 1.6, 0.03]}><boxGeometry args={[vanW * 0.8, 0.8, 0.03]} /><meshStandardMaterial color="#dfe8ee" roughness={0.05} metalness={0.9} /></mesh>
+          <mesh position={[wallSpan * 0.28, 0.95, 0.2]} castShadow receiveShadow><boxGeometry args={[0.42, 1.9, 0.38]} />{wood}</mesh>
+          {/* WC against the same wall */}
+          <group position={[wallSpan * 0.03, 0, 0.3]}>
+            <mesh position={[0, 0.2, 0]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.4, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.15} /></mesh>
+            <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.2, 0.2, 0.06, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+            <mesh position={[0, 0.5, -0.24]} castShadow><boxGeometry args={[0.36, 0.7, 0.16]} /><meshStandardMaterial color="#ffffff" roughness={0.25} /></mesh>
+          </group>
+        </WallUnit>
       </group>
     );
   }
+
   return null;
 }
 
