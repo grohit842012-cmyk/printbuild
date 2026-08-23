@@ -741,20 +741,68 @@ function RoomBlock({
         const landingSize: [number, number, number] = alongZ
           ? [stepWidth * 2 + sideOff * 0.5, 0.06, landingDepth]
           : [landingDepth, 0.06, stepWidth * 2 + sideOff * 0.5];
+        // Handrail along the outer edge of a flight (wall side), plus newel posts.
+        const rail = (sideSign: 1 | -1, dir: 1 | -1, baseY: number, count: number) => {
+          const runLen = count * treadAdj;
+          const midAlong = (dir === 1 ? -longDim / 2 + 0.05 : longDim / 2 - 0.05) + dir * runLen / 2;
+          const sideX = sideSign * (sideOff + stepWidth / 2 - 0.03);
+          const rise = count * riser;
+          const angle = Math.atan2(rise, runLen);
+          const len = Math.hypot(rise, runLen);
+          const px = alongZ ? sideX : midAlong;
+          const pz = alongZ ? midAlong : sideX;
+          return (
+            <group position={[px, baseY + rise / 2 + 0.92, pz]}>
+              <mesh
+                rotation={alongZ ? [dir * angle, 0, 0] : [0, 0, -dir * angle]}
+                castShadow
+              >
+                <boxGeometry args={alongZ ? [0.05, 0.05, len] : [len, 0.05, 0.05]} />
+                <meshStandardMaterial color="#4e3524" roughness={0.5} />
+              </mesh>
+            </group>
+          );
+        };
+        // Sloped stringer under each flight so the steps read as one structure.
+        const stringer = (sideSign: 1 | -1, dir: 1 | -1, baseY: number, count: number) => {
+          const runLen = count * treadAdj;
+          const midAlong = (dir === 1 ? -longDim / 2 + 0.05 : longDim / 2 - 0.05) + dir * runLen / 2;
+          const rise = count * riser;
+          const angle = Math.atan2(rise, runLen);
+          const len = Math.hypot(rise, runLen);
+          const px = alongZ ? sideSign * sideOff : midAlong;
+          const pz = alongZ ? midAlong : sideSign * sideOff;
+          return (
+            <mesh
+              position={[px, baseY + rise / 2 - 0.06, pz]}
+              rotation={alongZ ? [dir * angle, 0, 0] : [0, 0, -dir * angle]}
+              castShadow
+              receiveShadow
+            >
+              <boxGeometry args={alongZ ? [stepWidth * 0.98, 0.16, len] : [len, 0.16, stepWidth * 0.98]} />
+              <meshStandardMaterial color="#c9bda8" roughness={0.85} />
+            </mesh>
+          );
+        };
         return (
           <group>
             {/* Flight 1 — runs forward (+) on left side */}
+            {stringer(-1, 1, 0, stepsF1)}
             {renderFlight(-1, 1, 0, stepsF1)}
+            {rail(-1, 1, 0, stepsF1)}
             {/* Mid-landing at far end */}
             <mesh position={landingPos} castShadow receiveShadow>
               <boxGeometry args={landingSize} />
               <meshStandardMaterial color="#8a6a44" roughness={0.6} />
             </mesh>
             {/* Flight 2 — runs OPPOSITE direction (-) on right side, starting from landing */}
+            {stringer(1, -1, flight1TopY, stepsF2)}
             {renderFlight(1, -1, flight1TopY, stepsF2)}
+            {rail(1, -1, flight1TopY, stepsF2)}
           </group>
         );
       })()}
+
       {/* Lift cab is rendered as a single full-height shaft by <LiftShaft/>
           at the top level — nothing per-floor here. */}
       {room.type === "parking" && (
