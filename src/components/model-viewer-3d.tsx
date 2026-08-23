@@ -2323,7 +2323,7 @@ export function ModelViewer3D({
               />
             ))}
           {visibleFloor === "all" && !interior && <Roof variation={variation} topY={topY} />}
-          <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
+          <ElevationFeatures variation={variation} topY={topY} visibleFloor={interior ? "all" : visibleFloor} showBalcony={showBalcony} />
 
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
           {!interior && <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />}
