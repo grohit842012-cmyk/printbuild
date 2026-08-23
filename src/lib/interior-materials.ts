@@ -274,7 +274,7 @@ export function interiorSchemeFor(seed: number, accent: string): InteriorScheme 
   const s = Math.abs(Math.floor(seed || 1));
   const finish: FloorFinish = (["wood", "wood", "stone", "concrete"] as FloorFinish[])[s % 4];
   const [wBase, wDark] = WOODS[s % WOODS.length];
-  const wallTone = ["#f3ece1", "#efe8dd", "#f5f1e8", "#ece5d9"][s % 4];
+  const wallTone = ["#e6ddcd", "#e2d9c9", "#e9e2d4", "#ded5c4"][s % 4];
   const accentCol = new THREE.Color(accent);
   const accentWall = `#${accentCol.clone().lerp(new THREE.Color("#3a2f26"), 0.42).getHexString()}`;
   return {
@@ -288,10 +288,12 @@ export function interiorSchemeFor(seed: number, accent: string): InteriorScheme 
     floorColor: finish === "wood" ? "#ffffff" : "#ffffff",
     floorRoughness: finish === "concrete" ? 0.42 : finish === "stone" ? 0.5 : 0.55,
     wallMap: plasterTexture(wallTone, [1.6, 1.6], 12),
-    wallColor: "#ffffff",
+    // Slightly warm off-white so interiors don't blow out to pure white.
+    wallColor: "#ded8cc",
     accentWall,
-    ceilingColor: "#f7f4ee",
-    trim: "#e8dfd0",
+    ceilingColor: "#e9e4d9",
+    trim: "#ddd3c2",
     lightColor: "#ffd7a3",
   };
 }
+
