@@ -1251,11 +1251,19 @@ function ElevationFeatures({
 
         {/* Sliding-glass door set, flush on the wall behind the balcony */}
         <group position={wallPos}>
-          {/* dark recess so it reads as a real opening, not a sticker */}
-          <mesh position={[-outX * 0.09, doorH / 2, -outZ * 0.09]}>
-            <boxGeometry args={isNS ? [doorSpan, doorH, 0.14] : [0.14, doorH, doorSpan]} />
-            <meshStandardMaterial color="#1c1a17" roughness={0.95} />
+          {/* reveal jambs + head so it reads as a real opening while staying
+              see-through from inside (no solid panel across the glass) */}
+          {[-1, 1].map((s) => (
+            <mesh key={`jamb${s}`} position={add(lat(s * (doorSpan / 2 + 0.05)), [-outX * 0.07, doorH / 2, -outZ * 0.07])}>
+              <boxGeometry args={isNS ? [0.1, doorH, 0.16] : [0.16, doorH, 0.1]} />
+              <meshStandardMaterial color="#3a332b" roughness={0.95} />
+            </mesh>
+          ))}
+          <mesh position={[-outX * 0.07, doorH + 0.05, -outZ * 0.07]}>
+            <boxGeometry args={isNS ? [doorSpan + 0.2, 0.1, 0.16] : [0.16, 0.1, doorSpan + 0.2]} />
+            <meshStandardMaterial color="#3a332b" roughness={0.95} />
           </mesh>
+
           {/* outer frame */}
           <mesh position={[outX * 0.03, doorH / 2, outZ * 0.03]}>
             <boxGeometry args={isNS ? [doorSpan + 0.14, doorH + 0.12, 0.07] : [0.07, doorH + 0.12, doorSpan + 0.14]} />
