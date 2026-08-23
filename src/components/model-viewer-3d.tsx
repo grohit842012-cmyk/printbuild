@@ -689,11 +689,12 @@ function RoomBlock({
         // Run length per flight (along the long axis), leaving room for the landing at the far end.
         const longDim = alongZ ? d : w;
         const shortDim = alongZ ? w : d;
-        const landingDepth = Math.max(tread * 2.2, 0.9);
+        const landingDepth = Math.max(tread * 1.6, 0.7);
         const flightRun = Math.max(tread * 2, longDim * 0.9 - landingDepth);
-        const treadAdj = flightRun / Math.max(stepsF1, stepsF2); // shrink tread if cramped
-        const stepWidth = shortDim * 0.45;
+        const treadAdj = Math.min(tread, flightRun / Math.max(stepsF1, stepsF2)); // real tread depth, never oversized
+        const stepWidth = Math.min(shortDim * 0.24, 0.9); // ~3 ft flight width
         const sideOff = stepWidth / 2 + 0.04; // half-width gap between the two flights
+
         const treadGeom: [number, number, number] = alongZ
           ? [stepWidth, 0.04, treadAdj]
           : [treadAdj, 0.04, stepWidth];
