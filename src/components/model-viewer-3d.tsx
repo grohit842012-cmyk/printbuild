@@ -689,11 +689,12 @@ function RoomBlock({
         // Run length per flight (along the long axis), leaving room for the landing at the far end.
         const longDim = alongZ ? d : w;
         const shortDim = alongZ ? w : d;
-        const landingDepth = Math.max(tread * 2.2, 0.9);
+        const landingDepth = Math.max(tread * 1.6, 0.7);
         const flightRun = Math.max(tread * 2, longDim * 0.9 - landingDepth);
-        const treadAdj = flightRun / Math.max(stepsF1, stepsF2); // shrink tread if cramped
-        const stepWidth = shortDim * 0.45;
+        const treadAdj = Math.min(tread, flightRun / Math.max(stepsF1, stepsF2)); // real tread depth, never oversized
+        const stepWidth = Math.min(shortDim * 0.24, 0.9); // ~3 ft flight width
         const sideOff = stepWidth / 2 + 0.04; // half-width gap between the two flights
+
         const treadGeom: [number, number, number] = alongZ
           ? [stepWidth, 0.04, treadAdj]
           : [treadAdj, 0.04, stepWidth];
@@ -915,14 +916,29 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
     );
   }
   if (room.type === "kitchen") {
+    const runW = Math.min(wallSpan * 0.8, 3.2);
+    const upperW = Math.min(wallSpan * 0.62, 2.4);
     return (
       <group>
         {/* run of base units with a stone worktop */}
         <WallUnit>
-          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[Math.min(wallSpan * 0.8, 3.2), 0.84, 0.6]} />{darkWood}</mesh>
-          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.82, 3.3), 0.05, 0.64]} />{stone}</mesh>
-          {/* wall cabinets hung on the wall itself */}
-          <mesh position={[0, 1.62, 0.19]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.62, 2.4), 0.7, 0.36]} />{wood}</mesh>
+          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[runW, 0.84, 0.6]} />{darkWood}</mesh>
+          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[runW + 0.04, 0.05, 0.64]} />{stone}</mesh>
+          {/* splashback ties the worktop to the wall */}
+          <mesh position={[0, 1.1, 0.03]}><boxGeometry args={[runW, 0.44, 0.05]} />{stone}</mesh>
+          {/* wall cabinets, carried by end panels down to the splashback so they never float */}
+          <mesh position={[0, 1.67, 0.19]} castShadow><boxGeometry args={[upperW, 0.7, 0.36]} />{wood}</mesh>
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * upperW / 2, 1.4, 0.19]} castShadow>
+              <boxGeometry args={[0.04, 1.24, 0.36]} />{wood}
+            </mesh>
+          ))}
+          {/* tall pantry at one end, standing on the floor */}
+          {wallSpan > 3 && (
+            <mesh position={[runW / 2 + 0.32, 1.05, 0.3]} castShadow receiveShadow>
+              <boxGeometry args={[0.6, 2.1, 0.58]} />{wood}
+            </mesh>
+          )}
           <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 0.87, 0.3]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
           <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 1.0, 0.46]} rotation={[-0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
         </WallUnit>
@@ -936,6 +952,7 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
       </group>
     );
   }
+
   if (room.type === "dining") {
     const tw = Math.min(safeW * 0.5, 1.6);
     return (
@@ -985,17 +1002,28 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
     );
   }
   if (room.type === "bath") {
+    const vanW = Math.min(wallSpan * 0.5, 1.0);
     return (
       <group>
-        <mesh position={[-safeW * 0.25, 0.45, -safeD * 0.28]} castShadow receiveShadow><boxGeometry args={[0.8, 0.86, 0.5]} />{darkWood}</mesh>
-        <mesh position={[-safeW * 0.25, 0.9, -safeD * 0.28]} castShadow><boxGeometry args={[0.86, 0.05, 0.55]} />{stone}</mesh>
-        <mesh position={[-safeW * 0.25, 0.95, -safeD * 0.28]} castShadow><cylinderGeometry args={[0.17, 0.19, 0.12, 24]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
-        <mesh position={[-safeW * 0.25, 1.55, -safeD * 0.33]}><boxGeometry args={[0.6, 0.8, 0.03]} /><meshStandardMaterial color="#dfe8ee" roughness={0.05} metalness={0.9} /></mesh>
-        <mesh position={[safeW * 0.24, 0.2, safeD * 0.2]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.4, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.15} /></mesh>
-        <mesh position={[safeW * 0.24, 0.44, safeD * 0.2]}><cylinderGeometry args={[0.2, 0.2, 0.06, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+        <WallUnit>
+          {/* vanity — carcass sits on the floor, back flush to the wall */}
+          <mesh position={[-wallSpan * 0.18, 0.43, 0.26]} castShadow receiveShadow><boxGeometry args={[vanW, 0.86, 0.5]} />{darkWood}</mesh>
+          <mesh position={[-wallSpan * 0.18, 0.88, 0.27]} castShadow><boxGeometry args={[vanW + 0.04, 0.05, 0.53]} />{stone}</mesh>
+          <mesh position={[-wallSpan * 0.18, 0.95, 0.27]} castShadow><cylinderGeometry args={[0.17, 0.19, 0.12, 24]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+          {/* mirror + tall storage cupboard, both mounted on the wall face */}
+          <mesh position={[-wallSpan * 0.18, 1.6, 0.03]}><boxGeometry args={[vanW * 0.8, 0.8, 0.03]} /><meshStandardMaterial color="#dfe8ee" roughness={0.05} metalness={0.9} /></mesh>
+          <mesh position={[wallSpan * 0.28, 0.95, 0.2]} castShadow receiveShadow><boxGeometry args={[0.42, 1.9, 0.38]} />{wood}</mesh>
+          {/* WC against the same wall */}
+          <group position={[wallSpan * 0.03, 0, 0.3]}>
+            <mesh position={[0, 0.2, 0]} castShadow><cylinderGeometry args={[0.2, 0.18, 0.4, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.15} /></mesh>
+            <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.2, 0.2, 0.06, 20]} /><meshStandardMaterial color="#ffffff" roughness={0.2} /></mesh>
+            <mesh position={[0, 0.5, -0.24]} castShadow><boxGeometry args={[0.36, 0.7, 0.16]} /><meshStandardMaterial color="#ffffff" roughness={0.25} /></mesh>
+          </group>
+        </WallUnit>
       </group>
     );
   }
+
   return null;
 }
 
@@ -1223,11 +1251,19 @@ function ElevationFeatures({
 
         {/* Sliding-glass door set, flush on the wall behind the balcony */}
         <group position={wallPos}>
-          {/* dark recess so it reads as a real opening, not a sticker */}
-          <mesh position={[-outX * 0.09, doorH / 2, -outZ * 0.09]}>
-            <boxGeometry args={isNS ? [doorSpan, doorH, 0.14] : [0.14, doorH, doorSpan]} />
-            <meshStandardMaterial color="#1c1a17" roughness={0.95} />
+          {/* reveal jambs + head so it reads as a real opening while staying
+              see-through from inside (no solid panel across the glass) */}
+          {[-1, 1].map((s) => (
+            <mesh key={`jamb${s}`} position={add(lat(s * (doorSpan / 2 + 0.05)), [-outX * 0.07, doorH / 2, -outZ * 0.07])}>
+              <boxGeometry args={isNS ? [0.1, doorH, 0.16] : [0.16, doorH, 0.1]} />
+              <meshStandardMaterial color="#3a332b" roughness={0.95} />
+            </mesh>
+          ))}
+          <mesh position={[-outX * 0.07, doorH + 0.05, -outZ * 0.07]}>
+            <boxGeometry args={isNS ? [doorSpan + 0.2, 0.1, 0.16] : [0.16, 0.1, doorSpan + 0.2]} />
+            <meshStandardMaterial color="#3a332b" roughness={0.95} />
           </mesh>
+
           {/* outer frame */}
           <mesh position={[outX * 0.03, doorH / 2, outZ * 0.03]}>
             <boxGeometry args={isNS ? [doorSpan + 0.14, doorH + 0.12, 0.07] : [0.07, doorH + 0.12, doorSpan + 0.14]} />
@@ -2287,7 +2323,7 @@ export function ModelViewer3D({
               />
             ))}
           {visibleFloor === "all" && !interior && <Roof variation={variation} topY={topY} />}
-          <ElevationFeatures variation={variation} topY={topY} visibleFloor={visibleFloor} showBalcony={showBalcony} />
+          <ElevationFeatures variation={variation} topY={topY} visibleFloor={interior ? "all" : visibleFloor} showBalcony={showBalcony} />
 
           {visibleFloor === "all" && <LiftShaft variation={variation} />}
           {!interior && <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />}
