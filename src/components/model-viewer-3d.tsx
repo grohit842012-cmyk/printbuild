@@ -916,14 +916,29 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
     );
   }
   if (room.type === "kitchen") {
+    const runW = Math.min(wallSpan * 0.8, 3.2);
+    const upperW = Math.min(wallSpan * 0.62, 2.4);
     return (
       <group>
         {/* run of base units with a stone worktop */}
         <WallUnit>
-          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[Math.min(wallSpan * 0.8, 3.2), 0.84, 0.6]} />{darkWood}</mesh>
-          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.82, 3.3), 0.05, 0.64]} />{stone}</mesh>
-          {/* wall cabinets hung on the wall itself */}
-          <mesh position={[0, 1.62, 0.19]} castShadow><boxGeometry args={[Math.min(wallSpan * 0.62, 2.4), 0.7, 0.36]} />{wood}</mesh>
+          <mesh position={[0, 0.42, 0.31]} castShadow receiveShadow><boxGeometry args={[runW, 0.84, 0.6]} />{darkWood}</mesh>
+          <mesh position={[0, 0.86, 0.32]} castShadow><boxGeometry args={[runW + 0.04, 0.05, 0.64]} />{stone}</mesh>
+          {/* splashback ties the worktop to the wall */}
+          <mesh position={[0, 1.1, 0.03]}><boxGeometry args={[runW, 0.44, 0.05]} />{stone}</mesh>
+          {/* wall cabinets, carried by end panels down to the splashback so they never float */}
+          <mesh position={[0, 1.67, 0.19]} castShadow><boxGeometry args={[upperW, 0.7, 0.36]} />{wood}</mesh>
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * upperW / 2, 1.4, 0.19]} castShadow>
+              <boxGeometry args={[0.04, 1.24, 0.36]} />{wood}
+            </mesh>
+          ))}
+          {/* tall pantry at one end, standing on the floor */}
+          {wallSpan > 3 && (
+            <mesh position={[runW / 2 + 0.32, 1.05, 0.3]} castShadow receiveShadow>
+              <boxGeometry args={[0.6, 2.1, 0.58]} />{wood}
+            </mesh>
+          )}
           <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 0.87, 0.3]}><boxGeometry args={[0.5, 0.03, 0.4]} />{metal}</mesh>
           <mesh position={[-Math.min(wallSpan * 0.18, 0.7), 1.0, 0.46]} rotation={[-0.3, 0, 0]}><cylinderGeometry args={[0.015, 0.015, 0.3, 8]} />{metal}</mesh>
         </WallUnit>
@@ -937,6 +952,7 @@ function Furniture({ room, w, d, scheme, windowWalls }: { room: RoomRect; w: num
       </group>
     );
   }
+
   if (room.type === "dining") {
     const tw = Math.min(safeW * 0.5, 1.6);
     return (
