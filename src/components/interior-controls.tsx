@@ -5,6 +5,24 @@ import * as THREE from "three";
 /** Axis-aligned wall box in world metres (XZ footprint). */
 export interface Collider { x1: number; z1: number; x2: number; z2: number }
 
+/**
+ * A climbable switchback staircase, described in world metres. `t` runs 0→1
+ * from the bottom step to the top landing; the two flights sit either side of
+ * the short axis and run in opposite directions.
+ */
+export interface Ramp {
+  x1: number; z1: number; x2: number; z2: number;
+  alongZ: boolean;
+  /** +1 or -1: direction the first flight climbs along the long axis. */
+  dir: 1 | -1;
+  /** Which side of the short axis the first flight sits on. */
+  side1: 1 | -1;
+  yBottom: number;
+  yTop: number;
+  /** Floor the staircase starts on. */
+  floor: number;
+}
+
 /** Shared movement input, written by keyboard and the on-screen joystick. */
 export interface MoveInput { x: number; y: number }
 
@@ -18,28 +36,57 @@ function blocked(colliders: Collider[], x: number, z: number) {
   return false;
 }
 
+/** Height on the staircase at (x,z), or null when the point is off the stair. */
+function rampHeight(r: Ramp, x: number, z: number): number | null {
+  if (x < r.x1 || x > r.x2 || z < r.z1 || z > r.z2) return null;
+  const cx = (r.x1 + r.x2) / 2;
+  const cz = (r.z1 + r.z2) / 2;
+  const along = r.alongZ ? z - cz : x - cx;
+  const side = r.alongZ ? x - cx : z - cz;
+  const L = r.alongZ ? r.z2 - r.z1 : r.x2 - r.x1;
+  const p = THREE.MathUtils.clamp((along * r.dir + L / 2) / L, 0, 1);
+  const onFirst = Math.sign(side || r.side1) === r.side1;
+  const t = onFirst ? p * 0.5 : 0.5 + (1 - p) * 0.5;
+  return r.yBottom + THREE.MathUtils.clamp(t, 0, 1) * (r.yTop - r.yBottom);
+}
+
 /**
  * First-person walk-through rig: drag (or pointer-lock) to look, WASD/arrows or
  * the on-screen joystick to move, with wall collision so you cannot walk through
- * the house.
+ * the house. Staircases are climbable — walk onto one and you rise to the floor
+ * above, with that floor's walls taking over as collision.
  */
 export function FirstPersonRig({
   colliders,
+  floorColliders,
+  ramps = [],
+  baseYs = [0],
   start,
   eyeY,
+  eyeHeight = 1.65,
+  startFloor = 0,
   move,
   bounds,
+  onFloorChange,
 }: {
   colliders: Collider[];
+  /** Per-floor wall colliders; falls back to `colliders` when absent. */
+  floorColliders?: Collider[][];
+  ramps?: Ramp[];
+  baseYs?: number[];
   start: [number, number];
   eyeY: number;
+  eyeHeight?: number;
+  startFloor?: number;
   move: React.MutableRefObject<MoveInput>;
   bounds: { x1: number; z1: number; x2: number; z2: number };
+  onFloorChange?: (floor: number) => void;
 }) {
   const { camera, gl } = useThree();
   const yaw = useRef(0);
   const pitch = useRef(0);
   const pos = useRef(new THREE.Vector3(start[0], eyeY, start[1]));
+  const floorRef = useRef(startFloor);
   const keys = useRef<Record<string, boolean>>({});
   const dragging = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -48,10 +95,12 @@ export function FirstPersonRig({
 
   useEffect(() => {
     pos.current.set(start[0], eyeY, start[1]);
+    floorRef.current = startFloor;
     camera.position.copy(pos.current);
     camera.rotation.order = "YXZ";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startKey]);
+
 
   useEffect(() => {
     const el = gl.domElement;
