@@ -602,6 +602,22 @@ function planFloor(
   };
   rebalanceStairOnlySide();
 
+  // Kitchens belong in a corner of the plate (two external walls = light,
+  // extract and a service edge); the dining sits directly beside it, toward
+  // the middle of the run so it links the kitchen to the living zone.
+  const kitchenZone = order.find((o) => o.type === "kitchen");
+  if (kitchenZone) {
+    const sideMax = Math.max(...order.filter((o) => o.side === kitchenZone.side).map((o) => o.order));
+    kitchenZone.order = sideMax + 1;
+    const diningZone = order.find((o) => o.type === "dining");
+    if (diningZone) {
+      diningZone.side = kitchenZone.side;
+      diningZone.order = kitchenZone.order - 0.5;
+    }
+  }
+
+
+
   // Re-number order positions
   const left = order.filter((o) => o.side === "left").sort((a, b) => a.order - b.order);
   const right = order.filter((o) => o.side === "right").sort((a, b) => a.order - b.order);
