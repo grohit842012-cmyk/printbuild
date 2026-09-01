@@ -2409,12 +2409,18 @@ export function ModelViewer3D({
           {!interior && <ContactShadows position={[0, 0, 0]} opacity={0.55} scale={camDist * 2.5} blur={2.4} far={camDist} />}
           {interior ? (
             <FirstPersonRig
-              colliders={colliders}
+              colliders={floorColliders[walkFloor] ?? floorColliders[0] ?? []}
+              floorColliders={floorColliders}
+              ramps={ramps}
+              baseYs={baseYs}
               start={startPos}
-              eyeY={(baseYs[walkFloor] ?? 0) + 5.4 * FT_TO_M}
+              startFloor={walkFloor}
+              eyeY={(baseYs[walkFloor] ?? 0) + 1.65}
+              eyeHeight={1.65}
               move={move}
               bounds={walkBounds}
             />
+
           ) : (
             <OrbitControls
               enablePan={false}
