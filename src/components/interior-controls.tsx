@@ -156,14 +156,47 @@ export function FirstPersonRig({
     const dz = (-cos * fwd - sin * strafe) * step;
 
     const p = pos.current;
+    const fi = floorRef.current;
+    // Stair the walker is standing on right now (either the flight up from this
+    // floor, or the one coming up from the floor below).
+    const currentRamp = ramps.find(
+      (r) => (r.floor === fi || r.floor === fi - 1) && rampHeight(r, p.x, p.z) !== null,
+    );
+    const walls = currentRamp
+      ? []
+      : (floorColliders?.[fi] ?? colliders);
+
     const nx = THREE.MathUtils.clamp(p.x + dx, bounds.x1, bounds.x2);
-    if (!blocked(colliders, nx, p.z)) p.x = nx;
+    if (!blocked(walls, nx, p.z)) p.x = nx;
     const nz = THREE.MathUtils.clamp(p.z + dz, bounds.z1, bounds.z2);
-    if (!blocked(colliders, p.x, nz)) p.z = nz;
-    p.y = eyeY;
+    if (!blocked(walls, p.x, nz)) p.z = nz;
+
+    const onRamp = ramps
+      .map((r) => ({ r, y: rampHeight(r, p.x, p.z) }))
+      .filter((h) => h.y !== null && Math.abs((h.y as number) + eyeHeight - p.y) < 1.4)
+      .sort((a, b) => Math.abs((a.y as number) - p.y) - Math.abs((b.y as number) - p.y))[0];
+
+    if (onRamp) {
+      const y = onRamp.y as number;
+      p.y = y + eyeHeight;
+      const mid = (onRamp.r.yBottom + onRamp.r.yTop) / 2;
+      floorRef.current = y >= mid ? onRamp.r.floor + 1 : onRamp.r.floor;
+    } else {
+      // Snap to the nearest floor slab we are standing over.
+      let best = 0;
+      let bestD = Infinity;
+      baseYs.forEach((b, i) => {
+        const d = Math.abs(b + eyeHeight - p.y);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      floorRef.current = best;
+      p.y = baseYs[best] + eyeHeight;
+    }
+    if (onFloorChange && floorRef.current !== fi) onFloorChange(floorRef.current);
 
     camera.position.lerp(p, 0.45);
     camera.rotation.set(pitch.current, yaw.current, 0, "YXZ");
+
   });
 
   return null;
