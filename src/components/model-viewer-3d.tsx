@@ -2206,20 +2206,19 @@ export function ModelViewer3D({
   const walkFloor = typeof visibleFloor === "number" ? visibleFloor : 0;
   const walkPlate = variation.plates[walkFloor] ?? variation.plates[0];
 
-  const { colliders, startPos, walkBounds } = useMemo(() => {
+  const { floorColliders, ramps, startPos, walkBounds } = useMemo(() => {
     const toScene = makeToScene(variation.plotWidthFt, variation.plotDepthFt);
-    const list: Collider[] = [];
     const t = WALL_THICKNESS * FT_TO_M;
-    const push = (ax: number, ay: number, bx: number, by: number) => {
-      const [x1, z1] = toScene(ax, ay);
-      const [x2, z2] = toScene(bx, by);
-      list.push({
-        x1: Math.min(x1, x2) - t / 2, z1: Math.min(z1, z2) - t / 2,
-        x2: Math.max(x1, x2) + t / 2, z2: Math.max(z1, z2) + t / 2,
-      });
-    };
-    const p = walkPlate;
-    if (p) {
+    const buildFor = (p: FloorPlate) => {
+      const list: Collider[] = [];
+      const push = (ax: number, ay: number, bx: number, by: number) => {
+        const [x1, z1] = toScene(ax, ay);
+        const [x2, z2] = toScene(bx, by);
+        list.push({
+          x1: Math.min(x1, x2) - t / 2, z1: Math.min(z1, z2) - t / 2,
+          x2: Math.max(x1, x2) + t / 2, z2: Math.max(z1, z2) + t / 2,
+        });
+      };
       // Perimeter
       push(p.x, p.y, p.x + p.w, p.y);
       push(p.x, p.y + p.h, p.x + p.w, p.y + p.h);
@@ -2246,19 +2245,52 @@ export function ModelViewer3D({
           }
         }
       }
-    }
+      return list;
+    };
+    const perFloor = variation.plates.map(buildFor);
+
+    // Climbable switchback staircases, matching the rendered geometry.
+    const rampList: Ramp[] = [];
+    variation.plates.forEach((p, i) => {
+      if (i + 1 >= variation.plates.length) return;
+      const s = p.rooms.find((r) => r.type === "stairs");
+      if (!s) return;
+      const [ax, az] = toScene(s.x, s.y);
+      const [bx, bz] = toScene(s.x + s.w, s.y + s.h);
+      const x1 = Math.min(ax, bx), x2 = Math.max(ax, bx);
+      const z1 = Math.min(az, bz), z2 = Math.max(az, bz);
+      rampList.push({
+        x1, z1, x2, z2,
+        alongZ: z2 - z1 >= x2 - x1,
+        dir: 1,
+        side1: -1,
+        yBottom: i * FLOOR_HEIGHT * FT_TO_M,
+        yTop: (i + 1) * FLOOR_HEIGHT * FT_TO_M,
+        floor: i,
+      });
+    });
+
+    const p = walkPlate;
     const home = p?.rooms.find((r) => r.type === "living") ?? p?.rooms.find((r) => !["stairs", "lift", "parking"].includes(r.type)) ?? p?.rooms[0];
     const [hx, hz] = home
       ? toScene(home.x + home.w / 2, home.y + home.h / 2)
       : toScene(variation.plotWidthFt / 2, variation.plotDepthFt / 2);
-    const [b1x, b1z] = p ? toScene(p.x + 1, p.y + 1) : [-5, -5];
-    const [b2x, b2z] = p ? toScene(p.x + p.w - 1, p.y + p.h - 1) : [5, 5];
+    // Bounds cover every floor plate so you can walk upstairs into a bigger/
+    // smaller footprint without being clamped out of the building.
+    const minX = Math.min(...variation.plates.map((q) => q.x));
+    const minY = Math.min(...variation.plates.map((q) => q.y));
+    const maxX = Math.max(...variation.plates.map((q) => q.x + q.w));
+    const maxY = Math.max(...variation.plates.map((q) => q.y + q.h));
+    const [b1x, b1z] = toScene(minX + 1, minY + 1);
+    const [b2x, b2z] = toScene(maxX - 1, maxY - 1);
     return {
-      colliders: list,
+      floorColliders: perFloor,
+      ramps: rampList,
       startPos: [hx, hz] as [number, number],
       walkBounds: { x1: Math.min(b1x, b2x), z1: Math.min(b1z, b2z), x2: Math.max(b1x, b2x), z2: Math.max(b1z, b2z) },
     };
   }, [variation, walkPlate, planMode, kitchenOpen, doorsOpen]);
+
   const baseYs = useMemo(
     () => variation.plates.map((_, i) => i * FLOOR_HEIGHT * FT_TO_M),
     [variation],
