@@ -14,7 +14,7 @@ import {
   pavingTexture,
   type InteriorScheme,
 } from "@/lib/interior-materials";
-import { FirstPersonRig, TouchJoystick, type Collider, type MoveInput } from "@/components/interior-controls";
+import { FirstPersonRig, TouchJoystick, type Collider, type MoveInput, type Ramp } from "@/components/interior-controls";
 
 
 const FLOOR_HEIGHT = 10; // ft
