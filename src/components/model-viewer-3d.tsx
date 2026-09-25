@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Environment, ContactShadows, Sky } from "@react-three/drei";
+import { OrbitControls, Environment, ContactShadows, Sky, Lightformer } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useState, useRef, Suspense, type ReactElement } from "react";
 import * as THREE from "three";
@@ -12,6 +12,7 @@ import {
   concreteTexture,
   grassTexture,
   pavingTexture,
+  roofTexture,
   type InteriorScheme,
 } from "@/lib/interior-materials";
 import { FirstPersonRig, TouchJoystick, type Collider, type MoveInput, type Ramp } from "@/components/interior-controls";
@@ -394,6 +395,21 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
             <meshStandardMaterial color={FRAME_COLOR} roughness={0.5} metalness={0.15} />
           </mesh>,
         );
+        // Deep side reveals make the glazing sit inside the masonry instead
+        // of reading as a flat coloured patch pasted onto the facade.
+        const revealDepth = t * 1.45;
+        const jambArgs: [number, number, number] = side === "N" || side === "S"
+          ? [0.09, winTop - winBot, revealDepth]
+          : [revealDepth, winTop - winBot, 0.09];
+        const lateral = segLen * 0.46;
+        for (const sign of [-1, 1]) {
+          segments.push(
+            <mesh key={`wj${key++}`} position={[side === "N" || side === "S" ? lx + sign * lateral : lx, (winTop + winBot) / 2, side === "E" || side === "W" ? lz + sign * lateral : lz]} castShadow>
+              <boxGeometry args={jambArgs} />
+              <meshStandardMaterial color={FRAME_COLOR} roughness={0.48} metalness={0.12} />
+            </mesh>,
+          );
+        }
       }
     }
   };
@@ -404,6 +420,94 @@ function PerimeterWalls({ plate, variation, timeOfDay = "day", showBalcony = tru
   buildSide("E", plate.h, plate.w);
 
   return <group>{segments}</group>;
+}
+
+/** Construction details shared by every elevation: a grounded stone plinth,
+ * crisp slab shadow lines and a sheltered entrance sized from the real door. */
+function ExteriorArchitecturalDetails({ plate, variation }: { plate: FloorPlate; variation: Variation }) {
+  const palette = paletteFor(variation);
+  const w = plate.w * FT_TO_M;
+  const d = plate.h * FT_TO_M;
+  const h = FLOOR_HEIGHT * FT_TO_M;
+  const isGround = plate.floor === 0;
+  const entry = isGround ? plate.entranceDoor : undefined;
+  const cx = plate.x + plate.w / 2;
+  const cz = plate.y + plate.h / 2;
+  const stone = stoneTexture("#8f877a", [3.4, 1]);
+
+  let portal: ReactElement | null = null;
+  if (entry) {
+    const mx = ((entry.x1 + entry.x2) / 2 - cx) * FT_TO_M;
+    const mz = ((entry.y1 + entry.y2) / 2 - cz) * FT_TO_M;
+    const side = entranceWall(variation);
+    const isNS = side === "N" || side === "S";
+    const outX = side === "E" ? 1 : side === "W" ? -1 : 0;
+    const outZ = side === "S" ? 1 : side === "N" ? -1 : 0;
+    const doorW = Math.max(1.05, entry.width * FT_TO_M);
+    const portalW = doorW + 0.75;
+    const portalH = 2.65;
+    const depth = 0.95;
+    const lateral = (v: number): [number, number, number] => isNS ? [v, 0, 0] : [0, 0, v];
+    const base: [number, number, number] = [mx + outX * depth * 0.42, 0, mz + outZ * depth * 0.42];
+    portal = (
+      <group position={base}>
+        {[-1, 1].map((sign) => {
+          const p = lateral(sign * portalW / 2);
+          return (
+            <mesh key={sign} position={[p[0], portalH / 2, p[2]]} castShadow receiveShadow>
+              <boxGeometry args={isNS ? [0.18, portalH, depth] : [depth, portalH, 0.18]} />
+              <meshStandardMaterial color={palette.trim} roughness={0.82} />
+            </mesh>
+          );
+        })}
+        <mesh position={[0, portalH, 0]} castShadow receiveShadow>
+          <boxGeometry args={isNS ? [portalW + 0.2, 0.18, depth + 0.25] : [depth + 0.25, 0.18, portalW + 0.2]} />
+          <meshStandardMaterial color={palette.accent} roughness={0.68} metalness={palette.material === "corten" ? 0.28 : 0.04} />
+        </mesh>
+        {[0, 1, 2].map((step) => (
+          <mesh key={step} position={[outX * (depth * 0.65 + step * 0.22), 0.035 + step * 0.045, outZ * (depth * 0.65 + step * 0.22)]} castShadow receiveShadow>
+            <boxGeometry args={isNS ? [portalW * (1.12 - step * 0.05), 0.08, 0.42] : [0.42, 0.08, portalW * (1.12 - step * 0.05)]} />
+            <meshStandardMaterial color="#aaa195" map={stone ?? undefined} roughness={0.88} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  return (
+    <group>
+      {/* Fine slab bands create believable floor junctions and shadow lines. */}
+      {[[0, -d / 2], [0, d / 2]].map(([x, z], i) => (
+        <mesh key={`datum-ns-${i}`} position={[x, h - 0.055, z]} castShadow>
+          <boxGeometry args={[w + 0.14, 0.11, 0.12]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.7} />
+        </mesh>
+      ))}
+      {[[-w / 2, 0], [w / 2, 0]].map(([x, z], i) => (
+        <mesh key={`datum-ew-${i}`} position={[x, h - 0.055, z]} castShadow>
+          <boxGeometry args={[0.12, 0.11, d + 0.14]} />
+          <meshStandardMaterial color={palette.trim} roughness={0.7} />
+        </mesh>
+      ))}
+      {isGround && (
+        <>
+          {[[0, -d / 2 - 0.035], [0, d / 2 + 0.035]].map(([x, z], i) => (
+            <mesh key={`plinth-ns-${i}`} position={[x, 0.23, z]} castShadow receiveShadow>
+              <boxGeometry args={[w + 0.18, 0.46, 0.14]} />
+              <meshStandardMaterial color="#a39a8d" map={stone ?? undefined} roughness={0.94} />
+            </mesh>
+          ))}
+          {[[-w / 2 - 0.035, 0], [w / 2 + 0.035, 0]].map(([x, z], i) => (
+            <mesh key={`plinth-ew-${i}`} position={[x, 0.23, z]} castShadow receiveShadow>
+              <boxGeometry args={[0.14, 0.46, d + 0.18]} />
+              <meshStandardMaterial color="#a39a8d" map={stone ?? undefined} roughness={0.94} />
+            </mesh>
+          ))}
+        </>
+      )}
+      {portal}
+    </group>
+  );
 }
 
 function FloorMesh({
@@ -486,6 +590,7 @@ function FloorMesh({
         <meshStandardMaterial color="#e2e8f0" roughness={0.9} />
       </mesh>
       <PerimeterWalls plate={plate} variation={variation} timeOfDay={timeOfDay} showBalcony={showBalcony} />
+      <ExteriorArchitecturalDetails plate={plate} variation={variation} />
       {curvedCorners.map((c, i) => (
         <group key={`curve-${i}`} position={[c.x, (FLOOR_HEIGHT * FT_TO_M) / 2, c.z]}>
           <mesh castShadow receiveShadow>
@@ -1248,7 +1353,7 @@ function ElevationFeatures({
     // Visible in "All" view and in the balcony floor's own floor-wise view.
     if (!allFloors && visibleFloor !== spec.plate.floor) return null;
     const { isNS, plate, level, spanFt, depthFt, doorSpanFt } = spec;
-    const baseY = level * FLOOR_HEIGHT * FT_TO_M;
+    const baseY = allFloors ? level * FLOOR_HEIGHT * FT_TO_M : 0;
 
     // offset = depth/2 → the slab's inner edge sits exactly on the wall plane.
     const feat = sidePosition(variation, plate, front, depthFt / 2, spanFt, depthFt);
@@ -1534,6 +1639,8 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
   const palette = paletteFor(variation);
   const TRIM = palette.trim;
   const massing = variation.massingStyle ?? "pergola-terrace";
+  const roofKind = variation.roofType === "sloped" || massing === "gabled-house" ? "tile" : massing.includes("butterfly") || massing.includes("slope") ? "seam" : "membrane";
+  const roofMap = roofTexture(roofKind, palette.roof);
 
   if (massing === "gabled-house") {
     const ridgeH = Math.min(w, d) * 0.32;
@@ -1541,11 +1648,11 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
       <group position={center}>
         <mesh position={[0, 0.08 + ridgeH / 2, -d * 0.18]} rotation={[0.38, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[w + 0.75, 0.16, d * 0.62]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.65} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.72} />
         </mesh>
         <mesh position={[0, 0.08 + ridgeH / 2, d * 0.18]} rotation={[-0.38, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[w + 0.75, 0.16, d * 0.62]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.65} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.72} />
         </mesh>
       </group>
     );
@@ -1565,11 +1672,11 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         </mesh>
         <mesh position={[-w * 0.28, lift * 0.92, 0]} rotation={[0, 0, -0.3]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.62, 0.18, d + 0.85]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.7} />
         </mesh>
         <mesh position={[w * 0.28, lift * 0.92, 0]} rotation={[0, 0, 0.3]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.62, 0.18, d + 0.85]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.7} />
         </mesh>
         <mesh position={[0, lift * 0.62, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.24, 0.2, d + 0.95]} />
@@ -1589,7 +1696,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         </mesh>
         <mesh position={[0, lift * 0.72, 0]} rotation={[0, 0, 0.2]} castShadow receiveShadow>
           <boxGeometry args={[w + 0.9, 0.2, d + 0.8]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.7} />
         </mesh>
         <mesh position={[-w * 0.42, lift * 0.52, 0]} castShadow receiveShadow>
           <boxGeometry args={[0.24, lift * 0.7, d + 0.55]} />
@@ -1604,7 +1711,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
       <group position={center}>
         <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[w + 0.45, 0.2, d + 0.45]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.8} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.82} />
         </mesh>
         <mesh position={[0, 0.55, -d / 2 - 0.1]} castShadow><boxGeometry args={[w + 0.65, 0.78, 0.25]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
         <mesh position={[0, 0.55, d / 2 + 0.1]} castShadow><boxGeometry args={[w + 0.65, 0.78, 0.25]} /><meshStandardMaterial color={TRIM} roughness={0.7} /></mesh>
@@ -1649,11 +1756,11 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         {/* The two roof slabs of the butterfly V */}
         <mesh position={[-w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, -0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.7} />
         </mesh>
         <mesh position={[w * 0.24, lift / 2 + lift * 0.35, 0]} rotation={[0, 0, 0.22]} castShadow receiveShadow>
           <boxGeometry args={[w * 0.56, 0.18, d + 0.7]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.68} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.7} />
         </mesh>
         {/* Central ridge trim */}
         <mesh position={[0, lift * 0.35 + 0.05, 0]} castShadow receiveShadow>
@@ -1678,7 +1785,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
         {/* terracotta hipped roof */}
         <mesh position={[0, 0.1 + ridgeH / 2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
           <coneGeometry args={[Math.max(w, d) * 0.62, ridgeH, 4]} />
-          <meshStandardMaterial color={palette.roof} roughness={0.65} />
+          <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.74} />
         </mesh>
       </group>
     );
@@ -1690,7 +1797,7 @@ function Roof({ variation, topY }: { variation: Variation; topY: number }) {
     <group position={center}>
       <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
         <boxGeometry args={[w + 0.4, 0.2, d + 0.4]} />
-        <meshStandardMaterial color={palette.roof} roughness={0.8} />
+        <meshStandardMaterial color="#ffffff" map={roofMap ?? undefined} roughness={0.82} />
       </mesh>
       <mesh position={[0, 0.5, -d / 2 - 0.1]} castShadow>
         <boxGeometry args={[w + 0.6, 0.7, 0.25]} />
@@ -1978,6 +2085,10 @@ function Plot({ variation }: { variation: Variation }) {
   };
   const half = { w: w / 2 + 1.2, d: d / 2 + 1.2 };
   const outer = { w: w / 2 + 5, d: d / 2 + 5 };
+  const front = entranceWall(variation);
+  const approachNS = front === "N" || front === "S";
+  const approachX = front === "E" ? w / 2 + 2.5 : front === "W" ? -w / 2 - 2.5 : 0;
+  const approachZ = front === "S" ? d / 2 + 2.5 : front === "N" ? -d / 2 - 2.5 : 0;
   for (let i = 0; i < 14; i++) {
     const side = i % 4;
     const t = rand(i * 3 + 1);
@@ -2001,11 +2112,24 @@ function Plot({ variation }: { variation: Variation }) {
         <planeGeometry args={[w + 2.2, d + 2.2]} />
         <meshStandardMaterial color="#cfc8ba" map={pavingTexture("#cfc8ba", [8, 8]) ?? undefined} roughness={0.85} />
       </mesh>
-      {/* Driveway */}
-      <mesh position={[0, -0.088, d / 2 + 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w * 0.55, 5]} />
+      {/* Driveway and front path follow the actual entrance orientation. */}
+      <mesh position={[approachX, -0.088, approachZ]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={approachNS ? [Math.min(w * 0.55, 5.2), 5.2] : [5.2, Math.min(d * 0.55, 5.2)]} />
         <meshStandardMaterial color="#b6ada0" map={pavingTexture("#b6ada0", [4, 6]) ?? undefined} roughness={0.9} />
       </mesh>
+      {/* Low site kerb grounds the plot without turning it into a closed compound. */}
+      {[[0, -d / 2 - 0.72, w + 1.6, 0.14], [0, d / 2 + 0.72, w + 1.6, 0.14]].map(([x, z, kw, kd], i) => (
+        <mesh key={`kerb-ns-${i}`} position={[x, 0.04, z]} castShadow receiveShadow>
+          <boxGeometry args={[kw, 0.16, kd]} />
+          <meshStandardMaterial color="#9c9387" roughness={0.92} />
+        </mesh>
+      ))}
+      {[[-w / 2 - 0.72, 0, 0.14, d + 1.6], [w / 2 + 0.72, 0, 0.14, d + 1.6]].map(([x, z, kw, kd], i) => (
+        <mesh key={`kerb-ew-${i}`} position={[x, 0.04, z]} castShadow receiveShadow>
+          <boxGeometry args={[kw, 0.16, kd]} />
+          <meshStandardMaterial color="#9c9387" roughness={0.92} />
+        </mesh>
+      ))}
       {/* Ground shrubs / hedge dabs for realism */}
       {Array.from({ length: 22 }).map((_, i) => {
         const a = rand(i * 11 + 100) * Math.PI * 2;
@@ -2338,7 +2462,7 @@ export function ModelViewer3D({
         gl={{ antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.15;
+          gl.toneMappingExposure = 0.96;
         }}
       >
         <Suspense fallback={null}>
@@ -2354,11 +2478,11 @@ export function ModelViewer3D({
             mieDirectionalG={0.8}
           />
           <fog attach="fog" args={["#dfe8ee", camDist * 3, camDist * 8]} />
-          <ambientLight intensity={0.7} color="#ffffff" />
+          <hemisphereLight args={["#dcecff", "#7f765f", 0.58]} />
           {/* Sun */}
           <directionalLight
             position={[-camDist * 0.8, camDist * 1.4, camDist * 0.6]}
-            intensity={1.4}
+            intensity={1.75}
             color="#fff5e0"
             castShadow
             shadow-mapSize={[2048, 2048]}
@@ -2366,10 +2490,16 @@ export function ModelViewer3D({
             shadow-camera-right={camDist}
             shadow-camera-top={camDist}
             shadow-camera-bottom={-camDist}
+            shadow-bias={-0.00015}
+            shadow-normalBias={0.035}
           />
           {/* Cool fill from opposite side */}
-          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.55} color="#e8f0ff" />
-          <Environment preset="park" />
+          <directionalLight position={[camDist, camDist * 0.7, -camDist * 0.6]} intensity={0.28} color="#dce8f5" />
+          <Environment resolution={128}>
+            <Lightformer intensity={2.2} color="#fff4df" position={[-8, 12, 8]} scale={[10, 10, 1]} />
+            <Lightformer intensity={1.1} color="#c9dcf0" position={[8, 5, -8]} rotation-y={Math.PI} scale={[12, 5, 1]} />
+            <Lightformer intensity={0.65} color="#d9ccb0" position={[0, 1, 10]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
+          </Environment>
 
           <Plot variation={variation} />
           <ParkingArea variation={variation} />
